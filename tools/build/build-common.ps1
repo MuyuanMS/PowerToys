@@ -30,25 +30,40 @@ solution or project file name without its extension, or the directory name for a
 Do not execute this file directly; dot-source it from `build.ps1` or `build-installer.ps1` so helpers are available in your script scope.
 #>
 
+function Resolve-BuildInputPath {
+    param (
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+
+    $workingPath = [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $Path))
+    if (Test-Path -LiteralPath $workingPath) {
+        return $workingPath
+    }
+
+    if ($script:RepoRoot) {
+        return [System.IO.Path]::GetFullPath((Join-Path $script:RepoRoot $Path))
+    }
+
+    return $workingPath
+}
+
 function Get-LogRepoRoot {
     param (
         [string]$Solution
     )
 
-    # Use the repo/worktree that contains the project being built (first ancestor with PowerToys.slnx),
-    # so builds in another clone don't write logs into the clone whose tools\build scripts ran.
-    # Relative paths are resolved against $script:RepoRoot because msbuild runs from there.
     $fallback = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
     if (-not $Solution) { return $fallback }
 
     try {
-        $fullPath = $Solution
-        if (-not [System.IO.Path]::IsPathRooted($fullPath)) {
-            $base = $script:RepoRoot
-            if (-not $base) { $base = (Get-Location).Path }
-            $fullPath = Join-Path $base $fullPath
-        }
-        $dir = Split-Path ([System.IO.Path]::GetFullPath($fullPath)) -Parent
+        $fullPath = Resolve-BuildInputPath $Solution
+        $item = Get-Item -LiteralPath $fullPath -ErrorAction Stop
+        $dir = if ($item.PSIsContainer) { $item.FullName } else { $item.DirectoryName }
         while ($dir) {
             if (Test-Path -LiteralPath (Join-Path $dir 'PowerToys.slnx') -PathType Leaf) {
                 return $dir
@@ -75,23 +90,19 @@ function RunMSBuild {
     # Logs go to <repo>\artifacts\logs\<project name>\, not the project folder: the context-menu
     # projects run MakeAppx on their own folder before compiling, and MSBuild's open log files
     # there make it fail with 0x80070020 (file in use).
-    $normalizedSolution = $Solution.TrimEnd([char[]]@(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar
-    ))
-    $projectPath = $normalizedSolution
-    if (-not [System.IO.Path]::IsPathRooted($projectPath)) {
-        $base = $script:RepoRoot
-        if (-not $base) { $base = (Get-Location).Path }
-        $projectPath = Join-Path $base $projectPath
-    }
-    $projectName = if (Test-Path -LiteralPath $projectPath -PathType Container) {
-        [System.IO.Path]::GetFileName($normalizedSolution)
+    $resolvedSolution = Resolve-BuildInputPath $Solution
+    $item = Get-Item -LiteralPath $resolvedSolution -ErrorAction SilentlyContinue
+    $projectName = if ($item -and $item.PSIsContainer) {
+        $item.Name
     } else {
-        [System.IO.Path]::GetFileNameWithoutExtension($normalizedSolution)
+        [System.IO.Path]::GetFileNameWithoutExtension($resolvedSolution)
     }
     if ([string]::IsNullOrWhiteSpace($projectName)) {
-        $projectName = [System.IO.Path]::GetFileName($normalizedSolution)
+        $projectName = [System.IO.Path]::GetFileName($resolvedSolution)
+    }
+    if ([string]::IsNullOrWhiteSpace($projectName) -and
+        (Test-Path -LiteralPath (Join-Path $resolvedSolution 'PowerToys.slnx') -PathType Leaf)) {
+        $projectName = 'PowerToys'
     }
     if ([string]::IsNullOrWhiteSpace($projectName)) {
         throw "Cannot determine a project name from '$Solution'."
@@ -113,7 +124,7 @@ function RunMSBuild {
     $binLog = Join-Path $logRoot ("build.{0}.{1}.trace.binlog" -f $cfg, $plat)
 
     $base = @(
-        $Solution
+        $resolvedSolution
         "/p:Platform=$Platform"
         "/p:Configuration=$Configuration"
         "/verbosity:normal"

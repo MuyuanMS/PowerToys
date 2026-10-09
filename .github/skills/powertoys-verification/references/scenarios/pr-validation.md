@@ -136,8 +136,8 @@ tools\build\build.ps1 -Platform x64 -Configuration Release  # run from the chang
 ```
 
 **Exit code 0 = success (absolute).** On non-zero, read `build.<config>.<platform>.errors.log` in
-`artifacts\logs\<project>\` at the repo root. If the toolchain is missing (VS 2022 17.4+/2026,
-Windows SDK) and the build can't complete → **BLOCKED (`BLK-ENV`)** — never PASS on an unbuilt PR.
+`artifacts\logs\<project>\` at the repo root. If the toolchain is missing (Visual Studio 2022 17.4+
+or Visual Studio 2026, Windows SDK) and the build can't complete → **BLOCKED (`BLK-ENV`)** — never PASS on an unbuilt PR.
 
 > **Partial build ⇒ missing-module dialogs are EXPECTED.** A module-specific build produces only
 > *your* module, so the build-output runner pops a modal **"Failed to load PowerToys.<Module>ModuleInterface.dll"**
