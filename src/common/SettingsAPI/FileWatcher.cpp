@@ -11,7 +11,7 @@ namespace
         {
             // Match std::ifstream sharing. A rename notification can arrive while
             // the publisher still holds DELETE access to the replacement file.
-            wil::unique_hfile file(CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
+            wil::unique_hfile file(CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr));
             if (file)
             {
                 return file;
