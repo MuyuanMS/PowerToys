@@ -131,6 +131,7 @@ public class MouseButtonLockSettingsTests : UITestBase
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);
 
         var group = Session.Find<Element>(By.AccessibilityId(GroupId), 10_000);
+        group.ScrollIntoView();
         Assert.IsTrue(group.Displayed, "Mouse Button Lock settings group was not visible.");
 
         MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, false);
@@ -245,6 +246,7 @@ public class MouseButtonLockSettingsTests : UITestBase
     {
         MouseUtilsTestHelper.NavigateToMouseUtilities(this);
         MouseUtilsTestHelper.SetModuleEnabled(this, ModuleToggleId, true);
+        Session.Find<Element>(By.AccessibilityId(GroupId), 5_000).ScrollIntoView();
 
         if (!Session.Has(By.AccessibilityId(LmbLockId), 500))
         {
