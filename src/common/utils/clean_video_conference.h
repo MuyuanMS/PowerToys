@@ -23,10 +23,12 @@ bool clean_video_conference()
     // 31AD75E9-8C3A-49C8-B9ED-5880D6B4A732 is the CLSID GUID for the 32 video conference mute driver.
     // 860BB310-5D01-11D0-BD3B-00A0C911CE86 is the CLSID GUID for CLSID_VideoInputDeviceCategory.
 
-    // Unregister the 64 bit driver CLSID:
-    delete_tree(HKEY_CLASSES_ROOT, L"HKCR", L"CLSID\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A764}");
+    // Delete both registrations explicitly because HKCR is a merged view of HKCU and HKLM.
+    delete_tree(HKEY_CURRENT_USER, L"HKCU", L"Software\\Classes\\CLSID\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A764}");
+    delete_tree(HKEY_LOCAL_MACHINE, L"HKLM", L"Software\\Classes\\CLSID\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A764}");
     // Unregister the 64 bit driver CLSID from Video Input Devices:
-    delete_tree(HKEY_CLASSES_ROOT, L"HKCR", L"CLSID\\{860BB310-5D01-11D0-BD3B-00A0C911CE86}\\Instance\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A764}");
+    delete_tree(HKEY_CURRENT_USER, L"HKCU", L"Software\\Classes\\CLSID\\{860BB310-5D01-11D0-BD3B-00A0C911CE86}\\Instance\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A764}");
+    delete_tree(HKEY_LOCAL_MACHINE, L"HKLM", L"Software\\Classes\\CLSID\\{860BB310-5D01-11D0-BD3B-00A0C911CE86}\\Instance\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A764}");
     // Unregister the 32 bit driver CLSID:
     delete_tree(HKEY_LOCAL_MACHINE, L"HKLM", L"Software\\WOW6432Node\\Classes\\CLSID\\{31AD75E9-8C3A-49C8-B9ED-5880D6B4A732}");
     // Unregister the 32 bit driver CLSID from Video Input Devices:
