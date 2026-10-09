@@ -2,7 +2,7 @@
 
 #include <common/logger/logger.h>
 
-// Video Conference Mute was a utility we deprecated. However, this required a manual user disable of the module to remove the camera registration, so we include the disable code here to be able to clean up.
+// Video Conference Mute was deprecated, but its camera registration could remain after an older installation, so we include the registry cleanup here.
 bool clean_video_conference()
 {
     bool succeeded = true;

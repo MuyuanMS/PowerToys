@@ -66,20 +66,20 @@ namespace
     const wchar_t PT_URI_PROTOCOL_SCHEME[] = L"powertoys://";
     const wchar_t POWER_TOYS_MODULE_LOAD_FAIL[] = L"Failed to load "; // Module name will be appended on this message and it is not localized.
 
-    const wchar_t POWERTOYS_REGISTRY_KEY[] = L"Software\\Microsoft\\PowerToys";
+    const wchar_t POWER_TOYS_REGISTRY_KEY[] = L"Software\\Microsoft\\PowerToys";
     const wchar_t VIDEO_CONFERENCE_CLEANUP_DONE_VALUE[] = L"VideoConferenceMuteCleanupDone";
 
     bool is_video_conference_cleanup_done()
     {
         DWORD value = 0;
         DWORD size = sizeof(value);
-        return RegGetValueW(HKEY_CURRENT_USER, POWERTOYS_REGISTRY_KEY, VIDEO_CONFERENCE_CLEANUP_DONE_VALUE, RRF_RT_REG_DWORD, nullptr, &value, &size) == ERROR_SUCCESS && value == 1;
+        return RegGetValueW(HKEY_CURRENT_USER, POWER_TOYS_REGISTRY_KEY, VIDEO_CONFERENCE_CLEANUP_DONE_VALUE, RRF_RT_REG_DWORD, nullptr, &value, &size) == ERROR_SUCCESS && value == 1;
     }
 
     void mark_video_conference_cleanup_done()
     {
         const DWORD value = 1;
-        const LSTATUS result = RegSetKeyValueW(HKEY_CURRENT_USER, POWERTOYS_REGISTRY_KEY, VIDEO_CONFERENCE_CLEANUP_DONE_VALUE, REG_DWORD, &value, sizeof(value));
+        const LSTATUS result = RegSetKeyValueW(HKEY_CURRENT_USER, POWER_TOYS_REGISTRY_KEY, VIDEO_CONFERENCE_CLEANUP_DONE_VALUE, REG_DWORD, &value, sizeof(value));
         if (result != ERROR_SUCCESS)
         {
             Logger::warn(L"Failed to record Video Conference Mute cleanup marker, error: {}", result);
