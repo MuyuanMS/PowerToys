@@ -23,14 +23,12 @@ namespace MouseJump.Common.Capture;
 /// <see cref="AddCaptureTasks"/> isn't safe to call concurrently with itself or with
 /// <see cref="DisposeAsync"/> - it's expected to be called once per device, from one thread,
 /// before disposal. Waiting for completion and disposal are deliberately separate concerns:
-/// <see cref="WaitForCompletionAsync"/> is the synchronization point for capture failures, while
-/// <see cref="DisposeAsync"/> waits internally so it doesn't dispose a provider still in use and
-/// surfaces aggregated capture and disposal failures after every provider has had a chance to
-/// dispose.
+/// <see cref="WaitForCompletionAsync"/> is the synchronization point (and where failures
+/// surface), while <see cref="DisposeAsync"/> is just resource cleanup - it waits internally so
+/// it doesn't dispose a provider still in use, but never throws and doesn't imply cancellation.
 /// Ownership of each <see cref="IScreenshotCaptureProvider"/> passed to
 /// <see cref="AddCaptureTasks"/> transfers to this pipeline: <see cref="DisposeAsync"/> disposes
-/// every one of them (if disposable). Capture and disposal failures are aggregated and
-/// surfaced after every provider has had a chance to dispose.
+/// every one of them (if disposable).
 /// </remarks>
 public sealed class ScreenshotCapturePipeline : IAsyncDisposable
 {
@@ -120,31 +118,19 @@ public sealed class ScreenshotCapturePipeline : IAsyncDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        var exceptions = new List<Exception>();
         try
         {
             await this.WaitForCompletionAsync().ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch
         {
-            exceptions.Add(ex);
+            // already the caller's to observe via WaitForCompletionAsync if they want it -
+            // disposal itself shouldn't throw
         }
 
         foreach (var provider in this.providers.OfType<IDisposable>())
         {
-            try
-            {
-                provider.Dispose();
-            }
-            catch (Exception ex)
-            {
-                exceptions.Add(ex);
-            }
-        }
-
-        if (exceptions.Count > 0)
-        {
-            throw new AggregateException("One or more screenshot pipeline operations failed.", exceptions);
+            provider.Dispose();
         }
     }
 

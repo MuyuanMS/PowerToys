@@ -11,7 +11,7 @@ namespace MouseJump.Common.Telemetry;
 /// </summary>
 public static class Telemetry
 {
-    private static TelemetryContext current = TelemetryContext.Create(nameof(Telemetry));
+    private static TelemetryContext? current;
 
     /// <summary>
     /// Gets the ambient <see cref="TelemetryContext"/> for the whole process - defaults to one
@@ -23,10 +23,8 @@ public static class Telemetry
     /// but discards everything" writer, if that's ever preferable to just not starting.
     /// </summary>
     public static TelemetryContext Current
-        => Volatile.Read(ref Telemetry.current);
+        => Telemetry.current ??= TelemetryContext.Create(nameof(Telemetry));
 
     public static void SetCurrent(TelemetryContext context)
-        => Interlocked.Exchange(
-            ref Telemetry.current,
-            context ?? throw new ArgumentNullException(nameof(context)));
+        => Telemetry.current = context ?? throw new ArgumentNullException(nameof(context));
 }
