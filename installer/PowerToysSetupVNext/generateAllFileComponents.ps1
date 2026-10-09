@@ -156,25 +156,32 @@ Function Generate-FileComponents() {
     )
 
     $wxsFile = Get-Content $wxsFilePath;
+    $installPath = $null
+    $fileList = $null
+    $installPathFound = $false
+    $fileListFound = $false
 
-    $wxsFile | ForEach-Object {
-        if ($_ -match "(<?define $($fileListName)Path=)(.*)\?>") {
-            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'installPath',
-            Justification = 'variable is used after the pipeline')]
-
+    foreach ($line in $wxsFile) {
+        if ($line -match "(<?define $($fileListName)Path=)(.*)\?>") {
             $installPath = $matches[2]
-            return $_
+            $installPathFound = $true
+            continue
         }
-        if ($_ -match "(<?define $fileListName=)(.*)\?>") {
-            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'fileList',
-            Justification = 'variable is used in another scope')]
 
+        if ($line -match "(<?define $fileListName=)(.*)\?>") {
             $fileList = $matches[2] -split ';' | Where-Object { $_ -ne '' }
-            return
+            $fileListFound = $true
         }
     }
 
-    if ($null -eq $fileList -or $fileList.Count -eq 0) {
+    if (-not $installPathFound) {
+        throw "Expected WiX preprocessor define '<?define $($fileListName)Path=...?>' was not found in '$wxsFilePath'."
+    }
+    if (-not $fileListFound) {
+        throw "Expected WiX preprocessor define '<?define $($fileListName)=...?>' was not found in '$wxsFilePath'."
+    }
+
+    if ($fileList.Count -eq 0) {
         # No files to generate components for — leave placeholder intact
         return
     }
