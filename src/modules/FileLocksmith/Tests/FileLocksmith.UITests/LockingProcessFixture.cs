@@ -203,10 +203,12 @@ internal sealed class LockingProcessFixture : IDisposable
     /// A holder marks itself ready only after the open succeeds, and records why it could not.
     /// </summary>
     private string BuildHolderCommand() =>
-        "try { $handle = [IO.File]::Open('" + TargetPath + "', 'Open', 'Read', 'Read') } " +
-        "catch { $_.Exception.ToString() | Set-Content '" + HolderErrorLogPath + "'; exit 1 } " +
-        "New-Item -ItemType File -Force -Path ('" + RootFolder + "\\ready-' + $PID + '.marker') | Out-Null; " +
+        "try { $handle = [IO.File]::Open('" + EscapePowerShellSingleQuoted(TargetPath) + "', 'Open', 'Read', 'Read') } " +
+        "catch { $_.Exception.ToString() | Set-Content '" + EscapePowerShellSingleQuoted(HolderErrorLogPath) + "'; exit 1 } " +
+        "New-Item -ItemType File -Force -Path ('" + EscapePowerShellSingleQuoted(RootFolder) + "\\ready-' + $PID + '.marker') | Out-Null; " +
         "Start-Sleep -Seconds 900";
+
+    private static string EscapePowerShellSingleQuoted(string value) => value.Replace("'", "''");
 
     private int ReadyHolderCount => processes.Count(process =>
         !HasExited(process) && File.Exists(Path.Combine(RootFolder, $"ready-{process.Id}.marker")));
