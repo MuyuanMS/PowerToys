@@ -273,9 +273,11 @@ namespace MouseWithoutBorders.Class
 
             void GenerateNewKey();
 
-            Task ConnectToMachineAsync(string machineName, string securityKey);
+            Task ConnectToMachineAsync(string machineName, string securityKey, Guid attemptId);
 
-            Task RestorePreviousConnectionAsync();
+            Task RestorePreviousConnectionAsync(Guid attemptId);
+
+            Task CompleteConnectionAsync(Guid attemptId);
 
             Task<MachineSocketState[]> RequestMachineSocketStateAsync();
         }
@@ -284,14 +286,17 @@ namespace MouseWithoutBorders.Class
         {
             private readonly MachineInf[] machines;
 
-            internal ConnectionSnapshot(string securityKey, string[] matrix, MachinePool pool)
+            internal ConnectionSnapshot(string securityKey, string[] matrix, MachinePool pool, Guid attemptId)
             {
+                AttemptId = attemptId;
                 SecurityKey = securityKey;
                 MachineMatrix = (string[])matrix.Clone();
                 machines = pool.ListAllMachines().ToArray();
             }
 
             internal string SecurityKey { get; }
+
+            internal Guid AttemptId { get; }
 
             internal string[] MachineMatrix { get; }
 
@@ -327,11 +332,11 @@ namespace MouseWithoutBorders.Class
                 return Task.FromResult(machineStates.Select((state) => new ISettingsSyncHelper.MachineSocketState { Name = state.Key, Status = state.Value }).ToArray());
             }
 
-            public Task ConnectToMachineAsync(string pcName, string securityKey)
+            public Task ConnectToMachineAsync(string pcName, string securityKey, Guid attemptId)
             {
                 lock (ConnectionSnapshotLock)
                 {
-                    previousConnection = new ConnectionSnapshot(Setting.Values.MyKey, MachineStuff.MachineMatrix, MachineStuff.MachinePool);
+                    previousConnection = new ConnectionSnapshot(Setting.Values.MyKey, MachineStuff.MachineMatrix, MachineStuff.MachinePool, attemptId);
                     Setting.Values.PauseInstantSaving = true;
                     try
                     {
@@ -360,13 +365,13 @@ namespace MouseWithoutBorders.Class
                 return Task.CompletedTask;
             }
 
-            public Task RestorePreviousConnectionAsync()
+            public Task RestorePreviousConnectionAsync(Guid attemptId)
             {
                 lock (ConnectionSnapshotLock)
                 {
-                    if (previousConnection == null)
+                    if (previousConnection == null || previousConnection.AttemptId != attemptId)
                     {
-                        throw new InvalidOperationException("No previous connection configuration is available to restore.");
+                        throw new InvalidOperationException("No matching connection attempt is available to restore.");
                     }
 
                     Setting.Values.PauseInstantSaving = true;
@@ -391,6 +396,20 @@ namespace MouseWithoutBorders.Class
 
                     previousConnection = null;
 
+                    return Task.CompletedTask;
+                }
+            }
+
+            public Task CompleteConnectionAsync(Guid attemptId)
+            {
+                lock (ConnectionSnapshotLock)
+                {
+                    if (previousConnection == null || previousConnection.AttemptId != attemptId)
+                    {
+                        throw new InvalidOperationException("No matching connection attempt is available to complete.");
+                    }
+
+                    previousConnection = null;
                     return Task.CompletedTask;
                 }
             }

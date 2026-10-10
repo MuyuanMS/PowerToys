@@ -33,6 +33,10 @@ public sealed class IpcSerializationCompatibilityTests
 
         Assert.AreEqual(typeof(Task), contract!.GetMethod("ConnectToMachineAsync")!.ReturnType);
         Assert.AreEqual(typeof(Task), contract.GetMethod("RestorePreviousConnectionAsync")!.ReturnType);
+        Assert.AreEqual(typeof(Task), contract.GetMethod("CompleteConnectionAsync")!.ReturnType);
+        Assert.AreEqual(typeof(Guid), contract.GetMethod("ConnectToMachineAsync")!.GetParameters()[2].ParameterType);
+        Assert.AreEqual(typeof(Guid), contract.GetMethod("RestorePreviousConnectionAsync")!.GetParameters()[0].ParameterType);
+        Assert.AreEqual(typeof(Guid), contract.GetMethod("CompleteConnectionAsync")!.GetParameters()[0].ParameterType);
     }
 
     [TestMethod]
@@ -43,7 +47,8 @@ public sealed class IpcSerializationCompatibilityTests
         pool.Initialize(originalNames);
         pool.TryUpdateMachineID("REMOTE", (ID)1, false);
         var matrix = new[] { "REMOTE", "LOCAL", string.Empty, string.Empty };
-        var snapshot = new Program.ConnectionSnapshot("previous-key", matrix, pool);
+        var attemptId = Guid.NewGuid();
+        var snapshot = new Program.ConnectionSnapshot("previous-key", matrix, pool, attemptId);
 
         matrix[0] = "OTHER";
         var attemptedNames = new[] { "OTHER", "LOCAL" };
@@ -51,9 +56,42 @@ public sealed class IpcSerializationCompatibilityTests
         snapshot.RestoreMachinePool(pool);
 
         Assert.AreEqual("previous-key", snapshot.SecurityKey);
+        Assert.AreEqual(attemptId, snapshot.AttemptId);
         Assert.AreEqual("REMOTE", snapshot.MachineMatrix[0]);
         Assert.IsTrue(pool.TryFindMachineByName("REMOTE", out var restored));
         Assert.AreEqual((ID)1, restored.Id);
         Assert.IsFalse(pool.TryFindMachineByName("OTHER", out _));
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public void ConnectionCompletionAndRollbackRequireTheMatchingAttempt()
+    {
+        var helperType = typeof(Program).GetNestedType("SettingsSyncHelper", BindingFlags.NonPublic)!;
+        var snapshotField = helperType.GetField("previousConnection", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var helper = Activator.CreateInstance(helperType, nonPublic: true);
+        var attemptId = Guid.NewGuid();
+        var snapshot = new Program.ConnectionSnapshot("previous-key", new string[4], new MachinePool(), attemptId);
+        var previousSnapshot = snapshotField.GetValue(null);
+
+        try
+        {
+            snapshotField.SetValue(null, snapshot);
+            foreach (var methodName in new[] { "RestorePreviousConnectionAsync", "CompleteConnectionAsync" })
+            {
+                var exception = Assert.ThrowsException<TargetInvocationException>(() =>
+                    helperType.GetMethod(methodName)!.Invoke(helper, new object[] { Guid.NewGuid() }));
+                Assert.IsInstanceOfType<InvalidOperationException>(exception.InnerException);
+                Assert.AreSame(snapshot, snapshotField.GetValue(null));
+            }
+
+            var completion = (Task)helperType.GetMethod("CompleteConnectionAsync")!.Invoke(helper, new object[] { attemptId })!;
+            Assert.IsTrue(completion.IsCompletedSuccessfully);
+            Assert.IsNull(snapshotField.GetValue(null));
+        }
+        finally
+        {
+            snapshotField.SetValue(null, previousSnapshot);
+        }
     }
 }
