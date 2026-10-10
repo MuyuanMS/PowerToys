@@ -10,6 +10,7 @@
 #include <common/Telemetry/EtwTrace/EtwTrace.h>
 
 #include <WorkspacesLib/JsonUtils.h>
+#include <WorkspacesLib/WorkspaceStore.h>
 #include <WorkspacesLib/utils.h>
 
 #include <Launcher.h>
@@ -175,6 +176,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     }
 
     // prepare project in advance
+    const auto originalProject = WorkspacesData::WorkspacesProjectJSON::ToJson(projectToLaunch);
     auto installedApps = Utils::Apps::GetAppsList();
     bool updatedApps = Utils::Apps::UpdateWorkspacesApps(projectToLaunch, installedApps);
     bool updatedIds = false;
@@ -192,16 +194,11 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     // update the file before launching, so WorkspacesWindowArranger and WorkspacesLauncherUI could get updated app paths
     if (updatedApps || updatedIds)
     {
-        for (int i = 0; i < workspaces.size(); i++)
-        {
-            if (workspaces[i].id == projectToLaunch.id)
-            {
-                workspaces[i] = projectToLaunch;
-                break;
-            }
-        }
-
-        json::to_file(WorkspacesData::WorkspacesFile(), WorkspacesData::WorkspacesListJSON::ToJson(workspaces));
+        const auto result = WorkspaceStore::UpdateApplicationMetadata(WorkspacesData::WorkspacesFile(),
+                                                                      originalProject,
+                                                                      WorkspacesData::WorkspacesProjectJSON::ToJson(projectToLaunch));
+        if (result != WorkspaceStore::UpdateResult::Updated)
+            Logger::warn("Updated workspace application metadata could not be saved without overwriting concurrent changes");
     }
 
     // launch
