@@ -29,6 +29,7 @@ namespace Awake.Core
             Year,
             Hour,
             Minute,
+            Second,
             AmPm,
         }
 
@@ -290,6 +291,7 @@ namespace Awake.Core
                     'y' => PickerField.Year,
                     'h' or 'H' => PickerField.Hour,
                     'm' => PickerField.Minute,
+                    's' => PickerField.Second,
                     't' => PickerField.AmPm,
                     _ => null,
                 };
@@ -489,6 +491,7 @@ namespace Awake.Core
             {
                 PickerField.Hour => TimeSpan.FromHours(1),
                 PickerField.Minute => TimeSpan.FromMinutes(1),
+                PickerField.Second => TimeSpan.FromSeconds(1),
                 PickerField.AmPm => TimeSpan.FromHours(12),
                 _ => TimeSpan.Zero,
             };
@@ -519,6 +522,7 @@ namespace Awake.Core
                 : stepped.Hour - probe.Hour == 12 ? PickerField.AmPm
                 : stepped.Hour != probe.Hour ? PickerField.Hour
                 : stepped.Minute != probe.Minute ? PickerField.Minute
+                : stepped.Second != probe.Second ? PickerField.Second
                 : null;
         }
 
@@ -567,7 +571,8 @@ namespace Awake.Core
             Bridge.SendMessage(Bridge.GetDlgItem(hDlg, DatePickerId), Native.Constants.DTM_GETSYSTEMTIME, 0, ref date);
             Bridge.SendMessage(Bridge.GetDlgItem(hDlg, TimePickerId), Native.Constants.DTM_GETSYSTEMTIME, 0, ref time);
 
-            return new DateTime(date.Year, date.Month, date.Day, time.Hour, time.Minute, 0, DateTimeKind.Local);
+            int second = _timeFields.Contains(PickerField.Second) ? time.Second : 0;
+            return new DateTime(date.Year, date.Month, date.Day, time.Hour, time.Minute, second, DateTimeKind.Local);
         }
 
         private static void WritePickers(IntPtr hDlg, DateTime value)
