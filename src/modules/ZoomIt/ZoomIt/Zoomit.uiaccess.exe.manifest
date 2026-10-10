@@ -7,7 +7,7 @@
         version="1.0.0.0"
         type="win32"
         processorArchitecture="*"/>
-    <description>Sysinternals Zoomit</description>
+    <description>Sysinternals ZoomIt</description>
     <dependency>
         <dependentAssembly>
             <assemblyIdentity
