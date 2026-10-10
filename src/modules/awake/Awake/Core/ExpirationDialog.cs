@@ -38,6 +38,8 @@ namespace Awake.Core
         // Keeps date arithmetic and the conversion to DateTimeOffset clear of DateTime.MaxValue.
         private static readonly DateTime LatestExpiration = new(9998, 12, 31, 23, 59, 0);
 
+        private static int PickerProbeYear => Math.Min(DateTime.Today.Year + 1, LatestExpiration.Year);
+
         // Kept in fields so the delegates are not collected while the dialog is open.
         private static readonly Bridge.DialogProcDelegate DialogProcInstance = DialogProc;
         private static readonly Bridge.SubclassProcDelegate PickerSubclassProcInstance = PickerSubclassProc;
@@ -195,7 +197,7 @@ namespace Awake.Core
             _timeFields = FieldOrder(SetPaddedFormat(timePicker, Native.Constants.LOCALE_SSHORTTIME, padEnd: true));
 
             // Widest value (two-digit fields, PM), next year's to stay within the range.
-            WritePickers(hDlg, new DateTime(DateTime.Today.Year + 1, 12, 28, 22, 58, 0));
+            WritePickers(hDlg, new DateTime(PickerProbeYear, 12, 28, 22, 58, 0));
             FitPickers(hDlg, datePicker, timePicker);
 
             WritePickers(hDlg, _suggestion.LocalDateTime);
@@ -509,7 +511,7 @@ namespace Awake.Core
         {
             SystemTime value = default;
             Bridge.SendMessage(picker, Native.Constants.DTM_GETSYSTEMTIME, 0, ref value);
-            SystemTime probe = SystemTime.FromDateTime(new DateTime(DateTime.Today.Year + 1, 6, 15, 10, 30, 0));
+            SystemTime probe = SystemTime.FromDateTime(new DateTime(PickerProbeYear, 6, 15, 10, 30, 0));
             SystemTime stepped = probe;
             Bridge.SendMessage(picker, Native.Constants.DTM_SETSYSTEMTIME, Native.Constants.GDT_VALID, ref probe);
             Bridge.SendMessage(picker, Native.Constants.WM_KEYDOWN, Native.Constants.VK_UP, 0);
