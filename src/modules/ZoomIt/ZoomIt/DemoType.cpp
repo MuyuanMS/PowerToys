@@ -303,6 +303,8 @@ void SendKeyInput( const WORD vK, const wchar_t ch, const bool keyup = false )
         return;
     }
 
+    PushInjection( vK, ch );
+
     INPUT input = {0};
     input.type = INPUT_KEYBOARD;
 
@@ -345,7 +347,6 @@ void SendKeyInput( const WORD vK, const wchar_t ch, const bool keyup = false )
 //----------------------------------------------------------------------------
 void SendUnicodeKeyDown( const wchar_t ch )
 {
-    PushInjection( NULL, ch );
     SendKeyInput ( NULL, ch );
 }
 
@@ -356,7 +357,6 @@ void SendUnicodeKeyDown( const wchar_t ch )
 //----------------------------------------------------------------------------
 void SendUnicodeKeyUp( const wchar_t ch )
 {
-    PushInjection( NULL, ch );
     SendKeyInput ( NULL, ch, true );
 }
 
@@ -367,7 +367,6 @@ void SendUnicodeKeyUp( const wchar_t ch )
 //----------------------------------------------------------------------------
 void SendVirtualKeyDown( const WORD vK )
 {
-    PushInjection( vK, NULL );
     SendKeyInput ( vK, NULL );
 }
 
@@ -378,7 +377,6 @@ void SendVirtualKeyDown( const WORD vK )
 //----------------------------------------------------------------------------
 void SendVirtualKeyUp( const WORD vK )
 {
-    PushInjection( vK, NULL );
     SendKeyInput ( vK, NULL, true );
 }
 
