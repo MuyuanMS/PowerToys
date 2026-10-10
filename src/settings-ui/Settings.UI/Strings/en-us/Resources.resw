@@ -345,13 +345,13 @@
     <value>Couldn't find a device with that name on the network. Check that the device name is correct.</value>
   </data>
   <data name="MouseWithoutBorders_ConnectErrorTimeout" xml:space="preserve">
-    <value>The remote device didn't respond in time. Check the device name, that Mouse Without Borders is running there, the network connection, and firewall settings, then try again.</value>
+    <value>The remote device didn't respond in time. Check the device name, that MouseWithoutBorders is running there, the network connection, and firewall settings, then try again.</value>
   </data>
   <data name="MouseWithoutBorders_ConnectErrorGeneric" xml:space="preserve">
     <value>Couldn't reach the remote device. Check the security key, device name, and network connection, then try again.</value>
   </data>
   <data name="MouseWithoutBorders_ConnectErrorModuleUnreachable" xml:space="preserve">
-    <value>The Mouse Without Borders module on this PC isn't responding, so the remote device was never contacted. Make sure Mouse Without Borders is enabled and running on this PC, then try again.</value>
+    <value>The MouseWithoutBorders module on this PC isn't responding, so the remote device was never contacted. Make sure MouseWithoutBorders is enabled and running on this PC, then try again.</value>
   </data>
   <data name="MouseWithoutBorders_ConnectErrorModuleDisconnected" xml:space="preserve">
     <value>The Mouse Without Borders module stopped responding during the connection attempt. Check that it is running, and verify the connection settings before trying again.</value>
