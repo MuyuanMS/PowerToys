@@ -163,15 +163,7 @@ DWORD GetInputIntegrityLimit()
 //----------------------------------------------------------------------------
 bool IsForegroundAboveOurIntegrity()
 {
-    static HWND lastHwnd = nullptr;
-    static bool lastResult = false;
-
     const HWND hwnd = GetForegroundWindow();
-    if( hwnd == lastHwnd )
-    {
-        return lastResult;
-    }
-
     static const DWORD ourLevel = GetInputIntegrityLimit();
     DWORD targetLevel = 0;
     DWORD pid = 0;
@@ -183,9 +175,7 @@ bool IsForegroundAboveOurIntegrity()
         CloseHandle( hProcess );
     }
 
-    lastHwnd = hwnd;
-    lastResult = targetLevel == 0 || ourLevel == 0 || targetLevel > ourLevel;
-    return lastResult;
+    return targetLevel == 0 || ourLevel == 0 || targetLevel > ourLevel;
 }
 
 //----------------------------------------------------------------------------
