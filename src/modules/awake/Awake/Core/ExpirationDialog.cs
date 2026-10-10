@@ -67,7 +67,11 @@ namespace Awake.Core
                 DwSize = (uint)Marshal.SizeOf<InitCommonControlsEx>(),
                 DwIcc = Native.Constants.ICC_DATE_CLASSES,
             };
-            Bridge.InitCommonControlsEx(ref controls);
+            if (!Bridge.InitCommonControlsEx(ref controls))
+            {
+                Logger.LogError("Failed to initialize common controls for the expiration dialog.");
+                return false;
+            }
 
             _suggestion = suggestion;
             _wheelTarget = IntPtr.Zero;
