@@ -273,13 +273,44 @@ namespace MouseWithoutBorders.Class
 
             void GenerateNewKey();
 
-            void ConnectToMachine(string machineName, string securityKey);
+            Task ConnectToMachineAsync(string machineName, string securityKey, Guid attemptId);
+
+            Task RestorePreviousConnectionAsync(Guid attemptId);
+
+            Task CompleteConnectionAsync(Guid attemptId);
 
             Task<MachineSocketState[]> RequestMachineSocketStateAsync();
         }
 
+        internal sealed class ConnectionSnapshot
+        {
+            private readonly MachineInf[] machines;
+
+            internal ConnectionSnapshot(string securityKey, string[] matrix, MachinePool pool, Guid attemptId)
+            {
+                AttemptId = attemptId;
+                SecurityKey = securityKey;
+                MachineMatrix = (string[])matrix.Clone();
+                machines = pool.ListAllMachines().ToArray();
+            }
+
+            internal string SecurityKey { get; }
+
+            internal Guid AttemptId { get; }
+
+            internal string[] MachineMatrix { get; }
+
+            internal void RestoreMachinePool(MachinePool pool)
+            {
+                pool.Initialize(machines);
+            }
+        }
+
         private sealed class SettingsSyncHelper : ISettingsSyncHelper
         {
+            private static readonly object ConnectionSnapshotLock = new();
+            private static ConnectionSnapshot previousConnection;
+
             public Task<ISettingsSyncHelper.MachineSocketState[]> RequestMachineSocketStateAsync()
             {
                 var machineStates = new Dictionary<string, SocketStatus>();
@@ -301,27 +332,86 @@ namespace MouseWithoutBorders.Class
                 return Task.FromResult(machineStates.Select((state) => new ISettingsSyncHelper.MachineSocketState { Name = state.Key, Status = state.Value }).ToArray());
             }
 
-            public void ConnectToMachine(string pcName, string securityKey)
+            public Task ConnectToMachineAsync(string pcName, string securityKey, Guid attemptId)
             {
-                Setting.Values.PauseInstantSaving = true;
+                lock (ConnectionSnapshotLock)
+                {
+                    previousConnection = new ConnectionSnapshot(Setting.Values.MyKey, MachineStuff.MachineMatrix, MachineStuff.MachinePool, attemptId);
+                    Setting.Values.PauseInstantSaving = true;
+                    try
+                    {
+                        MachineStuff.ClearComputerMatrix();
+                        Setting.Values.MyKey = securityKey;
+                        Encryption.MyKey = securityKey;
+                        Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
+                        MachineStuff.MachineMatrix = new string[MachineStuff.MAX_MACHINE] { pcName.Trim().ToUpper(CultureInfo.CurrentCulture), Common.MachineName.Trim(), string.Empty, string.Empty };
 
-                MachineStuff.ClearComputerMatrix();
-                Setting.Values.MyKey = securityKey;
-                Encryption.MyKey = securityKey;
-                Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
-                MachineStuff.MachineMatrix = new string[MachineStuff.MAX_MACHINE] { pcName.Trim().ToUpper(CultureInfo.CurrentCulture), Common.MachineName.Trim(), string.Empty, string.Empty };
+                        string[] machines = MachineStuff.MachineMatrix;
+                        MachineStuff.MachinePool.Initialize(machines);
+                        MachineStuff.UpdateMachinePoolStringSetting();
 
-                string[] machines = MachineStuff.MachineMatrix;
-                MachineStuff.MachinePool.Initialize(machines);
-                MachineStuff.UpdateMachinePoolStringSetting();
+                        SocketStuff.InvalidKeyFound = false;
+                        InitAndCleanup.ReopenSocketDueToReadError = true;
+                        Common.ReopenSockets(true);
+                        MachineStuff.SendMachineMatrix();
+                    }
+                    finally
+                    {
+                        Setting.Values.PauseInstantSaving = false;
+                        Setting.Values.SaveSettings();
+                    }
+                }
 
-                SocketStuff.InvalidKeyFound = false;
-                InitAndCleanup.ReopenSocketDueToReadError = true;
-                Common.ReopenSockets(true);
-                MachineStuff.SendMachineMatrix();
+                return Task.CompletedTask;
+            }
 
-                Setting.Values.PauseInstantSaving = false;
-                Setting.Values.SaveSettings();
+            public Task RestorePreviousConnectionAsync(Guid attemptId)
+            {
+                lock (ConnectionSnapshotLock)
+                {
+                    if (previousConnection == null || previousConnection.AttemptId != attemptId)
+                    {
+                        throw new InvalidOperationException("No matching connection attempt is available to restore.");
+                    }
+
+                    Setting.Values.PauseInstantSaving = true;
+                    try
+                    {
+                        Setting.Values.MyKey = previousConnection.SecurityKey;
+                        Encryption.MyKey = previousConnection.SecurityKey;
+                        Encryption.MagicNumber = Encryption.Get24BitHash(Encryption.MyKey);
+                        MachineStuff.MachineMatrix = (string[])previousConnection.MachineMatrix.Clone();
+                        previousConnection.RestoreMachinePool(MachineStuff.MachinePool);
+                        MachineStuff.UpdateMachinePoolStringSetting();
+                        SocketStuff.InvalidKeyFound = false;
+                        InitAndCleanup.ReopenSocketDueToReadError = true;
+                        Common.ReopenSockets(true);
+                        MachineStuff.SendMachineMatrix();
+                    }
+                    finally
+                    {
+                        Setting.Values.PauseInstantSaving = false;
+                        Setting.Values.SaveSettings();
+                    }
+
+                    previousConnection = null;
+
+                    return Task.CompletedTask;
+                }
+            }
+
+            public Task CompleteConnectionAsync(Guid attemptId)
+            {
+                lock (ConnectionSnapshotLock)
+                {
+                    if (previousConnection == null || previousConnection.AttemptId != attemptId)
+                    {
+                        throw new InvalidOperationException("No matching connection attempt is available to complete.");
+                    }
+
+                    previousConnection = null;
+                    return Task.CompletedTask;
+                }
             }
 
             public void GenerateNewKey()
