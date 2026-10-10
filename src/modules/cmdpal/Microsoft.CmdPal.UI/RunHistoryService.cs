@@ -5,7 +5,6 @@
 using System.Collections.Immutable;
 using Microsoft.CmdPal.Common.Services;
 using Microsoft.CmdPal.Ext.Run;
-using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 
@@ -24,11 +23,22 @@ internal sealed class RunHistoryService : IRunHistoryService
     {
         if (_appStateService.State.RunHistory.IsEmpty)
         {
-            var history = WindowsRunHistory.Read();
+            var history = Microsoft.Terminal.UI.RunHistory.CreateRunHistory();
+
+            // Copy the WinRT-projected IVector<string> into a plain List<string>
+            // before building the ImmutableList. ImmutableList.CreateRange tries to
+            // cast the source to IReadOnlyCollection<string>, which requires a WinRT
+            // helper type that isn't available in AOT builds and throws
+            // NotSupportedException.
+            var historyList = new List<string>(history.Count);
+            for (var i = 0; i < history.Count; i++)
+            {
+                historyList.Add(history[i]);
+            }
 
             _appStateService.UpdateState(state => state with
             {
-                RunHistory = history.ToImmutableList(),
+                RunHistory = historyList.ToImmutableList(),
             });
         }
 

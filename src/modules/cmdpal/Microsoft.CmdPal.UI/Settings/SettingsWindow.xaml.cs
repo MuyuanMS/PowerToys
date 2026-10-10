@@ -674,7 +674,7 @@ public sealed partial class SettingsWindow : WindowEx,
                     return;
                 }
 
-                _settingsTargetHighlighter.Highlight(target, true);
+                _settingsTargetHighlighter.Highlight(target, !_settingsService.Settings.DisableAnimations);
             }
             else
             {

@@ -35,8 +35,6 @@ namespace Microsoft.CmdPal.UI.Dock;
 
 public sealed partial class DockControl : UserControl, IRecipient<EnterDockEditModeMessage>, IRecipient<ExitDockEditModeMessage>, IRecipient<CrossMonitorBandDropMessage>
 {
-    private static readonly TimeSpan DropTimeout = TimeSpan.FromSeconds(3);
-
     private readonly ContextMenuHost _menuHost;
 
     private DockViewModel _viewModel;
@@ -972,8 +970,6 @@ public sealed partial class DockControl : UserControl, IRecipient<EnterDockEditM
 
         e.Handled = true;
 
-        using var timeout = new CancellationTokenSource(DropTimeout);
-        var deferral = e.GetDeferral();
         try
         {
             var bookmarksManager = App.Current.Services.GetService<IBookmarksManager>();
@@ -983,10 +979,10 @@ public sealed partial class DockControl : UserControl, IRecipient<EnterDockEditM
                 return;
             }
 
+            var foundItem = false;
             if (hasStorageItems)
             {
-                var items = await e.DataView.GetStorageItemsAsync().AsTask().WaitAsync(timeout.Token);
-                var bookmarks = new List<(string Name, string Target)>();
+                var items = await e.DataView.GetStorageItemsAsync();
                 foreach (var item in items)
                 {
                     var path = item.Path;
@@ -995,42 +991,28 @@ public sealed partial class DockControl : UserControl, IRecipient<EnterDockEditM
                         continue;
                     }
 
-                    bookmarks.Add(await DockDropHelper.GetBookmarkAsync(path, timeout.Token));
+                    var name = Path.GetFileNameWithoutExtension(path);
+                    AddBookmarkAndPinToDock(bookmarksManager, name, path);
+                    foundItem = true;
                 }
+            }
 
-                timeout.Token.ThrowIfCancellationRequested();
-                foreach (var (name, target) in bookmarks)
-                {
-                    AddBookmarkAndPinToDock(bookmarksManager, name, target);
-                }
-
-                if (bookmarks.Count > 0)
-                {
-                    return;
-                }
+            if (foundItem)
+            {
+                return;
             }
 
             if (hasUri)
             {
-                var uri = await e.DataView.GetUriAsync().AsTask().WaitAsync(timeout.Token);
-                timeout.Token.ThrowIfCancellationRequested();
+                var uri = await e.DataView.GetUriAsync();
                 var url = uri.AbsoluteUri;
                 var name = uri.Host;
                 AddBookmarkAndPinToDock(bookmarksManager, name, url);
             }
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            Logger.LogWarning("[DockDrop] Timed out resolving dropped items");
-            WeakReferenceMessenger.Default.Send(new ShowToastMessage(RS_.GetString("Dock_Drop_TimedOut")));
-        }
         catch (Exception ex)
         {
             Logger.LogError("[DockDrop] Error handling file drop on dock", ex);
-        }
-        finally
-        {
-            deferral.Complete();
         }
     }
 

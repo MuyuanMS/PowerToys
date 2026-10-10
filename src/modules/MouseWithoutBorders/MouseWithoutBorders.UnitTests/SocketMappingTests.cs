@@ -50,7 +50,7 @@ public sealed class SocketMappingTests
     }
 
     [TestMethod]
-    public void MappingSelectionRequiresAtLeastOneConfiguredSource()
+    public void UserMappingsAreSelectedWithoutPolicyMappings()
     {
         Assert.IsFalse(SocketStuff.HasName2IpMappings(string.Empty, string.Empty));
         Assert.IsTrue(SocketStuff.HasName2IpMappings(string.Empty, "PEER 192.0.2.1"));

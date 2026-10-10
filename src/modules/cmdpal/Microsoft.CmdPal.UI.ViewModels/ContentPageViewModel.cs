@@ -164,7 +164,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         DoOnActivePage(
         () =>
         {
-            SendPageUiMessage(new UpdateCommandBarMessage(this));
+            WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
         });
     }
 
@@ -214,7 +214,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                 DoOnActivePage(
                 () =>
                 {
-                    SendPageUiMessage(new UpdateCommandBarMessage(this));
+                    WeakReferenceMessenger.Default.Send<UpdateCommandBarMessage>(new(this));
                 });
 
                 break;
@@ -238,11 +238,11 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
             {
                 if (HasDetails)
                 {
-                    SendPageUiMessage(new ShowDetailsMessage(Details));
+                    WeakReferenceMessenger.Default.Send<ShowDetailsMessage>(new(Details));
                 }
                 else
                 {
-                    SendPageUiMessage(new HideDetailsMessage());
+                    WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
                 }
             });
     }
@@ -384,8 +384,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
     {
         if (PrimaryCommand is not null)
         {
-            var message = new PerformCommandMessage(PrimaryCommand.Command.Model, PrimaryCommand.Model, this);
-            WeakReferenceMessenger.Default.Send(message);
+            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(PrimaryCommand.Command.Model, PrimaryCommand.Model));
         }
     }
 
@@ -395,8 +394,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
     {
         if (SecondaryCommand is not null)
         {
-            var message = new PerformCommandMessage(SecondaryCommand.Command.Model, SecondaryCommand.Model, this);
-            WeakReferenceMessenger.Default.Send(message);
+            WeakReferenceMessenger.Default.Send<PerformCommandMessage>(new(SecondaryCommand.Command.Model, SecondaryCommand.Model));
         }
     }
 

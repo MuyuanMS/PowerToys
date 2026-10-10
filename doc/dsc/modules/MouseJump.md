@@ -213,10 +213,8 @@ resources:
 - [Settings Resource][01]
 - [PowerToys DSC Overview][02]
 - [FindMyMouse][03]
-- [MouseButtonLock][04]
 
 <!-- Link reference definitions -->
 [01]: ../settings-resource.md
 [02]: ../overview.md
 [03]: ./FindMyMouse.md
-[04]: ./MouseButtonLock.md

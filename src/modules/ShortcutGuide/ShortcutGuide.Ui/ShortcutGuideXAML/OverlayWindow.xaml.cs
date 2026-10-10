@@ -5,10 +5,12 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Common.UI;
 using CommunityToolkit.WinUI.Animations;
 using ManagedCommon;
 using Microsoft.PowerToys.Common.UI.Controls.Window;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -170,6 +172,13 @@ namespace ShortcutGuide
             {
                 _closeType = "CloseButton";
                 CloseAnimated();
+            };
+
+            // Reveal the main pane after the window has loaded so the
+            // Implicit.ShowAnimations play on first appearance.
+            this.OverlayRoot.Loaded += (_, _) =>
+            {
+                this.MainPane.Visibility = Visibility.Visible;
             };
         }
 

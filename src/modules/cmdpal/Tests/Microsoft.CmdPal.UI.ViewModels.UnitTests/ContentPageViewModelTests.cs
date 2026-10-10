@@ -228,7 +228,7 @@ public partial class ContentPageViewModelTests
         menu.CommandInvoking += (_, message) => invocation = message;
         Assert.AreEqual(ContextKeybindingResult.Hide, menu.InvokeCommand(menu.FindKeybinding(primaryKey)));
         Assert.IsNotNull(invocation);
-        Assert.AreSame(primary, invocation.CommandContext);
+        Assert.AreSame(primary, invocation.Context);
 
         page.Commands = [new Separator("Empty")];
 

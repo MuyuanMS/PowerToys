@@ -81,7 +81,7 @@ public class QuickAccessShelfItemActionsTests
         if (hasSecondary)
         {
             Assert.AreSame(item.SecondaryCommand!.Command.Model, invoked[0].Command);
-            Assert.AreSame(item.Model.Unsafe, invoked[0].CommandContext);
+            Assert.AreSame(item.Model.Unsafe, invoked[0].Context);
         }
     }
 
@@ -129,7 +129,7 @@ public class QuickAccessShelfItemActionsTests
 
         Assert.HasCount(hasSubmenu ? 0 : 1, invoked);
         Assert.HasCount(hasSubmenu ? 1 : 0, opened);
-        Assert.AreSame(requested, hasSubmenu ? opened[0]?.Model.Unsafe : invoked[0].CommandContext);
+        Assert.AreSame(requested, hasSubmenu ? opened[0]?.Model.Unsafe : invoked[0].Context);
     }
 
     private ListItemViewModel CreateItem(params IContextItem[] commands)

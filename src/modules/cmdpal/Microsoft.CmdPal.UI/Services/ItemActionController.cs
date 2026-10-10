@@ -70,7 +70,7 @@ internal sealed partial class ItemActionController :
         }
         else
         {
-            _messenger.Send(new PerformCommandMessage(command));
+            _messenger.Send(new PerformCommandMessage(command.Command.Model, command.Model));
         }
 
         return true;

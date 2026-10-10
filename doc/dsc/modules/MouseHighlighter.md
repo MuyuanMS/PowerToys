@@ -266,13 +266,11 @@ resources:
 
 - [Settings Resource][01]
 - [PowerToys DSC Overview][02]
-- [MouseButtonLock][03]
-- [MousePointerCrosshairs][04]
-- [PowerToys Mouse Utilities Documentation][05]
+- [MousePointerCrosshairs][03]
+- [PowerToys Mouse Utilities Documentation][04]
 
 <!-- Link reference definitions -->
 [01]: ../settings-resource.md
 [02]: ../overview.md
-[03]: ./MouseButtonLock.md
-[04]: ./MousePointerCrosshairs.md
-[05]: https://learn.microsoft.com/windows/powertoys/mouse-utilities
+[03]: ./MousePointerCrosshairs.md
+[04]: https://learn.microsoft.com/windows/powertoys/mouse-utilities

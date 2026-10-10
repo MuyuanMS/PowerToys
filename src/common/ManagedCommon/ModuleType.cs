@@ -40,7 +40,6 @@ namespace ManagedCommon
         Workspaces,
         GrabAndMove,
         ZoomIt,
-        MouseButtonLock,
         GeneralSettings,
     }
 }

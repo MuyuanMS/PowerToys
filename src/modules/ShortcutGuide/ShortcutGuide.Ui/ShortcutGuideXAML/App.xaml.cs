@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -15,10 +14,12 @@ using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using PowerToys.Interop;
 using ShortcutGuide.Helpers;
 using ShortcutGuide.Models;
 using ShortcutGuide.Telemetry;
+using KeyEventHandler = Microsoft.UI.Xaml.Input.KeyEventHandler;
 
 namespace ShortcutGuide
 {
@@ -47,7 +48,7 @@ namespace ShortcutGuide
         private EventWaitHandle? _winKeyHoldEvent;
         private EventWaitHandle? _exitEvent;
         private RegisteredWaitHandle? _runnerExitRegistration;
-        private Task? _listenForActivationEventsTask;
+        private Thread? _listenForActivationEventsThread;
         private int _activeSource = (int)ShortcutGuideActivationSource.None;
         private int _activeSurface = (int)ShortcutGuideOverlaySurface.Hidden;
         private int _disposed;
@@ -104,12 +105,12 @@ namespace ShortcutGuide
                 _winKeyHoldEvent = TryOpenActivationEvent(Constants.ShortcutGuideWinKeyHoldEvent());
                 _exitEvent = TryOpenActivationEvent(Constants.ShortcutGuideExitEvent());
 
-                _listenForActivationEventsTask = Task.Factory.StartNew(
-                    ListenForActivationEvents,
-                    CancellationToken.None,
-                    TaskCreationOptions.LongRunning,
-                    TaskScheduler.Default);
-
+                _listenForActivationEventsThread = new Thread(ListenForActivationEvents)
+                {
+                    IsBackground = true,
+                    Name = "ShortcutGuide-ActivationEventListener",
+                };
+                _listenForActivationEventsThread.Start();
                 _winKeyUpKeyboardHook = new HotkeySettingsControlHook(
                 (int key) =>
                 {
@@ -307,7 +308,6 @@ namespace ShortcutGuide
                         }
 
                         Program.ForegroundWindowHandle = NativeMethods.GetForegroundWindow();
-                        _ = Task.Run(() => Program.LogForegroundCapture(Program.ForegroundWindowHandle));
                         OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                         OverlayWindow.ShowOverlay();
                         if (OverlayWindow.UpdateTaskbarPaneLayout())
@@ -334,14 +334,8 @@ namespace ShortcutGuide
                         if (!isOverlayVisible)
                         {
                             Program.ForegroundWindowHandle = NativeMethods.GetForegroundWindow();
-                            _ = Task.Run(() => Program.LogForegroundCapture(Program.ForegroundWindowHandle));
                         }
 
-                        var openStopwatch = Stopwatch.StartNew();
-
-                        // Show the overlay (which also force-activates the window) while
-                        // the main pane is still Collapsed, then prepare and lay out the
-                        // navigation items and shortcut data before revealing it.
                         OverlayWindow.MainPaneControl.Visibility = Visibility.Collapsed;
                         OverlayWindow.TaskbarPaneControl.Visibility = Visibility.Collapsed;
                         OverlayWindow.ShowOverlay();
@@ -352,13 +346,8 @@ namespace ShortcutGuide
                             return;
                         }
 
-                        long contentPreparedMs = openStopwatch.ElapsedMilliseconds;
-
                         OverlayWindow.MainPaneControl.Visibility = Visibility.Visible;
                         OverlayWindow.MainPaneControl.FocusSearch();
-
-                        openStopwatch.Stop();
-                        Logger.LogInfo($"Shortcut Guide first show timing: content prepared in {contentPreparedMs} ms, total show time: {openStopwatch.ElapsedMilliseconds} ms.");
                         break;
 
                     case ShortcutGuideActivationAction.Close:
@@ -433,7 +422,7 @@ namespace ShortcutGuide
                                         or UnauthorizedAccessException)
                 {
                     // Fall back to the empty default if the file is corrupt or unreadable.
-                    Logger.LogWarning($"Failed to load pinned shortcuts from '{PathAnonymizer.Anonymize(pinnedPath)}'. Falling back to empty list. Reason: {ex.Message}");
+                    Logger.LogWarning($"Failed to load pinned shortcuts from '{pinnedPath}'. Falling back to empty list. Reason: {ex.Message}");
                 }
             }
 
@@ -500,24 +489,21 @@ namespace ShortcutGuide
             TaskScheduler.UnobservedTaskException -= TaskScheduler_UnobservedTaskException;
 
             _listenerShutdownEvent.Set();
-
-            if (_listenForActivationEventsTask != null)
+            if (_listenForActivationEventsThread != null)
             {
                 try
                 {
-                    if (!_listenForActivationEventsTask.Wait(TimeSpan.FromSeconds(1)))
+                    if (!_listenForActivationEventsThread.Join(TimeSpan.FromSeconds(1)))
                     {
-                        Logger.LogWarning(
-                            "Shortcut Guide activation-event listener did not stop within the timeout.");
+                        Logger.LogWarning("Shortcut Guide activation-event listener did not stop within the timeout.");
                     }
                 }
-                catch (AggregateException ex)
+                catch (ThreadStateException ex)
                 {
-                    Logger.LogWarning(
-                        $"Failed to wait for Shortcut Guide activation-event listener to stop: {ex.InnerException?.Message}");
+                    Logger.LogWarning($"Failed to join Shortcut Guide activation-event listener: {ex.Message}");
                 }
 
-                _listenForActivationEventsTask = null;
+                _listenForActivationEventsThread = null;
             }
 
             _regularHotkeyEvent?.Dispose();

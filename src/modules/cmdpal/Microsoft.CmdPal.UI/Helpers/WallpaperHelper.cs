@@ -103,7 +103,7 @@ internal sealed partial class WallpaperHelper
     /// Gets the wallpaper image for the primary monitor.
     /// </summary>
     /// <returns>The wallpaper image, or null if it cannot be determined.</returns>
-    public BitmapImage? GetWallpaperImage(int decodePixelWidth = 0)
+    public BitmapImage? GetWallpaperImage()
     {
         try
         {
@@ -114,11 +114,6 @@ internal sealed partial class WallpaperHelper
             }
 
             var image = new BitmapImage();
-            if (decodePixelWidth > 0)
-            {
-                image.DecodePixelWidth = decodePixelWidth;
-            }
-
             using var stream = File.OpenRead(path);
             var randomAccessStream = stream.AsRandomAccessStream();
             if (randomAccessStream == null)
