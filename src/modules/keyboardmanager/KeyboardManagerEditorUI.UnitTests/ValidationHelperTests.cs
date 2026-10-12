@@ -253,6 +253,17 @@ namespace KeyboardManagerEditorUI.UnitTests
             CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
         }
 
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnEmptyList_ForNullReplacement()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new List<ShortcutKeyMapping>(),
+                null,
+                null);
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
         private static ShortcutKeyMapping CreateKeyRemap(int originalKey, int targetKey, SingleKeyRemapCondition condition = SingleKeyRemapCondition.Always) =>
             new()
             {

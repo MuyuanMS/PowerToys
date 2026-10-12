@@ -341,7 +341,7 @@ namespace KeyboardManagerEditorUI.Helpers
         public static IReadOnlyList<int> GetOrphanedKeysCausedBy(
             IReadOnlyCollection<ShortcutKeyMapping> otherMappings,
             ShortcutKeyMapping? replacedMapping,
-            ShortcutKeyMapping replacement)
+            ShortcutKeyMapping? replacement)
         {
             if (otherMappings == null || replacement == null || !IsOrphanedKeyWarningCandidate(replacement))
             {

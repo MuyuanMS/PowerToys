@@ -571,7 +571,7 @@ namespace KeyboardManagerEditorUI.Pages
 
         private string? GetOrphanedKeysWarning(List<string> triggerKeys)
         {
-            // Only single-key remaps (to a key, text or Disable) can leave a key without an assignment.
+            // Only a single-key trigger remapped to a key, shortcut, text, or Disable can leave a key without an assignment.
             if (UnifiedMappingControl.CurrentActionType is not (UnifiedMappingControl.ActionType.KeyOrShortcut or UnifiedMappingControl.ActionType.Text or UnifiedMappingControl.ActionType.Disable) ||
                 _mappingService == null ||
                 !TryGetEditingContext(out string? replacingId, out bool exactMatch, out ShortcutSettings? existingSettings) ||
