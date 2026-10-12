@@ -366,7 +366,7 @@ void apply_module_status_update(const json::JsonObject& module_config, bool save
         json::JsonObject current_settings = std::move(loaded_opt).value();
 
         json::JsonObject enabled;
-        if (current_settings.HasKey(L"enabled"))
+        if (json::has(current_settings, L"enabled", json::JsonValueType::Object))
         {
             enabled = current_settings.GetNamedObject(L"enabled");
         }
