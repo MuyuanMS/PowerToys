@@ -43,6 +43,9 @@ namespace KeyboardManagerEditorUI.Helpers
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int virtualKey);
+
         // Singleton to make sure only one instance of the hook is active
         private KeyboardHookHelper()
         {
@@ -135,9 +138,8 @@ namespace KeyboardManagerEditorUI.Helpers
             var virtualKey = (VirtualKey)key;
             if (IsKeyboardNavigationExit(virtualKey))
             {
-                // Shift was already swallowed by this hook, so the window would see a plain Tab and move
-                // focus forward. Swallow the Tab instead and let the target move focus backward.
-                bool moveFocusBackward = _currentlyPressedKeys.Count > 0;
+                // The hook may have started after Shift was pressed, so check both tracked and physical state.
+                bool moveFocusBackward = ShouldMoveFocusBackward(_currentlyPressedKeys, IsShiftPressed());
 
                 // Keep the recorded keys unless nothing was captured, or the only captured key is the
                 // Shift held for Shift+Tab.
@@ -177,6 +179,16 @@ namespace KeyboardManagerEditorUI.Helpers
         private static bool IsShiftKey(VirtualKey key)
         {
             return key == VirtualKey.Shift || key == VirtualKey.LeftShift || key == VirtualKey.RightShift;
+        }
+
+        internal static bool ShouldMoveFocusBackward(IEnumerable<VirtualKey> currentlyPressedKeys, bool shiftIsPressed)
+        {
+            return shiftIsPressed || currentlyPressedKeys.Any(IsShiftKey);
+        }
+
+        private static bool IsShiftPressed()
+        {
+            return (GetAsyncKeyState((int)VirtualKey.Shift) & 0x8000) != 0;
         }
 
         private void KeyDown(int key)
