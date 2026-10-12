@@ -1,10 +1,6 @@
 #include "pch.h"
-
-#include <filesystem>
-#include <fstream>
-#include <iterator>
-
 #include "general_settings.h"
+#include "general_settings_reader.h"
 #include "auto_start_helper.h"
 #include "tray_icon.h"
 #include "quick_access_host.h"
@@ -68,131 +64,9 @@ namespace
         return fallback;
     }
 
-    std::optional<std::filesystem::path> preserve_invalid_settings_file(
-        const std::wstring& settings_path,
-        const std::string& contents)
-    {
-        for (unsigned int attempt = 0; attempt < 100; ++attempt)
-        {
-            std::filesystem::path backup_path{ settings_path };
-            std::wstring suffix = L".corrupt";
-            if (attempt > 0)
-            {
-                suffix += L"." + std::to_wstring(attempt);
-            }
-            backup_path += suffix;
-
-            std::error_code ec;
-            const bool backup_exists = std::filesystem::exists(backup_path, ec);
-            if (ec)
-            {
-                return std::nullopt;
-            }
-            if (backup_exists)
-            {
-                std::ifstream existing_backup{ backup_path, std::ios::binary };
-                if (existing_backup.is_open())
-                {
-                    using isbi = std::istreambuf_iterator<char>;
-                    std::string saved_contents{ isbi{ existing_backup }, isbi{} };
-                    if (!existing_backup.bad() && saved_contents == contents)
-                    {
-                        return backup_path;
-                    }
-                }
-                continue;
-            }
-
-            std::filesystem::copy_file(settings_path, backup_path, std::filesystem::copy_options::none, ec);
-            if (ec)
-            {
-                std::error_code exists_ec;
-                if (std::filesystem::exists(backup_path, exists_ec) && !exists_ec)
-                {
-                    continue;
-                }
-                return std::nullopt;
-            }
-
-            std::ifstream backup_file{ backup_path, std::ios::binary };
-            if (!backup_file.is_open())
-            {
-                return std::nullopt;
-            }
-
-            using isbi = std::istreambuf_iterator<char>;
-            std::string saved_contents{ isbi{ backup_file }, isbi{} };
-            if (backup_file.bad() || saved_contents != contents)
-            {
-                return std::nullopt;
-            }
-
-            return backup_path;
-        }
-
-        return std::nullopt;
-    }
-
-    // Returns either:
-    // - std::nullopt if the file could not be read or preserved safely; or
-    // - Populated JsonObject if settings were successfully parsed; or
-    // - Empty JsonObject if file is absent, 0-bytes, or invalid JSON was backed up.
     std::optional<json::JsonObject> load_general_settings_checked()
     {
-        const std::wstring settings_path = PTSettingsHelper::get_powertoys_general_save_file_location();
-
-        std::error_code ec;
-        const bool exists = std::filesystem::exists(settings_path, ec);
-        if (ec)
-        {
-            Logger::warn("load_general_settings_checked: Failed to check if settings.json exists: {}", ec.message());
-            return std::nullopt;
-        }
-
-        if (!exists)
-        {
-            // File genuinely does not exist.
-            return json::JsonObject{};
-        }
-
-        std::ifstream settings_file{ settings_path, std::ios::binary };
-        if (!settings_file.is_open())
-        {
-            Logger::warn(L"load_general_settings_checked: Failed to open existing settings.json.");
-            return std::nullopt;
-        }
-
-        using isbi = std::istreambuf_iterator<char>;
-        std::string contents{ isbi{ settings_file }, isbi{} };
-        if (settings_file.bad())
-        {
-            Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json.");
-            return std::nullopt;
-        }
-
-        if (contents.empty())
-        {
-            // File exists but is 0 bytes.
-            return json::JsonObject{};
-        }
-
-        json::JsonObject loaded;
-        if (json::JsonObject::TryParse(winrt::to_hstring(contents), loaded))
-        {
-            return loaded;
-        }
-
-        const auto backup_path = preserve_invalid_settings_file(settings_path, contents);
-        if (!backup_path.has_value())
-        {
-            Logger::warn(L"load_general_settings_checked: Invalid settings.json could not be safely preserved.");
-            return std::nullopt;
-        }
-
-        Logger::warn(
-            L"load_general_settings_checked: Invalid settings.json was preserved as {}; defaults will be used until settings are saved.",
-            backup_path->wstring());
-        return json::JsonObject{};
+        return general_settings::load_from_file_checked(PTSettingsHelper::get_powertoys_general_save_file_location());
     }
 }
 
@@ -446,7 +320,7 @@ void apply_module_status_update(const json::JsonObject& module_config, bool save
         }
 
         // Use the successful read as the base for the update, or create a new settings
-        // object if the file doesn't exist or is empty.
+        // object if the file doesn't exist.
         json::JsonObject current_settings = std::move(loaded_opt).value();
 
         json::JsonObject enabled;
