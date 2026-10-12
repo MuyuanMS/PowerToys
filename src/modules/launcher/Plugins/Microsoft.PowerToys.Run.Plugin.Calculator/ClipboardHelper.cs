@@ -13,6 +13,7 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator
     {
         private const uint UnicodeTextFormat = 13;
         private const uint MoveableZeroInitializedMemory = 0x0042;
+        private static readonly IntPtr MessageOnlyWindowParent = new(-3);
 
         // Retain the retry window used by WPF for initial clipboard contention.
         private const int ClipboardRetryCount = 10;
@@ -24,7 +25,7 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator
 
             // Own the clipboard through a message-only window. Passing a null owner to
             // OpenClipboard followed by EmptyClipboard can make SetClipboardData fail.
-            var window = CreateWindowEx(0, "STATIC", null, 0, 0, 0, 0, 0, new IntPtr(-3), IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            var window = CreateWindowEx(0, "STATIC", null, 0, 0, 0, 0, 0, MessageOnlyWindowParent, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
             if (window == IntPtr.Zero)
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());

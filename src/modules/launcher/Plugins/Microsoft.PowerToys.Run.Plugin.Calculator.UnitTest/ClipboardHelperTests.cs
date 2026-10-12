@@ -24,7 +24,7 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
         [DataRow("中文 مرحبا 😀")]
         public void TextPersistsAfterCopyingThreadExits(string text)
         {
-            WithPrivateClipboard(() =>
+            WithPrivateClipboard(desktop =>
             {
                 RunOnStaThread(() => ClipboardHelper.SetText(text));
                 Assert.AreEqual(text, System.Windows.Clipboard.GetText());
@@ -34,10 +34,10 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
         [TestMethod]
         public void ClipboardLockFailurePreservesPreviousContent()
         {
-            WithPrivateClipboard(() =>
+            WithPrivateClipboard(desktop =>
             {
                 ClipboardHelper.SetText("previous");
-                WithClipboardLocked(() => Assert.ThrowsException<Win32Exception>(() => ClipboardHelper.SetText("replacement")));
+                WithClipboardLocked(() => Assert.ThrowsException<Win32Exception>(() => ClipboardHelper.SetText("replacement")), desktop);
                 Assert.AreEqual("previous", System.Windows.Clipboard.GetText());
             });
         }
@@ -45,9 +45,9 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
         [TestMethod]
         public void ClipboardContentionClearsWithinTheExistingRetryWindow()
         {
-            WithPrivateClipboard(() =>
+            WithPrivateClipboard(desktop =>
             {
-                WithClipboardLocked(() => ClipboardHelper.SetText("replacement"), releaseAfterMilliseconds: 250);
+                WithClipboardLocked(() => ClipboardHelper.SetText("replacement"), desktop, releaseAfterMilliseconds: 250);
                 Assert.AreEqual("replacement", System.Windows.Clipboard.GetText());
             });
         }
@@ -55,12 +55,12 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
         [TestMethod]
         public void OleFlushCanFailAfterTextHasAlreadyBeenPlacedOnClipboard()
         {
-            WithPrivateClipboard(() =>
+            WithPrivateClipboard(desktop =>
             {
                 // This is the persistence phase used by WPF SetText. An observer can
                 // acquire the clipboard between OleSetClipboard and OleFlushClipboard.
                 System.Windows.Clipboard.SetDataObject("2", false);
-                WithClipboardLocked(() => Assert.AreEqual(unchecked((int)0x800401D0), OleFlushClipboard()));
+                WithClipboardLocked(() => Assert.AreEqual(unchecked((int)0x800401D0), OleFlushClipboard()), desktop);
                 Assert.AreEqual("2", System.Windows.Clipboard.GetText());
 
                 RunOnStaThread(() => ClipboardHelper.SetText("3"));
@@ -68,13 +68,20 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
             });
         }
 
-        private static void WithClipboardLocked(Action action, int releaseAfterMilliseconds = Timeout.Infinite)
+        private static void WithClipboardLocked(Action action, IntPtr desktop, int releaseAfterMilliseconds = Timeout.Infinite)
         {
             using var acquired = new ManualResetEventSlim();
             using var release = new ManualResetEventSlim();
             Exception failure = null;
             var holder = new Thread(() =>
             {
+                if (!AssignToDesktop(desktop))
+                {
+                    failure = new Win32Exception(Marshal.GetLastWin32Error());
+                    acquired.Set();
+                    return;
+                }
+
                 if (!OpenClipboard(IntPtr.Zero))
                 {
                     failure = new Win32Exception(Marshal.GetLastWin32Error());
@@ -133,7 +140,12 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
             }
         }
 
-        private static void WithPrivateClipboard(Action action)
+        private static bool AssignToDesktop(IntPtr desktop)
+        {
+            return GetThreadDesktop(GetCurrentThreadId()) == desktop || SetThreadDesktop(desktop);
+        }
+
+        private static void WithPrivateClipboard(Action<IntPtr> action)
         {
             Exception failure = null;
             var coordinator = new Thread(() =>
@@ -158,7 +170,7 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator.UnitTests
                         throw new Win32Exception(Marshal.GetLastWin32Error());
                     }
 
-                    RunOnStaThread(action);
+                    RunOnStaThread(() => action(desktop));
                 }
                 catch (Exception exception)
                 {
