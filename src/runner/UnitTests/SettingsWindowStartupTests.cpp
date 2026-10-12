@@ -5,7 +5,10 @@
 #include "pch.h"
 #include "CppUnitTest.h"
 
+#include <atomic>
 #include <barrier>
+#include <chrono>
+#include <thread>
 
 #include "../settings_window_startup.h"
 
@@ -91,6 +94,52 @@ namespace RunnerUnitTests
             Assert::IsFalse(completion.request.has_value());
             Assert::IsTrue(startup.CompleteStartup().canceled);
             Assert::IsTrue(startup.DeferOrCancel(L"General"));
+        }
+
+        TEST_METHOD(StopWaitsForAnInFlightLaunchAndBlocksLaterLaunches)
+        {
+            SettingsWindowStartup startup;
+            startup.CompleteStartup();
+
+            std::barrier<> launchEntered(2);
+            std::atomic<bool> allowLaunchToFinish{ false };
+            std::atomic<bool> stopAttempted{ false };
+            std::atomic<bool> stopFinished{ false };
+            std::thread launch([&]() {
+                startup.RunIfNotStopped([&]() {
+                    launchEntered.arrive_and_wait();
+                    while (!allowLaunchToFinish.load())
+                    {
+                        std::this_thread::yield();
+                    }
+                });
+            });
+            launchEntered.arrive_and_wait();
+
+            std::thread stop([&]() {
+                stopAttempted = true;
+                startup.Stop();
+                stopFinished = true;
+            });
+            while (!stopAttempted.load())
+            {
+                std::this_thread::yield();
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            const auto stopWaitedForLaunch = !stopFinished.load();
+
+            allowLaunchToFinish = true;
+            launch.join();
+            stop.join();
+
+            Assert::IsTrue(stopWaitedForLaunch);
+            Assert::IsTrue(stopFinished.load());
+
+            bool laterLaunchAttempted = false;
+            Assert::IsFalse(startup.RunIfNotStopped([&]() {
+                laterLaunchAttempted = true;
+            }));
+            Assert::IsFalse(laterLaunchAttempted);
         }
 
         TEST_METHOD(RequestConcurrentWithStartupCompletionIsHandledExactlyOnce)

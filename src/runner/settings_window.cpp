@@ -556,16 +556,23 @@ void run_settings_window(bool show_oobe_window, bool show_scoobe_window, std::op
         // as Administrator from a non-Administrator user or an error occur trying).
         // In the second case the Settings process will run elevated.
         STARTUPINFO startup_info = { sizeof(startup_info) };
-        if (!CreateProcessW(executable_path.c_str(),
-                            executable_args.data(),
-                            nullptr,
-                            nullptr,
-                            FALSE,
-                            0,
-                            nullptr,
-                            nullptr,
-                            &startup_info,
-                            &process_info))
+        const auto launchAllowed = settings_window_startup.RunIfNotStopped([&]() {
+            process_created = CreateProcessW(executable_path.c_str(),
+                                             executable_args.data(),
+                                             nullptr,
+                                             nullptr,
+                                             FALSE,
+                                             0,
+                                             nullptr,
+                                             nullptr,
+                                             &startup_info,
+                                             &process_info);
+            if (process_created)
+            {
+                g_settings_process_id = process_info.dwProcessId;
+            }
+        });
+        if (!launchAllowed || !process_created)
         {
             goto LExit;
         }

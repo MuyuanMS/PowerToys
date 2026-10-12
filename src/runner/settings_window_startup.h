@@ -65,6 +65,19 @@ public:
         pending.reset();
     }
 
+    template <typename Operation>
+    bool RunIfNotStopped(Operation&& operation)
+    {
+        std::scoped_lock lock(mutex);
+        if (stopped)
+        {
+            return false;
+        }
+
+        std::forward<Operation>(operation)();
+        return true;
+    }
+
 private:
     std::mutex mutex;
     bool initialized = false;

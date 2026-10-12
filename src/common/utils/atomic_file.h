@@ -45,6 +45,59 @@ namespace atomic_file
             HANDLE handle = INVALID_HANDLE_VALUE;
             bool ownsPath = false;
         };
+
+        template <typename SetFileInformationByHandleFn, typename MoveFileExFn>
+        DWORD publish_temporary_file(
+            HANDLE handle,
+            const std::wstring& temporaryPath,
+            const std::wstring& destination,
+            SetFileInformationByHandleFn&& setFileInformationByHandle,
+            MoveFileExFn&& moveFileEx)
+        {
+            const auto nameLength = destination.size() * sizeof(wchar_t);
+            if (nameLength > (std::numeric_limits<DWORD>::max)() - sizeof(FILE_RENAME_INFO))
+            {
+                return ERROR_FILENAME_EXCED_RANGE;
+            }
+
+            std::vector<std::byte> renameBuffer(sizeof(FILE_RENAME_INFO) + nameLength);
+            auto rename = reinterpret_cast<FILE_RENAME_INFO*>(renameBuffer.data());
+            rename->Flags = FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS;
+            rename->RootDirectory = nullptr;
+            rename->FileNameLength = static_cast<DWORD>(nameLength);
+            std::memcpy(rename->FileName, destination.data(), nameLength);
+
+            constexpr DWORD retryDelays[] = { 10, 20, 40, 80, 160 };
+            bool useMoveFileEx = false;
+            size_t retry = 0;
+            for (;;)
+            {
+                const auto succeeded = useMoveFileEx ?
+                    moveFileEx(temporaryPath.c_str(), destination.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) :
+                    setFileInformationByHandle(handle, FileRenameInfoEx, rename, static_cast<DWORD>(renameBuffer.size()));
+                if (succeeded)
+                {
+                    return ERROR_SUCCESS;
+                }
+
+                const auto error = GetLastError();
+                if (!useMoveFileEx &&
+                    (error == ERROR_INVALID_FUNCTION ||
+                     error == ERROR_INVALID_PARAMETER ||
+                     error == ERROR_NOT_SUPPORTED ||
+                     error == ERROR_CALL_NOT_IMPLEMENTED))
+                {
+                    useMoveFileEx = true;
+                    continue;
+                }
+                if ((error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED) || retry == ARRAYSIZE(retryDelays))
+                {
+                    return error;
+                }
+
+                Sleep(retryDelays[retry++]);
+            }
+        }
     }
 
     // Publish only complete, flushed contents. The destination is never opened for
@@ -93,39 +146,20 @@ namespace atomic_file
         {
             return GetLastError();
         }
-        const auto nameLength = destination.size() * sizeof(wchar_t);
-        if (nameLength > (std::numeric_limits<DWORD>::max)() - sizeof(FILE_RENAME_INFO))
+        const auto result = detail::publish_temporary_file(
+            temporary.handle,
+            temporary.path,
+            destination,
+            [](HANDLE file, FILE_INFO_BY_HANDLE_CLASS infoClass, LPVOID info, DWORD size) {
+                return SetFileInformationByHandle(file, infoClass, info, size);
+            },
+            [](LPCWSTR source, LPCWSTR target, DWORD flags) {
+                return MoveFileExW(source, target, flags);
+            });
+        if (result == ERROR_SUCCESS)
         {
-            return ERROR_FILENAME_EXCED_RANGE;
+            temporary.ownsPath = false;
         }
-
-        std::vector<std::byte> renameBuffer(sizeof(FILE_RENAME_INFO) + nameLength);
-        auto rename = reinterpret_cast<FILE_RENAME_INFO*>(renameBuffer.data());
-        rename->Flags = FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS;
-        rename->RootDirectory = nullptr;
-        rename->FileNameLength = static_cast<DWORD>(nameLength);
-        std::memcpy(rename->FileName, destination.data(), nameLength);
-
-        // Some existing readers do not share delete access. Give a short-lived
-        // reader time to close, without ever falling back to truncating the target.
-        constexpr DWORD retryDelays[] = { 10, 20, 40, 80, 160 };
-        for (size_t attempt = 0;; ++attempt)
-        {
-            // POSIX replacement leaves existing delete-shared readers attached to
-            // the old file, while new opens see the complete replacement. Ordinary
-            // MoveFileEx can fail with ACCESS_DENIED while such a reader is open.
-            if (SetFileInformationByHandle(temporary.handle, FileRenameInfoEx, rename, static_cast<DWORD>(renameBuffer.size())))
-            {
-                temporary.ownsPath = false;
-                return ERROR_SUCCESS;
-            }
-
-            const auto error = GetLastError();
-            if ((error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED) || attempt == ARRAYSIZE(retryDelays))
-            {
-                return error;
-            }
-            Sleep(retryDelays[attempt]);
-        }
+        return result;
     }
 }
