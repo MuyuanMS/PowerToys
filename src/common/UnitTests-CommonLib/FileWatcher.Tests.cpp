@@ -54,11 +54,11 @@ namespace UnitTestsCommonLib
             void reload(const std::filesystem::path& path)
             {
                 std::ifstream stream(path, std::ios::binary);
-                const auto readError = stream ? ERROR_SUCCESS : GetLastError();
+                const auto readFailed = !stream;
                 {
                     std::lock_guard lock(m_mutex);
                     ++m_reloadAttempts;
-                    m_lastReadError = readError;
+                    m_lastReadFailed = readFailed;
                 }
                 if (!stream)
                 {
@@ -79,7 +79,7 @@ namespace UnitTestsCommonLib
                 const bool updated = m_changed.wait_for(lock, std::chrono::seconds(5), [&]() { return m_contents == expected; });
                 if (!updated)
                 {
-                    const auto message = L"Cache reload attempts=" + std::to_wstring(m_reloadAttempts) + L", last read error=" + std::to_wstring(m_lastReadError) + L"\n";
+                    const auto message = L"Cache reload attempts=" + std::to_wstring(m_reloadAttempts) + L", last read failed=" + (m_lastReadFailed ? L"yes" : L"no") + L"\n";
                     Microsoft::VisualStudio::CppUnitTestFramework::Logger::WriteMessage(message.c_str());
                 }
                 return updated;
@@ -90,7 +90,7 @@ namespace UnitTestsCommonLib
             std::condition_variable m_changed;
             std::string m_contents;
             unsigned int m_reloadAttempts = 0;
-            DWORD m_lastReadError = ERROR_SUCCESS;
+            bool m_lastReadFailed = false;
         };
 
     }
