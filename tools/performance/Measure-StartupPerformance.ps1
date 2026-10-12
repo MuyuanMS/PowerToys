@@ -1310,6 +1310,7 @@ function Wait-RunnerStartupStages
 
     $pattern = '\[p-' + $Process.Id + '\].*Startup stages \(ms since process start\): (?<stages>.+?)\s*$'
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $carryovers = @{}
     do
     {
         foreach ($file in Get-ChildItem -Path $runnerLogFolder -Filter 'runner-log*.log' -ErrorAction SilentlyContinue)
@@ -1320,6 +1321,12 @@ function Wait-RunnerStartupStages
                 $offset = $Offsets[$file.FullName]
             }
 
+            $carryover = ''
+            if ($carryovers.ContainsKey($file.FullName))
+            {
+                $carryover = $carryovers[$file.FullName]
+            }
+
             $stream = [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
             try
             {
@@ -1327,22 +1334,31 @@ function Wait-RunnerStartupStages
                 {
                     $offset = 0
                     $Offsets[$file.FullName] = 0
+                    $carryover = ''
                 }
 
                 if ($stream.Length -le $offset)
                 {
-                    continue
-                }
+                    if (-not $Process.HasExited -or -not $carryovers.ContainsKey($file.FullName))
+                    {
+                        continue
+                    }
 
-                $null = $stream.Seek($offset, 'Begin')
-                $reader = [IO.StreamReader]::new($stream)
-                try
-                {
-                    $text = $reader.ReadToEnd()
+                    $text = ''
                 }
-                finally
+                else
                 {
-                    $reader.Dispose()
+                    $null = $stream.Seek($offset, 'Begin')
+                    $reader = [IO.StreamReader]::new($stream)
+                    try
+                    {
+                        $text = $reader.ReadToEnd()
+                        $Offsets[$file.FullName] = $stream.Position
+                    }
+                    finally
+                    {
+                        $reader.Dispose()
+                    }
                 }
             }
             finally
@@ -1350,8 +1366,11 @@ function Wait-RunnerStartupStages
                 $stream.Dispose()
             }
 
+            $text = $carryover + $text
             $match = [regex]::Match($text, $pattern, 'Multiline')
-            if ($match.Success)
+            $matchLineIsComplete = $match.Success -and
+                ($text.IndexOfAny([char[]]@("`r", "`n"), $match.Index) -ge 0 -or $Process.HasExited)
+            if ($matchLineIsComplete)
             {
                 $stages = [ordered]@{}
                 foreach ($pair in $match.Groups['stages'].Value -split ' ')
@@ -1365,6 +1384,23 @@ function Wait-RunnerStartupStages
 
                 return $stages
             }
+
+            $lastLineBreak = $text.LastIndexOfAny([char[]]@("`r", "`n"))
+            if ($lastLineBreak -ge 0)
+            {
+                $carryover = $text.Substring($lastLineBreak + 1)
+            }
+            else
+            {
+                $carryover = $text
+            }
+
+            if ($carryover.Length -gt 4096)
+            {
+                $carryover = $carryover.Substring($carryover.Length - 4096)
+            }
+
+            $carryovers[$file.FullName] = $carryover
         }
 
         if ($Process.HasExited)
