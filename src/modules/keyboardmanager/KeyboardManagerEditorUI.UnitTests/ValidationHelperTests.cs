@@ -54,7 +54,7 @@ namespace KeyboardManagerEditorUI.UnitTests
         }
 
         [TestMethod]
-        public void GetOrphanedKeys_ShouldEvaluateReplacementCollection_WhenEditingExistingMapping()
+        public void GetOrphanedKeys_ShouldReturnUnreachableSource_WithValidTarget()
         {
             IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
             {
@@ -74,6 +74,21 @@ namespace KeyboardManagerEditorUI.UnitTests
             });
 
             CollectionAssert.AreEqual(new List<int> { VkA, VkC }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldTreatSingleKeyShortcutOutputAsAssigned()
+        {
+            ShortcutKeyMapping shortcutToKey = CreateKeyRemap(VkC, VkA);
+            shortcutToKey.OriginalKeys = string.Join(";", VkControl, VkC);
+
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkB),
+                shortcutToKey,
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
         }
 
         [TestMethod]

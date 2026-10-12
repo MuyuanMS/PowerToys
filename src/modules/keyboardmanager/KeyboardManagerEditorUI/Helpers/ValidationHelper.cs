@@ -254,7 +254,7 @@ namespace KeyboardManagerEditorUI.Helpers
             });
         }
 
-        public static bool IsKeyOrphaned(int originalKey, KeyboardMappingService mappingService)
+        public static bool IsKeyOrphaned(int originalKey, KeyboardMappingService? mappingService)
         {
             if (mappingService == null)
             {
@@ -293,15 +293,16 @@ namespace KeyboardManagerEditorUI.Helpers
             foreach (ShortcutKeyMapping mapping in mappings)
             {
                 // App-specific remaps leave the key usable in every other app.
-                if (!TryGetSingleKey(mapping.OriginalKeys, out int originalKey) || originalKey == 0 ||
-                    !string.IsNullOrEmpty(mapping.TargetApp) || !HasValidSingleKeyTarget(mapping))
+                if (!string.IsNullOrEmpty(mapping.TargetApp) || !HasValidSingleKeyTarget(mapping))
                 {
                     continue;
                 }
 
+                bool hasSingleKeyOriginal = TryGetSingleKey(mapping.OriginalKeys, out int originalKey) && originalKey != 0;
+
                 // An "alone" remap only replaces a lone tap; the key still works when held or
                 // combined with other keys, so it remains reachable.
-                if (mapping.Condition != SingleKeyRemapCondition.Alone)
+                if (hasSingleKeyOriginal && mapping.Condition != SingleKeyRemapCondition.Alone)
                 {
                     originalKeys.Add(originalKey);
                 }
