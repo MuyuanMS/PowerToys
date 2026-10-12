@@ -62,32 +62,30 @@ namespace RunnerUnitTests
             Assert::AreEqual(0U, loaded->Size());
         }
 
-        TEST_METHOD (ExistingEmptyFileIsBackedUpBeforeRecovery)
+        TEST_METHOD (ExistingEmptyFileIsBackedUpAndDoesNotAllowSaving)
         {
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);
 
-            Assert::IsTrue(loaded.has_value());
-            Assert::AreEqual(0U, loaded->Size());
+            Assert::IsFalse(loaded.has_value());
             Assert::AreEqual(0ULL, static_cast<unsigned long long>(std::filesystem::file_size(m_settingsPath)));
             Assert::IsTrue(std::filesystem::exists(GetBackupPath()));
             Assert::AreEqual(0ULL, static_cast<unsigned long long>(std::filesystem::file_size(GetBackupPath())));
         }
 
-        TEST_METHOD (WhitespaceOnlyFileIsBackedUpBeforeRecovery)
+        TEST_METHOD (WhitespaceOnlyFileIsBackedUpAndDoesNotAllowSaving)
         {
             WriteSettings(" \r\n\t");
 
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);
 
-            Assert::IsTrue(loaded.has_value());
-            Assert::AreEqual(0U, loaded->Size());
+            Assert::IsFalse(loaded.has_value());
             Assert::IsTrue(ReadSettings(m_settingsPath) == ReadSettings(GetBackupPath()));
         }
 
         TEST_METHOD (EmptyFileCanBeReadAfterWriteCompletes)
         {
             const auto empty = general_settings::load_from_file_checked(m_settingsPath);
-            Assert::IsTrue(empty.has_value());
+            Assert::IsFalse(empty.has_value());
             WriteSettings(R"({"enabled":{"File Locksmith":false}})");
 
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);
@@ -96,15 +94,14 @@ namespace RunnerUnitTests
             Assert::IsFalse(loaded->GetNamedObject(L"enabled").GetNamedBoolean(L"File Locksmith"));
         }
 
-        TEST_METHOD (PartialJsonIsBackedUpBeforeRecovery)
+        TEST_METHOD (PartialJsonIsBackedUpAndDoesNotAllowSaving)
         {
             const std::string partial = R"({"enabled":{"File Locksmith":)";
             WriteSettings(partial);
 
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);
 
-            Assert::IsTrue(loaded.has_value());
-            Assert::AreEqual(0U, loaded->Size());
+            Assert::IsFalse(loaded.has_value());
             Assert::IsTrue(partial == ReadSettings());
             Assert::IsTrue(partial == ReadSettings(GetBackupPath()));
         }
@@ -118,7 +115,7 @@ namespace RunnerUnitTests
 
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);
 
-            Assert::IsTrue(loaded.has_value());
+            Assert::IsFalse(loaded.has_value());
             Assert::IsTrue(previous_backup == ReadSettings(GetBackupPath()));
             Assert::IsTrue(partial == ReadSettings(GetBackupPath(1)));
         }
@@ -136,7 +133,7 @@ namespace RunnerUnitTests
             Assert::IsFalse(enabled.GetNamedBoolean(L"File Locksmith"));
         }
 
-        TEST_METHOD (LockedFileDoesNotAllowSavingAndCanBeReadAfterUnlock)
+        TEST_METHOD (LockedFileReadFailsAndSucceedsAfterUnlock)
         {
             WriteSettings(R"({"enabled":{"File Locksmith":false}})");
             {

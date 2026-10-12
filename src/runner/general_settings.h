@@ -40,7 +40,8 @@ struct GeneralSettings
 };
 
 json::JsonObject load_general_settings();
-GeneralSettings get_general_settings();
+GeneralSettings get_general_settings(bool refresh_settings_from_disk = false);
+void save_general_settings(const json::JsonObject& settings);
 void apply_general_settings(const json::JsonObject& general_configs, bool save = true);
 void apply_module_status_update(const json::JsonObject& module_config, bool save = true);
 void start_enabled_powertoys();

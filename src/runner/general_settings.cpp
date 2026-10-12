@@ -86,6 +86,7 @@ static PowerToysSettings::HotkeyObject quick_access_shortcut;
 static DashboardSortOrder dashboard_sort_order = DashboardSortOrder::Alphabetical;
 static json::JsonObject ignored_conflict_properties = create_default_ignored_conflict_properties();
 static std::optional<json::JsonObject> last_successfully_loaded_general_settings;
+static bool general_settings_load_succeeded = false;
 
 json::JsonObject GeneralSettings::to_json()
 {
@@ -134,11 +135,13 @@ json::JsonObject load_general_settings()
     auto loaded_opt = load_general_settings_checked();
     if (!loaded_opt.has_value())
     {
-        Logger::warn(L"load_general_settings: Skipping global state update due to transient read error on settings.json.");
+        general_settings_load_succeeded = false;
+        Logger::warn(L"load_general_settings: Could not load settings.json safely; retaining the last loaded settings.");
         return last_successfully_loaded_general_settings.value_or(json::JsonObject{});
     }
     auto loaded = std::move(loaded_opt).value();
     last_successfully_loaded_general_settings = loaded;
+    general_settings_load_succeeded = true;
     settings_theme = loaded.GetNamedString(L"theme", L"system");
     if (settings_theme != L"dark" && settings_theme != L"light")
     {
@@ -174,7 +177,14 @@ json::JsonObject load_general_settings()
     return loaded;
 }
 
-GeneralSettings get_general_settings()
+void save_general_settings(const json::JsonObject& settings)
+{
+    PTSettingsHelper::save_general_settings(settings);
+    last_successfully_loaded_general_settings = settings;
+    general_settings_load_succeeded = true;
+}
+
+GeneralSettings get_general_settings(bool refresh_settings_from_disk)
 {
     const bool is_user_admin = check_user_is_admin();
     GeneralSettings settings
@@ -203,17 +213,27 @@ GeneralSettings get_general_settings()
 
     settings.isStartupEnabled = is_auto_start_task_active_for_this_user();
 
-    // Initialize module enabled map from durable settings.json so all modules, including
-    // those which are missing or which failed to load, are represented.
+    // Initialize module enabled map from the last loaded settings snapshot so modules
+    // which are missing or failed to load remain represented.
     try
     {
-        auto loaded_opt = load_general_settings_checked();
+        auto loaded_opt = refresh_settings_from_disk ? load_general_settings_checked() : last_successfully_loaded_general_settings;
+        if (refresh_settings_from_disk)
+        {
+            general_settings_load_succeeded = loaded_opt.has_value();
+            if (loaded_opt.has_value())
+            {
+                last_successfully_loaded_general_settings = *loaded_opt;
+            }
+        }
+
         if (!loaded_opt.has_value())
         {
             settings.isDataLoadedSuccessfully = false;
         }
         else
         {
+            settings.isDataLoadedSuccessfully = general_settings_load_succeeded;
             const json::JsonObject& loaded = *loaded_opt;
 
             if (json::has(loaded, L"enabled", json::JsonValueType::Object))
@@ -232,6 +252,7 @@ GeneralSettings get_general_settings()
     catch (...)
     {
         Logger::error(L"get_general_settings: Failed to load durable module settings.");
+        general_settings_load_succeeded = false;
         settings.isDataLoadedSuccessfully = false;
     }
 
@@ -318,13 +339,16 @@ void apply_module_status_update(const json::JsonObject& module_config, bool save
         auto loaded_opt = load_general_settings_checked();
         if (!loaded_opt.has_value())
         {
-            Logger::warn(L"apply_module_status_update: Skipping save due to transient read error on settings.json.");
+            general_settings_load_succeeded = false;
+            Logger::warn(L"apply_module_status_update: Skipping save because settings.json could not be loaded safely.");
             return;
         }
+        general_settings_load_succeeded = true;
 
         // Use the successful read as the base for the update, or create a new settings
         // object if the file doesn't exist.
         json::JsonObject current_settings = std::move(loaded_opt).value();
+        last_successfully_loaded_general_settings = current_settings;
 
         json::JsonObject enabled;
         if (json::has(current_settings, L"enabled", json::JsonValueType::Object))
@@ -341,7 +365,7 @@ void apply_module_status_update(const json::JsonObject& module_config, bool save
             enabled.SetNamedValue(name, json::value(target_enabled));
             current_settings.SetNamedValue(L"enabled", enabled);
 
-            PTSettingsHelper::save_general_settings(current_settings);
+            save_general_settings(current_settings);
 
             GeneralSettings settings_for_trace = get_general_settings();
             Trace::SettingsChanged(settings_for_trace);
@@ -555,11 +579,11 @@ void apply_general_settings(const json::JsonObject& general_configs, bool save)
 
     if (save)
     {
-        GeneralSettings save_settings = get_general_settings();
+        GeneralSettings save_settings = get_general_settings(true);
 
         if (!save_settings.isDataLoadedSuccessfully)
         {
-            Logger::warn(L"apply_general_settings: Skipping save due to transient read error on settings.json.");
+            Logger::warn(L"apply_general_settings: Skipping save because settings.json could not be loaded safely.");
             return;
         }
 
@@ -592,7 +616,7 @@ void apply_general_settings(const json::JsonObject& general_configs, bool save)
         std::wstring new_settings_json_string = save_settings.to_json().Stringify().c_str();
         if (old_settings_json_string != new_settings_json_string)
         {
-            PTSettingsHelper::save_general_settings(save_settings.to_json());
+            save_general_settings(save_settings.to_json());
             Trace::SettingsChanged(save_settings);
         }
     }

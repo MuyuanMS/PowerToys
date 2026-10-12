@@ -38,6 +38,7 @@ namespace general_settings
             const bool backup_exists = std::filesystem::exists(backup_path, ec);
             if (ec)
             {
+                Logger::warn("preserve_invalid_settings_file: Failed to check whether a settings backup exists: {}", ec.message());
                 return std::nullopt;
             }
             if (backup_exists)
@@ -154,9 +155,9 @@ namespace general_settings
                 }
 
                 Logger::warn(
-                    L"load_from_file_checked: Empty settings.json was preserved as {}; defaults will be used until settings are saved.",
+                    L"load_from_file_checked: Empty settings.json was preserved as {}; the settings data could not be loaded safely.",
                     backup_path->wstring());
-                return json::JsonObject{};
+                return std::nullopt;
             }
         }
 
@@ -174,8 +175,8 @@ namespace general_settings
         }
 
         Logger::warn(
-            L"load_from_file_checked: Invalid settings.json was preserved as {}; defaults will be used until settings are saved.",
+            L"load_from_file_checked: Invalid settings.json was preserved as {}; the settings data could not be loaded safely.",
             backup_path->wstring());
-        return json::JsonObject{};
+        return std::nullopt;
     }
 }

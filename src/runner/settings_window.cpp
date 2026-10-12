@@ -478,7 +478,7 @@ void run_settings_window(bool show_oobe_window, bool show_scoobe_window, std::op
     // Arg 4: process pid.
     DWORD powertoys_pid = GetCurrentProcessId();
 
-    GeneralSettings save_settings = get_general_settings();
+    GeneralSettings save_settings = get_general_settings(true);
 
     // Arg 5: settings theme.
     const std::wstring settings_theme_setting{ save_settings.theme };
@@ -511,11 +511,11 @@ void run_settings_window(bool show_oobe_window, bool show_scoobe_window, std::op
     // 1. Run on start up.
     if (save_settings.isDataLoadedSuccessfully)
     {
-        PTSettingsHelper::save_general_settings(save_settings.to_json());
+        save_general_settings(save_settings.to_json());
     }
     else
     {
-        Logger::warn(L"run_settings_window: Skipping save due to transient read error on settings.json.");
+        Logger::warn(L"run_settings_window: Skipping save because settings.json could not be loaded safely.");
     }
 
     std::wstring executable_args = fmt::format(L"\"{}\" {} {} {} {} {} {} {} {} {}",
