@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <atomic>
 #include <iostream>
-#include <set>
 #include <shellapi.h>
 #include <spdlog/sinks/null_sink.h>
 #include <wil/resource.h>
@@ -21,10 +20,9 @@
 #include <common/version/version.h>
 #include "Resources.h"
 #include "CommandLogging.h"
-#include "ApprovalChannel.h"
-#include "ConsoleApproval.h"
 #include "JsonOutput.h"
 #include "WorkerHandoff.h"
+#include "WorkerResult.h"
 
 namespace
 {
@@ -64,16 +62,7 @@ namespace
 
     void Print(const json::JsonObject& output, bool asJson, bool workerOutput = false)
     {
-        try
-        {
-            CliResources::Localize(output);
-        }
-        catch (const WorkspacesCli::Error&)
-        {
-            if (!output.HasKey(L"error"))
-                throw;
-            std::cerr << "Workspaces CLI: localized error resources are unavailable.\n";
-        }
+        CliResources::LocalizeForOutput(output, workerOutput);
         if (asJson)
         {
             std::cout << (workerOutput ? winrt::to_string(output.Stringify()) : WorkspacesCli::FormatJson(output)) << '\n';
@@ -92,13 +81,13 @@ namespace
             {
                 const auto project = item.GetObjectW();
                 std::cout << winrt::to_string(project.GetNamedString(L"id")) << '\t'
-                          << winrt::to_string(WorkspacesCli::EscapeApprovalText(project.GetNamedString(L"name"))) << '\t';
+                          << winrt::to_string(project.GetNamedString(L"name")) << '\t';
                 bool first = true;
                 for (const auto& app : project.GetNamedArray(L"applications"))
                 {
                     if (!first)
                         std::cout << ", ";
-                    std::cout << winrt::to_string(WorkspacesCli::EscapeApprovalText(app.GetObjectW().GetNamedString(L"application")));
+                    std::cout << winrt::to_string(app.GetObjectW().GetNamedString(L"application"));
                     first = false;
                 }
                 std::cout << '\n';
@@ -120,37 +109,9 @@ namespace
         }
     }
 
-    void ValidateLaunch(const WorkspacesData::WorkspacesProject& project)
-    {
-        if (project.apps.empty())
-            throw WorkspacesCli::Error(8, L"invalidData", "Workspace has no applications.");
-        std::set<std::wstring> appIds;
-        std::set<unsigned int> monitors;
-        for (const auto& monitor : project.monitors)
-        {
-            if (!monitor.dpi || !monitors.insert(monitor.number).second)
-                throw WorkspacesCli::Error(8, L"invalidData", "Workspace has invalid monitors.");
-        }
-        for (const auto& app : project.apps)
-        {
-            std::wstring id;
-            try
-            {
-                id = WorkspacesCli::NormalizeId(app.id);
-            }
-            catch (const WorkspacesCli::Error&)
-            {
-                throw WorkspacesCli::Error(8, L"invalidData", "Workspace has an invalid application ID.");
-            }
-            if (!appIds.insert(id).second ||
-                !monitors.contains(app.monitor) || app.position.width <= 0 || app.position.height <= 0)
-                throw WorkspacesCli::Error(8, L"invalidData", "Workspace has invalid application IDs or placement.");
-        }
-    }
-
     int Worker(const std::vector<std::wstring>& args, HANDLE ownerLifetime = nullptr)
     {
-        if (args.size() != 4 && args.size() != 6)
+        if (args.size() != 4)
             throw WorkspacesCli::Error(2, L"invalidArguments", "Invalid worker arguments.");
         const auto mapping = reinterpret_cast<HANDLE>(std::stoull(args[1]));
         const auto cancel = reinterpret_cast<HANDLE>(std::stoull(args[2]));
@@ -176,45 +137,12 @@ namespace
             options.deadline <= GetTickCount64())
             throw WorkspacesCli::Error(9, L"timeout", "Operation deadline has expired.");
         WorkspacesCli::OperationLifetime lifetime(parentPid, options.timeoutSeconds * 1000 + 5000, ownerLifetime);
-        std::optional<WorkspacesCli::WorkerApproval> approval;
-        std::optional<bool> approvalOriginValid;
-        if (args.size() == 6)
-        {
-            const auto requestWrite = reinterpret_cast<HANDLE>(std::stoull(args[4]));
-            const auto responseRead = reinterpret_cast<HANDLE>(std::stoull(args[5]));
-            if (GetFileType(requestWrite) != FILE_TYPE_PIPE || GetFileType(responseRead) != FILE_TYPE_PIPE)
-                throw WorkspacesCli::Error(8, L"invalidData", "Invalid confirmation handles.");
-            Check(SetHandleInformation(requestWrite, HANDLE_FLAG_INHERIT, 0), "Cannot isolate approval request handle.");
-            Check(SetHandleInformation(responseRead, HANDLE_FLAG_INHERIT, 0), "Cannot isolate approval response handle.");
-            approval.emplace(requestWrite, responseRead, [&] {
-                return WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0 || GetTickCount64() >= options.deadline;
-            });
-            options.requestApproval = [&](const auto& name, const auto& path, const auto& arguments, const auto& verification) {
-                if (!ownerLifetime && !approvalOriginValid.has_value())
-                {
-                    try
-                    {
-                        WorkspacesCli::ValidateApprovalOrigin(requestWrite, parentPid);
-                        WorkspacesCli::ValidateApprovalOrigin(responseRead, parentPid);
-                        approvalOriginValid = true;
-                    }
-                    catch (const WorkspacesCli::Error&)
-                    {
-                        approvalOriginValid = false;
-                    }
-                }
-                if (!ownerLifetime && !approvalOriginValid.value_or(false))
-                    return LaunchDecision::UiUnavailable;
-                return approval->Request(name, path, arguments, verification);
-            };
-        }
         WorkspacesCli::CheckEnabled();
         CheckLaunchContext();
         auto project = WorkspacesData::WorkspacesProjectJSON::FromJson(request.GetNamedObject(L"workspace"));
         if (!project)
             throw WorkspacesCli::Error(8, L"invalidData", "Invalid operation snapshot.");
-        Utils::Apps::UpdateWorkspacesApps(*project, Utils::Apps::GetAppsList());
-        ValidateLaunch(*project);
+        WorkspacesCli::ValidateLaunch(*project, true);
         wil::unique_mutex_nothrow mutex(CreateMutexW(nullptr, TRUE, L"Local\\PowerToys_WorkspacesLauncher_InstanceMutex"));
         const auto mutexError = GetLastError();
         if (!mutex)
@@ -224,7 +152,16 @@ namespace
         auto release = wil::scope_exit([&] { ReleaseMutex(mutex.get()); });
         if (WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0)
             throw WorkspacesCli::Error(12, L"canceled", "Operation canceled before starting applications.");
-        CliLogging::Initialize();
+        if (GetTickCount64() >= options.deadline)
+            throw WorkspacesCli::Error(9, L"timeout", "Operation deadline expired before application preparation.");
+        WorkspacesCli::EnsureApplicationIds(WorkspacesCli::SettingsRoot() / L"Workspaces" / L"workspaces.json", *project);
+        Utils::Apps::UpdateWorkspacesApps(*project, Utils::Apps::GetAppsList());
+        WorkspacesCli::ValidateLaunch(*project);
+        if (WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0)
+            throw WorkspacesCli::Error(12, L"canceled", "Operation canceled before starting applications.");
+        if (GetTickCount64() >= options.deadline)
+            throw WorkspacesCli::Error(9, L"timeout", "Operation deadline expired before starting applications.");
+        const bool loggingReady = CliLogging::Initialize();
         Logger::info("Workspaces CLI: launch worker started");
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         std::vector<WorkspacesData::WorkspacesProject> unusedStore;
@@ -242,6 +179,13 @@ namespace
                 throw WorkspacesCli::Error(9, L"outcomeUnknown", "Arranger exited without its final result.");
             result = WorkspacesCli::LaunchResult(*project, launcher.GetResult(), options.operationId, exitCode,
                                                 launcher.GetApplicationErrors(), launcher.GetApprovalDecisions());
+        }
+        if (!loggingReady)
+        {
+            json::JsonObject warning;
+            warning.SetNamedValue(L"code", json::value(L"loggingUnavailable"));
+            warning.SetNamedValue(L"message", json::value(L"File logging is unavailable for this operation. The launch result is unaffected."));
+            result.GetNamedArray(L"warnings").Append(warning);
         }
         const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         const auto saved = WorkspaceStore::UpdateLastLaunched(WorkspacesCli::SettingsRoot() / L"Workspaces" / L"workspaces.json", project->id, now);
@@ -276,7 +220,7 @@ namespace
         const auto arranger = std::filesystem::path(ExePath()).parent_path() / L"PowerToys.WorkspacesWindowArranger.exe";
         if (!std::filesystem::is_regular_file(arranger))
             throw WorkspacesCli::Error(6, L"unavailable", "The matching window arranger is unavailable.");
-        ValidateLaunch(project);
+        WorkspacesCli::ValidateLaunch(project, true);
         GUID guid{};
         winrt::check_hresult(CoCreateGuid(&guid));
         wchar_t guidText[40]{};
@@ -312,19 +256,13 @@ namespace
         wil::unique_handle write;
         Check(CreatePipe(read.put(), write.put(), &attributes, 0), "Cannot create result pipe.");
         Check(SetHandleInformation(read.get(), HANDLE_FLAG_INHERIT, 0), "Cannot restrict result handle inheritance.");
-        auto approvalRequests = WorkspacesCli::ApprovalPipe::Create();
-        auto approvalResponses = WorkspacesCli::ApprovalPipe::Create();
-        Check(SetHandleInformation(approvalRequests.write.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT),
-              "Cannot inherit confirmation requests.");
-        Check(SetHandleInformation(approvalResponses.read.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT),
-              "Cannot inherit confirmation replies.");
         wil::unique_handle input(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &attributes, OPEN_EXISTING, 0, nullptr));
         const auto executable = ExePath();
         wil::unique_process_information process;
         if (elevatedCaller)
         {
             process = WorkspacesCli::StartMediumWorker(executable, operationId,
-                {mapping.get(), cancel.get(), input.get(), write.get(), approvalRequests.write.get(), approvalResponses.read.get()}, deadline);
+                {mapping.get(), cancel.get(), input.get(), write.get()}, deadline);
         }
         else
         {
@@ -334,8 +272,7 @@ namespace
             auto list = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributeStorage.data());
             Check(InitializeProcThreadAttributeList(list, 1, 0, &attributeBytes), "Cannot initialize handle inheritance.");
             auto deleteList = wil::scope_exit([&] { DeleteProcThreadAttributeList(list); });
-            HANDLE inherited[] = { mapping.get(), cancel.get(), write.get(), input.get(),
-                                   approvalRequests.write.get(), approvalResponses.read.get() };
+            HANDLE inherited[] = { mapping.get(), cancel.get(), write.get(), input.get() };
             Check(UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inherited, sizeof(inherited), nullptr, nullptr),
                   "Cannot restrict inherited operation handles.");
             STARTUPINFOEXW startup{};
@@ -347,16 +284,12 @@ namespace
             startup.lpAttributeList = list;
             std::wstring command = L"\"" + executable + L"\" --launch-worker " +
                 std::to_wstring(reinterpret_cast<uintptr_t>(mapping.get())) + L" " +
-                std::to_wstring(reinterpret_cast<uintptr_t>(cancel.get())) + L" " + std::to_wstring(GetCurrentProcessId()) + L" " +
-                std::to_wstring(reinterpret_cast<uintptr_t>(approvalRequests.write.get())) + L" " +
-                std::to_wstring(reinterpret_cast<uintptr_t>(approvalResponses.read.get()));
+                std::to_wstring(reinterpret_cast<uintptr_t>(cancel.get())) + L" " + std::to_wstring(GetCurrentProcessId());
             Check(CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, TRUE,
                 EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW, nullptr, nullptr, &startup.StartupInfo, &process),
                 "Cannot start launch worker.");
         }
         write.reset();
-        approvalRequests.write.reset();
-        approvalResponses.read.reset();
         auto cleanup = wil::scope_exit([&] {
             if (WaitForSingleObject(process.hProcess, 0) == WAIT_TIMEOUT)
             {
@@ -368,66 +301,7 @@ namespace
                 }
             }
         });
-        WorkspacesCli::ConsoleApproval prompt(GetStdHandle(STD_INPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE),
-            CliResources::ApprovalText());
-        WorkspacesCli::FrontendApproval presenter(approvalRequests.read.get(), approvalResponses.write.get(), prompt, cancel.get());
-        std::string response;
-        ULONGLONG cancelDeadline = 0;
-        for (;;)
-        {
-            const auto now = GetTickCount64();
-            if (now >= deadline)
-                throw WorkspacesCli::Error(9, L"outcomeUnknown", "Wait ended without a final result. Already launched applications remain open; do not retry automatically.");
-            if (WaitForSingleObject(cancel.get(), 0) == WAIT_OBJECT_0)
-            {
-                presenter.Stop();
-                if (!cancelDeadline)
-                    cancelDeadline = now + 2000;
-                else if (now >= cancelDeadline)
-                    throw WorkspacesCli::Error(9, L"outcomeUnknown", "Cancellation was not acknowledged before the wait ended.");
-            }
-            presenter.Poll();
-            DWORD available = 0;
-            if (PeekNamedPipe(read.get(), nullptr, 0, nullptr, &available, nullptr) && available)
-            {
-                char buffer[4096];
-                DWORD received = 0;
-                Check(ReadFile(read.get(), buffer, (std::min)(available, static_cast<DWORD>(sizeof(buffer))), &received, nullptr),
-                      "Cannot read worker result.");
-                response.append(buffer, received);
-                if (response.size() > WorkspacesCli::MaxPayload)
-                    throw WorkspacesCli::Error(9, L"outcomeUnknown", "Worker returned an oversized result.");
-                continue;
-            }
-            if (WaitForSingleObject(process.hProcess, 0) == WAIT_OBJECT_0)
-            {
-                if (PeekNamedPipe(read.get(), nullptr, 0, nullptr, &available, nullptr) && available)
-                    continue;
-                break;
-            }
-            Sleep(20);
-        }
-        presenter.Stop();
-        DWORD processExit = 1;
-        Check(GetExitCodeProcess(process.hProcess, &processExit), "Cannot read worker exit status.");
-        if (response.empty())
-            throw WorkspacesCli::Error(9, L"outcomeUnknown", "Worker exited without a final result.");
-        json::JsonObject output;
-        try
-        {
-            output = json::JsonObject::Parse(winrt::to_hstring(response));
-        }
-        catch (const winrt::hresult_error&)
-        {
-            throw WorkspacesCli::Error(9, L"outcomeUnknown", "Worker returned an invalid result.");
-        }
-        if (output.GetNamedNumber(L"schemaVersion") != 1 || output.GetNamedString(L"command") != L"launch")
-            throw WorkspacesCli::Error(9, L"outcomeUnknown", "Worker result contract mismatch.");
-        exitCode = static_cast<int>(processExit);
-        if (output.HasKey(L"result") &&
-            output.GetNamedObject(L"result").GetNamedString(L"operationId") != operationId)
-            throw WorkspacesCli::Error(9, L"outcomeUnknown", "Worker returned a different operation result.");
-        return output;
+        return WorkspacesCli::ReadWorkerResult(process.hProcess, read.get(), cancel.get(), deadline, operationId, exitCode);
     }
 }
 
@@ -439,10 +313,10 @@ int wmain(int argc, wchar_t** argv)
     const bool asJson = worker || WorkspacesCli::WantsJson(args);
     std::wstring command = worker ? L"launch" : (args.empty() ? L"" : args.front());
     Logger::init(std::vector<spdlog::sink_ptr>{ std::make_shared<spdlog::sinks::null_sink_mt>() });
+    WorkspacesCli::ConsoleOutputCodePage consoleCodePage(!worker);
     try
     {
         winrt::init_apartment();
-        SetConsoleOutputCP(CP_UTF8);
         if (connectedWorker)
         {
             if (args.size() != 3)
@@ -454,8 +328,6 @@ int wmain(int argc, wchar_t** argv)
                 std::to_wstring(reinterpret_cast<uintptr_t>(handles.snapshot.get())),
                 std::to_wstring(reinterpret_cast<uintptr_t>(handles.cancel.get())),
                 std::to_wstring(handles.ownerPid),
-                std::to_wstring(reinterpret_cast<uintptr_t>(handles.approvalRequests.get())),
-                std::to_wstring(reinterpret_cast<uintptr_t>(handles.approvalReplies.get())),
             };
             return Worker(workerArguments, handles.ownerLifetime.get());
         }

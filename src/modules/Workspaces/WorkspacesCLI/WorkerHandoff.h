@@ -13,8 +13,6 @@ namespace WorkspacesCli
         HANDLE cancel = nullptr;
         HANDLE input = nullptr;
         HANDLE result = nullptr;
-        HANDLE approvalRequests = nullptr;
-        HANDLE approvalReplies = nullptr;
     };
 
     struct ReceivedWorkerHandles
@@ -23,8 +21,6 @@ namespace WorkspacesCli
         wil::unique_handle cancel;
         wil::unique_handle input;
         wil::unique_handle result;
-        wil::unique_handle approvalRequests;
-        wil::unique_handle approvalReplies;
         wil::unique_handle ownerLifetime;
         DWORD ownerPid = 0;
 
@@ -36,5 +32,4 @@ namespace WorkspacesCli
     ReceivedWorkerHandles ReceiveWorkerHandles(const std::wstring& operationId, DWORD ownerPid);
     bool SameUserSession(HANDLE first, HANDLE second);
     bool IsMediumProcess(HANDLE process);
-    void ValidateApprovalOrigin(HANDLE pipe, DWORD ownerPid);
 }

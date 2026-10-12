@@ -3,9 +3,9 @@
 
 #include <string>
 #include <string_view>
+#include <iostream>
 #include "Generated Files/resource.h"
 #include <WorkspacesLib/CliCommands.h>
-#include "ConsoleApproval.h"
 
 namespace CliResources
 {
@@ -32,6 +32,10 @@ namespace CliResources
             return IDS_CLIINVALIDDATA;
         if (code == L"storageError")
             return IDS_CLISTORAGEERROR;
+        if (code == L"workspaceChanged")
+            return IDS_CLIWORKSPACECHANGED;
+        if (code == L"applicationIdSaveFailed")
+            return IDS_CLIAPPLICATIONIDSAVEFAILED;
         if (code == L"workspaceNotFound")
             return IDS_CLINOTFOUND;
         if (code == L"ambiguousName")
@@ -82,6 +86,8 @@ namespace CliResources
                 const auto code = warning.GetNamedString(L"code");
                 if (code == L"metadataSaveFailed" || code == L"metadataSaveConflict")
                     warning.SetNamedValue(L"message", json::value(Get(IDS_CLIMETADATAWARNING)));
+                else if (code == L"loggingUnavailable")
+                    warning.SetNamedValue(L"message", json::value(Get(IDS_CLILOGGINGWARNING)));
             }
         }
         if (output.GetNamedString(L"command", L"") == L"launch" && output.HasKey(L"result"))
@@ -90,24 +96,30 @@ namespace CliResources
             {
                 const auto app = value.GetObjectW();
                 const auto code = app.GetNamedString(L"code", L"");
-                if (code == L"confirmationRequired" || code == L"confirmationTimedOut" ||
+                if (app.GetNamedString(L"state", L"") == L"launched")
+                    app.SetNamedValue(L"message", json::value(Get(IDS_CLIARRANGEMENTUNCONFIRMED)));
+                else if (code == L"confirmationRequired" || code == L"confirmationTimedOut" ||
                     code == L"confirmationFailed" || code == L"skipped" || code == L"consentDenied" || code == L"canceled")
                     app.SetNamedValue(L"message", json::value(Get(ErrorMessage(code.c_str()))));
             }
         }
     }
 
-    inline WorkspacesCli::ApprovalPromptText ApprovalText()
+    inline void LocalizeForOutput(const json::JsonObject& output, bool workerOutput)
     {
-        return {
-            Get(IDS_CLIAPPROVALINTRODUCTION),
-            Get(IDS_CLIAPPROVALAPP),
-            Get(IDS_CLIAPPROVALPATH),
-            Get(IDS_CLIAPPROVALARGUMENTS),
-            Get(IDS_CLIAPPROVALREASON),
-            Get(IDS_CLIAPPROVALSTATUS),
-            Get(IDS_CLIAPPROVALCHOICES),
-            Get(IDS_CLIAPPROVALINVALIDCHOICE),
-        };
+        try
+        {
+            Localize(output);
+        }
+        catch (const WorkspacesCli::Error&)
+        {
+            if (!output.HasKey(L"error"))
+                throw;
+            if (workerOutput)
+                OutputDebugStringW(L"Workspaces CLI: localized error resources are unavailable.\n");
+            else
+                std::cerr << "Workspaces CLI: localized error resources are unavailable.\n";
+        }
     }
+
 }

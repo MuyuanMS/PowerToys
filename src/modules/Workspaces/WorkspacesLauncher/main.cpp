@@ -10,13 +10,13 @@
 #include <common/Telemetry/EtwTrace/EtwTrace.h>
 
 #include <WorkspacesLib/JsonUtils.h>
-#include <WorkspacesLib/WorkspaceStore.h>
 #include <WorkspacesLib/utils.h>
 
 #include <Launcher.h>
 
 #include <Generated Files/resource.h>
 #include <WorkspacesLib/AppUtils.h>
+#include <WorkspacesLib/WorkspaceStore.h>
 #include <WorkspacesLib/trace.h>
 
 const std::wstring moduleName = L"Workspaces\\WorkspacesLauncher";
@@ -66,7 +66,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
 
             std::wstring cmd = cmdArgs.workspaceId + L" " + std::to_wstring(cmdArgs.invokePoint) + L" " + NonLocalizable::restartedString;
 
-            RunNonElevatedEx(exe_path.get(), cmd, modulePath);
+            if (!run_non_elevated(exe_path.get(), cmd, nullptr, modulePath.c_str()))
+                return 1;
             return 1;
         }
     }
@@ -176,7 +177,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     }
 
     // prepare project in advance
-    const auto originalProject = WorkspacesData::WorkspacesProjectJSON::ToJson(projectToLaunch);
+    const auto originalProject = projectToLaunch;
     auto installedApps = Utils::Apps::GetAppsList();
     bool updatedApps = Utils::Apps::UpdateWorkspacesApps(projectToLaunch, installedApps);
     bool updatedIds = false;
@@ -194,11 +195,12 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     // update the file before launching, so WorkspacesWindowArranger and WorkspacesLauncherUI could get updated app paths
     if (updatedApps || updatedIds)
     {
-        const auto result = WorkspaceStore::UpdateApplicationMetadata(WorkspacesData::WorkspacesFile(),
-                                                                      originalProject,
-                                                                      WorkspacesData::WorkspacesProjectJSON::ToJson(projectToLaunch));
-        if (result != WorkspaceStore::UpdateResult::Updated)
-            Logger::warn("Updated workspace application metadata could not be saved without overwriting concurrent changes");
+        const auto saved = WorkspaceStore::UpdateApplicationMetadata(WorkspacesData::WorkspacesFile(), originalProject, projectToLaunch);
+        if (saved != WorkspaceStore::UpdateResult::Updated)
+        {
+            Logger::error("Workspace application metadata could not be committed; launch stopped to avoid inconsistent launcher and arranger data.");
+            return 1;
+        }
     }
 
     // launch
