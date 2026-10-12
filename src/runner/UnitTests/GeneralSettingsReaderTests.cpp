@@ -27,7 +27,8 @@ namespace RunnerUnitTests
 
         TEST_METHOD_CLEANUP(RemoveSettingsFile)
         {
-            std::filesystem::remove(m_settingsPath);
+            std::error_code ec;
+            std::filesystem::remove(m_settingsPath, ec);
             for (unsigned int attempt = 0; attempt < 100; ++attempt)
             {
                 std::filesystem::path backup_path{ m_settingsPath };
@@ -36,7 +37,7 @@ namespace RunnerUnitTests
                 {
                     backup_path += L"." + std::to_wstring(attempt);
                 }
-                std::filesystem::remove(backup_path);
+                std::filesystem::remove(backup_path, ec);
             }
             winrt::uninit_apartment();
         }

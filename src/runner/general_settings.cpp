@@ -17,6 +17,8 @@
 #include <common/version/version.h>
 #include <common/utils/resources.h>
 
+#include <mutex>
+
 namespace
 {
     json::JsonValue create_empty_shortcut_array_value()
@@ -87,6 +89,7 @@ static DashboardSortOrder dashboard_sort_order = DashboardSortOrder::Alphabetica
 static json::JsonObject ignored_conflict_properties = create_default_ignored_conflict_properties();
 static std::optional<json::JsonObject> last_successfully_loaded_general_settings;
 static bool general_settings_load_succeeded = false;
+static std::mutex general_settings_snapshot_mutex;
 
 json::JsonObject GeneralSettings::to_json()
 {
@@ -135,13 +138,21 @@ json::JsonObject load_general_settings()
     auto loaded_opt = load_general_settings_checked();
     if (!loaded_opt.has_value())
     {
-        general_settings_load_succeeded = false;
+        std::optional<json::JsonObject> last_loaded;
+        {
+            std::lock_guard lock{ general_settings_snapshot_mutex };
+            general_settings_load_succeeded = false;
+            last_loaded = last_successfully_loaded_general_settings;
+        }
         Logger::warn(L"load_general_settings: Could not load settings.json safely; retaining the last loaded settings.");
-        return last_successfully_loaded_general_settings.value_or(json::JsonObject{});
+        return last_loaded.value_or(json::JsonObject{});
     }
     auto loaded = std::move(loaded_opt).value();
-    last_successfully_loaded_general_settings = loaded;
-    general_settings_load_succeeded = true;
+    {
+        std::lock_guard lock{ general_settings_snapshot_mutex };
+        last_successfully_loaded_general_settings = loaded;
+        general_settings_load_succeeded = true;
+    }
     settings_theme = loaded.GetNamedString(L"theme", L"system");
     if (settings_theme != L"dark" && settings_theme != L"light")
     {
@@ -180,6 +191,7 @@ json::JsonObject load_general_settings()
 void save_general_settings(const json::JsonObject& settings)
 {
     PTSettingsHelper::save_general_settings(settings);
+    std::lock_guard lock{ general_settings_snapshot_mutex };
     last_successfully_loaded_general_settings = settings;
     general_settings_load_succeeded = true;
 }
@@ -217,14 +229,22 @@ GeneralSettings get_general_settings(bool refresh_settings_from_disk)
     // which are missing or failed to load remain represented.
     try
     {
-        auto loaded_opt = refresh_settings_from_disk ? load_general_settings_checked() : last_successfully_loaded_general_settings;
+        std::optional<json::JsonObject> loaded_opt;
         if (refresh_settings_from_disk)
         {
+            loaded_opt = load_general_settings_checked();
+            std::lock_guard lock{ general_settings_snapshot_mutex };
             general_settings_load_succeeded = loaded_opt.has_value();
-            if (loaded_opt.has_value())
+            if (loaded_opt)
             {
-                last_successfully_loaded_general_settings = *loaded_opt;
+                last_successfully_loaded_general_settings = loaded_opt;
             }
+        }
+        else
+        {
+            std::lock_guard lock{ general_settings_snapshot_mutex };
+            loaded_opt = last_successfully_loaded_general_settings;
+            settings.isDataLoadedSuccessfully = general_settings_load_succeeded;
         }
 
         if (!loaded_opt.has_value())
@@ -233,7 +253,11 @@ GeneralSettings get_general_settings(bool refresh_settings_from_disk)
         }
         else
         {
-            settings.isDataLoadedSuccessfully = general_settings_load_succeeded;
+            if (refresh_settings_from_disk)
+            {
+                std::lock_guard lock{ general_settings_snapshot_mutex };
+                settings.isDataLoadedSuccessfully = general_settings_load_succeeded;
+            }
             const json::JsonObject& loaded = *loaded_opt;
 
             if (json::has(loaded, L"enabled", json::JsonValueType::Object))
@@ -252,7 +276,10 @@ GeneralSettings get_general_settings(bool refresh_settings_from_disk)
     catch (...)
     {
         Logger::error(L"get_general_settings: Failed to load durable module settings.");
-        general_settings_load_succeeded = false;
+        {
+            std::lock_guard lock{ general_settings_snapshot_mutex };
+            general_settings_load_succeeded = false;
+        }
         settings.isDataLoadedSuccessfully = false;
     }
 
@@ -339,16 +366,20 @@ void apply_module_status_update(const json::JsonObject& module_config, bool save
         auto loaded_opt = load_general_settings_checked();
         if (!loaded_opt.has_value())
         {
+            std::lock_guard lock{ general_settings_snapshot_mutex };
             general_settings_load_succeeded = false;
             Logger::warn(L"apply_module_status_update: Skipping save because settings.json could not be loaded safely.");
             return;
         }
-        general_settings_load_succeeded = true;
 
         // Use the successful read as the base for the update, or create a new settings
         // object if the file doesn't exist.
         json::JsonObject current_settings = std::move(loaded_opt).value();
-        last_successfully_loaded_general_settings = current_settings;
+        {
+            std::lock_guard lock{ general_settings_snapshot_mutex };
+            last_successfully_loaded_general_settings = current_settings;
+            general_settings_load_succeeded = true;
+        }
 
         json::JsonObject enabled;
         if (json::has(current_settings, L"enabled", json::JsonValueType::Object))
