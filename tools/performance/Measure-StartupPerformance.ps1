@@ -865,7 +865,7 @@ function Stop-RootProcesses
 
 function Stop-LaunchedProcesses
 {
-    foreach ($process in $script:launched)
+    foreach ($process in @($script:launched))
     {
         try
         {
@@ -883,9 +883,17 @@ function Stop-LaunchedProcesses
                 Stop-ProcessAndDescendants -Process $process
             }
         }
+        catch [ObjectDisposedException]
+        {
+        }
         catch
         {
             Write-Warning "Couldn't stop process $($process.Id): $($_.Exception.Message)"
+        }
+        finally
+        {
+            [void]$script:launched.Remove($process)
+            $process.Dispose()
         }
     }
 }
@@ -986,12 +994,35 @@ function Start-TargetProcess
 {
     param([Parameter(Mandatory)][string]$Path, [string]$Arguments = '')
 
+    Clear-ExitedLaunchedProcesses
     $startInfo = [Diagnostics.ProcessStartInfo]::new($Path, $Arguments)
     $startInfo.UseShellExecute = $false
     $startInfo.WorkingDirectory = Split-Path $Path -Parent
     $process = [Diagnostics.Process]::Start($startInfo)
     $script:launched.Add($process)
     return $process
+}
+
+function Clear-ExitedLaunchedProcesses
+{
+    foreach ($process in @($script:launched))
+    {
+        try
+        {
+            if (-not $process.HasExited)
+            {
+                continue
+            }
+        }
+        catch [ObjectDisposedException]
+        {
+            [void]$script:launched.Remove($process)
+            continue
+        }
+
+        [void]$script:launched.Remove($process)
+        $process.Dispose()
+    }
 }
 
 function Add-Sample
@@ -1292,6 +1323,12 @@ function Wait-RunnerStartupStages
             $stream = [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
             try
             {
+                if ($stream.Length -lt $offset)
+                {
+                    $offset = 0
+                    $Offsets[$file.FullName] = 0
+                }
+
                 if ($stream.Length -le $offset)
                 {
                     continue
