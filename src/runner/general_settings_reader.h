@@ -13,6 +13,8 @@
 #include <string>
 #include <thread>
 
+#include <winrt/base.h>
+
 #include <common/logger/logger.h>
 #include <common/utils/json.h>
 
@@ -40,7 +42,7 @@ namespace general_settings
             }
             if (backup_exists)
             {
-                std::ifstream existing_backup{ backup_path, std::ios::binary };
+                std::ifstream existing_backup{ std::filesystem::path{ backup_path }, std::ios::binary };
                 if (existing_backup.is_open())
                 {
                     using isbi = std::istreambuf_iterator<char>;
@@ -64,7 +66,7 @@ namespace general_settings
                 return std::nullopt;
             }
 
-            std::ifstream backup_file{ backup_path, std::ios::binary };
+            std::ifstream backup_file{ std::filesystem::path{ backup_path }, std::ios::binary };
             if (!backup_file.is_open())
             {
                 return std::nullopt;
@@ -89,7 +91,7 @@ namespace general_settings
         const bool exists = std::filesystem::exists(settings_path, ec);
         if (ec)
         {
-            Logger::warn("load_general_settings_checked: Failed to check if settings.json exists: {}", ec.message());
+            Logger::warn("load_from_file_checked: Failed to check if settings.json exists: {}", ec.message());
             return std::nullopt;
         }
 
@@ -98,10 +100,10 @@ namespace general_settings
             return json::JsonObject{};
         }
 
-        std::ifstream settings_file{ settings_path, std::ios::binary };
+        std::ifstream settings_file{ std::filesystem::path{ settings_path }, std::ios::binary };
         if (!settings_file.is_open())
         {
-            Logger::warn(L"load_general_settings_checked: Failed to open existing settings.json.");
+            Logger::warn(L"load_from_file_checked: Failed to open existing settings.json.");
             return std::nullopt;
         }
 
@@ -109,7 +111,7 @@ namespace general_settings
         std::string contents{ isbi{ settings_file }, isbi{} };
         if (settings_file.bad())
         {
-            Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json.");
+            Logger::warn(L"load_from_file_checked: Failed to read existing settings.json.");
             return std::nullopt;
         }
 
@@ -122,17 +124,17 @@ namespace general_settings
             {
                 std::this_thread::sleep_for(delay);
 
-                std::ifstream retry_file{ settings_path, std::ios::binary };
+                std::ifstream retry_file{ std::filesystem::path{ settings_path }, std::ios::binary };
                 if (!retry_file.is_open())
                 {
-                    Logger::warn(L"load_general_settings_checked: Failed to reopen existing settings.json while retrying an empty read.");
+                    Logger::warn(L"load_from_file_checked: Failed to reopen existing settings.json while retrying an empty read.");
                     return std::nullopt;
                 }
 
                 contents.assign(isbi{ retry_file }, isbi{});
                 if (retry_file.bad())
                 {
-                    Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json while retrying an empty read.");
+                    Logger::warn(L"load_from_file_checked: Failed to read existing settings.json while retrying an empty read.");
                     return std::nullopt;
                 }
 
@@ -147,12 +149,12 @@ namespace general_settings
                 const auto backup_path = preserve_invalid_settings_file(settings_path, contents);
                 if (!backup_path.has_value())
                 {
-                    Logger::warn(L"load_general_settings_checked: Empty settings.json could not be safely preserved.");
+                    Logger::warn(L"load_from_file_checked: Empty settings.json could not be safely preserved.");
                     return std::nullopt;
                 }
 
                 Logger::warn(
-                    L"load_general_settings_checked: Empty settings.json was preserved as {}; defaults will be used until settings are saved.",
+                    L"load_from_file_checked: Empty settings.json was preserved as {}; defaults will be used until settings are saved.",
                     backup_path->wstring());
                 return json::JsonObject{};
             }
@@ -167,12 +169,12 @@ namespace general_settings
         const auto backup_path = preserve_invalid_settings_file(settings_path, contents);
         if (!backup_path.has_value())
         {
-            Logger::warn(L"load_general_settings_checked: Invalid settings.json could not be safely preserved.");
+            Logger::warn(L"load_from_file_checked: Invalid settings.json could not be safely preserved.");
             return std::nullopt;
         }
 
         Logger::warn(
-            L"load_general_settings_checked: Invalid settings.json was preserved as {}; defaults will be used until settings are saved.",
+            L"load_from_file_checked: Invalid settings.json was preserved as {}; defaults will be used until settings are saved.",
             backup_path->wstring());
         return json::JsonObject{};
     }

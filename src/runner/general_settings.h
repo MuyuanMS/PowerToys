@@ -33,7 +33,7 @@ struct GeneralSettings
     std::wstring powerToysVersion;
     json::JsonObject ignoredConflictProperties;
 
-    // Flag to indicate whether durable settings were successfully read from disk.
+    // Indicates whether durable settings were read or safely recovered and can be written back.
     bool isDataLoadedSuccessfully = true;
 
     json::JsonObject to_json();

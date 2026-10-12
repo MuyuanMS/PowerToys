@@ -85,6 +85,7 @@ static bool enable_quick_access = true;
 static PowerToysSettings::HotkeyObject quick_access_shortcut;
 static DashboardSortOrder dashboard_sort_order = DashboardSortOrder::Alphabetical;
 static json::JsonObject ignored_conflict_properties = create_default_ignored_conflict_properties();
+static std::optional<json::JsonObject> last_successfully_loaded_general_settings;
 
 json::JsonObject GeneralSettings::to_json()
 {
@@ -134,9 +135,10 @@ json::JsonObject load_general_settings()
     if (!loaded_opt.has_value())
     {
         Logger::warn(L"load_general_settings: Skipping global state update due to transient read error on settings.json.");
-        return json::JsonObject{};
+        return last_successfully_loaded_general_settings.value_or(json::JsonObject{});
     }
     auto loaded = std::move(loaded_opt).value();
+    last_successfully_loaded_general_settings = loaded;
     settings_theme = loaded.GetNamedString(L"theme", L"system");
     if (settings_theme != L"dark" && settings_theme != L"light")
     {
