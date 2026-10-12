@@ -196,7 +196,7 @@ void save_general_settings(const json::JsonObject& settings)
     general_settings_load_succeeded = true;
 }
 
-GeneralSettings get_general_settings(bool refresh_settings_from_disk)
+GeneralSettings get_general_settings(bool refresh_module_enabled_settings_from_disk)
 {
     const bool is_user_admin = check_user_is_admin();
     GeneralSettings settings
@@ -230,7 +230,7 @@ GeneralSettings get_general_settings(bool refresh_settings_from_disk)
     try
     {
         std::optional<json::JsonObject> loaded_opt;
-        if (refresh_settings_from_disk)
+        if (refresh_module_enabled_settings_from_disk)
         {
             loaded_opt = load_general_settings_checked();
             std::lock_guard lock{ general_settings_snapshot_mutex };
@@ -253,7 +253,7 @@ GeneralSettings get_general_settings(bool refresh_settings_from_disk)
         }
         else
         {
-            if (refresh_settings_from_disk)
+            if (refresh_module_enabled_settings_from_disk)
             {
                 std::lock_guard lock{ general_settings_snapshot_mutex };
                 settings.isDataLoadedSuccessfully = general_settings_load_succeeded;
