@@ -36,6 +36,7 @@ namespace KeyboardManagerEditorUI.Controls
 
         private bool _disposed;
         private bool _internalUpdate;
+        private bool _inlineValidationErrorVisible;
 
         private KeyInputMode _currentInputMode = KeyInputMode.OriginalKeys;
 
@@ -1132,7 +1133,7 @@ namespace KeyboardManagerEditorUI.Controls
                 case ActionType.Text:
                     if (TextContentBox != null && _textContentDirty && string.IsNullOrWhiteSpace(TextContentBox.Text))
                     {
-                        ShowValidationErrorFromType(ValidationErrorType.EmptyTargetText);
+                        ShowInlineValidationErrorFromType(ValidationErrorType.EmptyTargetText);
                         return;
                     }
 
@@ -1141,7 +1142,7 @@ namespace KeyboardManagerEditorUI.Controls
                 case ActionType.OpenUrl:
                     if (UrlPathInput != null && _urlPathDirty && string.IsNullOrWhiteSpace(UrlPathInput.Text))
                     {
-                        ShowValidationErrorFromType(ValidationErrorType.EmptyUrl);
+                        ShowInlineValidationErrorFromType(ValidationErrorType.EmptyUrl);
                         return;
                     }
 
@@ -1150,14 +1151,25 @@ namespace KeyboardManagerEditorUI.Controls
                 case ActionType.OpenApp:
                     if (ProgramPathInput != null && _programPathDirty && string.IsNullOrWhiteSpace(ProgramPathInput.Text))
                     {
-                        ShowValidationErrorFromType(ValidationErrorType.EmptyProgramPath);
+                        ShowInlineValidationErrorFromType(ValidationErrorType.EmptyProgramPath);
                         return;
                     }
 
                     break;
             }
 
+            if (_inlineValidationErrorVisible)
+            {
+                HideValidationMessage();
+            }
+
             ShowAdvisoryWarningOrHide();
+        }
+
+        private void ShowInlineValidationErrorFromType(ValidationErrorType errorType)
+        {
+            ShowValidationErrorFromType(errorType);
+            _inlineValidationErrorVisible = true;
         }
 
         /// <summary>
@@ -1341,6 +1353,7 @@ namespace KeyboardManagerEditorUI.Controls
         /// </summary>
         private void ShowValidationMessage(string title, string message, InfoBarSeverity severity)
         {
+            _inlineValidationErrorVisible = false;
             if (ValidationInfoBar != null)
             {
                 ValidationInfoBar.Title = title;
@@ -1355,6 +1368,7 @@ namespace KeyboardManagerEditorUI.Controls
         /// </summary>
         public void HideValidationMessage()
         {
+            _inlineValidationErrorVisible = false;
             if (ValidationInfoBar != null)
             {
                 ValidationInfoBar.IsOpen = false;
