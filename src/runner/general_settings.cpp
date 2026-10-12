@@ -7,6 +7,9 @@
 #include "Generated files/resource.h"
 #include "hotkey_conflict_detector.h"
 
+#include <fstream>
+#include <iterator>
+
 #include <common/SettingsAPI/settings_helpers.h>
 #include "powertoy_module.h"
 #include <common/themes/windows_colors.h>
@@ -64,20 +67,78 @@ namespace
         return fallback;
     }
 
+    std::optional<std::filesystem::path> preserve_invalid_settings_file(
+        const std::wstring& settings_path,
+        const std::string& contents)
+    {
+        for (unsigned int attempt = 0; attempt < 100; ++attempt)
+        {
+            std::filesystem::path backup_path{ settings_path };
+            std::wstring suffix = L".corrupt";
+            if (attempt > 0)
+            {
+                suffix += L"." + std::to_wstring(attempt);
+            }
+            backup_path += suffix;
+
+            std::error_code ec;
+            const bool backup_exists = std::filesystem::exists(backup_path, ec);
+            if (ec)
+            {
+                return std::nullopt;
+            }
+            if (backup_exists)
+            {
+                std::ifstream existing_backup{ backup_path, std::ios::binary };
+                if (existing_backup.is_open())
+                {
+                    using isbi = std::istreambuf_iterator<char>;
+                    std::string saved_contents{ isbi{ existing_backup }, isbi{} };
+                    if (!existing_backup.bad() && saved_contents == contents)
+                    {
+                        return backup_path;
+                    }
+                }
+                continue;
+            }
+
+            std::filesystem::copy_file(settings_path, backup_path, std::filesystem::copy_options::none, ec);
+            if (ec)
+            {
+                std::error_code exists_ec;
+                if (std::filesystem::exists(backup_path, exists_ec) && !exists_ec)
+                {
+                    continue;
+                }
+                return std::nullopt;
+            }
+
+            std::ifstream backup_file{ backup_path, std::ios::binary };
+            if (!backup_file.is_open())
+            {
+                return std::nullopt;
+            }
+
+            using isbi = std::istreambuf_iterator<char>;
+            std::string saved_contents{ isbi{ backup_file }, isbi{} };
+            if (backup_file.bad() || saved_contents != contents)
+            {
+                return std::nullopt;
+            }
+
+            return backup_path;
+        }
+
+        return std::nullopt;
+    }
+
     // Returns either:
-    // - std::nullopt if there was a read/parse error on an existing non-empty file
-    // (skip saving); or
+    // - std::nullopt if the file could not be read or preserved safely; or
     // - Populated JsonObject if settings were successfully parsed; or
-    // - Empty JsonObject if file is absent or 0-bytes.
+    // - Empty JsonObject if file is absent, 0-bytes, or invalid JSON was backed up.
     std::optional<json::JsonObject> load_general_settings_checked()
     {
         const std::wstring settings_path = PTSettingsHelper::get_powertoys_general_save_file_location();
-
-        auto loaded = json::from_file(settings_path);
-        if (loaded.has_value())
-        {
-            return loaded;
-        }
 
         std::error_code ec;
         const bool exists = std::filesystem::exists(settings_path, ec);
@@ -93,22 +154,44 @@ namespace
             return json::JsonObject{};
         }
 
-        const auto size = std::filesystem::file_size(settings_path, ec);
-        if (ec)
+        std::ifstream settings_file{ settings_path, std::ios::binary };
+        if (!settings_file.is_open())
         {
-            Logger::warn("load_general_settings_checked: Failed to get file size for settings.json: {}", ec.message());
+            Logger::warn(L"load_general_settings_checked: Failed to open existing settings.json; save skipped.");
             return std::nullopt;
         }
 
-        if (size == 0)
+        using isbi = std::istreambuf_iterator<char>;
+        std::string contents{ isbi{ settings_file }, isbi{} };
+        if (settings_file.bad())
+        {
+            Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json; save skipped.");
+            return std::nullopt;
+        }
+
+        if (contents.empty())
         {
             // File exists but is 0 bytes.
             return json::JsonObject{};
         }
 
-        Logger::warn(L"load_general_settings_checked: Failed to read/parse existing settings.json ({} bytes); save skipped.", size);
+        json::JsonObject loaded;
+        if (json::JsonObject::TryParse(winrt::to_hstring(contents), loaded))
+        {
+            return loaded;
+        }
 
-        return std::nullopt;
+        const auto backup_path = preserve_invalid_settings_file(settings_path, contents);
+        if (!backup_path.has_value())
+        {
+            Logger::warn(L"load_general_settings_checked: Invalid settings.json could not be safely preserved; save skipped.");
+            return std::nullopt;
+        }
+
+        Logger::warn(
+            L"load_general_settings_checked: Invalid settings.json was preserved as {}; defaults will be used until settings are saved.",
+            backup_path->wstring());
+        return json::JsonObject{};
     }
 }
 
