@@ -32,6 +32,14 @@ namespace KeyboardManagerEditorUI.UnitTests
         }
 
         [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnEmptyList_ForNullMappings()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(null);
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
         public void IsKeyOrphaned_ShouldTreatShortcutOutputAsAssigned()
         {
             var singleKeyMappings = new[]

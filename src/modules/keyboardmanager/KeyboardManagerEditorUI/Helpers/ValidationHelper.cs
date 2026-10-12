@@ -294,7 +294,7 @@ namespace KeyboardManagerEditorUI.Helpers
             return GetOrphanedKeys(mappings).Contains(originalKey);
         }
 
-        public static IReadOnlyList<int> GetOrphanedKeys(IEnumerable<ShortcutKeyMapping> mappings)
+        public static IReadOnlyList<int> GetOrphanedKeys(IEnumerable<ShortcutKeyMapping>? mappings)
         {
             if (mappings == null)
             {
