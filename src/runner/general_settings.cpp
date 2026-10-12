@@ -329,10 +329,10 @@ void apply_module_status_update(const json::JsonObject& module_config, bool save
             enabled = current_settings.GetNamedObject(L"enabled");
         }
 
-        const bool has_current_saved = json::has(enabled, name, json::JsonValueType::Boolean);
-        const bool current_saved = has_current_saved && enabled.GetNamedBoolean(name);
+        // Missing module settings default to enabled.
+        const bool current_saved = !json::has(enabled, name, json::JsonValueType::Boolean) || enabled.GetNamedBoolean(name);
 
-        if (!has_current_saved || current_saved != target_enabled)
+        if (current_saved != target_enabled)
         {
             // Update only this module's enabled state.
             enabled.SetNamedValue(name, json::value(target_enabled));
