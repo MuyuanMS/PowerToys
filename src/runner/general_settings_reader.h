@@ -4,11 +4,14 @@
 
 #pragma once
 
+#include <array>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <optional>
 #include <string>
+#include <thread>
 
 #include <common/logger/logger.h>
 #include <common/utils/json.h>
@@ -112,7 +115,47 @@ namespace general_settings
 
         if (contents.empty())
         {
-            return std::nullopt;
+            settings_file.close();
+
+            constexpr std::array retry_delays{ std::chrono::milliseconds{ 25 }, std::chrono::milliseconds{ 50 }, std::chrono::milliseconds{ 100 } };
+            for (const auto delay : retry_delays)
+            {
+                std::this_thread::sleep_for(delay);
+
+                std::ifstream retry_file{ settings_path, std::ios::binary };
+                if (!retry_file.is_open())
+                {
+                    Logger::warn(L"load_general_settings_checked: Failed to reopen existing settings.json while retrying an empty read.");
+                    return std::nullopt;
+                }
+
+                contents.assign(isbi{ retry_file }, isbi{});
+                if (retry_file.bad())
+                {
+                    Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json while retrying an empty read.");
+                    return std::nullopt;
+                }
+
+                if (!contents.empty())
+                {
+                    break;
+                }
+            }
+
+            if (contents.empty())
+            {
+                const auto backup_path = preserve_invalid_settings_file(settings_path, contents);
+                if (!backup_path.has_value())
+                {
+                    Logger::warn(L"load_general_settings_checked: Empty settings.json could not be safely preserved.");
+                    return std::nullopt;
+                }
+
+                Logger::warn(
+                    L"load_general_settings_checked: Empty settings.json was preserved as {}; defaults will be used until settings are saved.",
+                    backup_path->wstring());
+                return json::JsonObject{};
+            }
         }
 
         json::JsonObject loaded;

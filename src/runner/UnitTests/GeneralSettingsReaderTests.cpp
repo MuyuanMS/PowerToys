@@ -62,12 +62,15 @@ namespace RunnerUnitTests
             Assert::AreEqual(0U, loaded->Size());
         }
 
-        TEST_METHOD (ExistingEmptyFileDoesNotAllowSaving)
+        TEST_METHOD (ExistingEmptyFileIsBackedUpBeforeRecovery)
         {
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);
 
-            Assert::IsFalse(loaded.has_value(), L"An existing empty file may be an in-progress write, not first-run settings.");
+            Assert::IsTrue(loaded.has_value());
+            Assert::AreEqual(0U, loaded->Size());
             Assert::AreEqual(0ULL, static_cast<unsigned long long>(std::filesystem::file_size(m_settingsPath)));
+            Assert::IsTrue(std::filesystem::exists(GetBackupPath()));
+            Assert::AreEqual(0ULL, static_cast<unsigned long long>(std::filesystem::file_size(GetBackupPath())));
         }
 
         TEST_METHOD (WhitespaceOnlyFileIsBackedUpBeforeRecovery)
@@ -83,7 +86,8 @@ namespace RunnerUnitTests
 
         TEST_METHOD (EmptyFileCanBeReadAfterWriteCompletes)
         {
-            Assert::IsFalse(general_settings::load_from_file_checked(m_settingsPath).has_value());
+            const auto empty = general_settings::load_from_file_checked(m_settingsPath);
+            Assert::IsTrue(empty.has_value());
             WriteSettings(R"({"enabled":{"File Locksmith":false}})");
 
             const auto loaded = general_settings::load_from_file_checked(m_settingsPath);

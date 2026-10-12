@@ -229,6 +229,7 @@ GeneralSettings get_general_settings()
     }
     catch (...)
     {
+        Logger::error(L"get_general_settings: Failed to load durable module settings.");
         settings.isDataLoadedSuccessfully = false;
     }
 
