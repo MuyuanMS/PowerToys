@@ -1,0 +1,24 @@
+[alias]
+# The end-to-end tests need the test hooks; without them Cargo skips those tests silently.
+test-all = "test --workspace --features awake/test-hooks"
+lint = "clippy --workspace --all-targets --features awake/test-hooks"
+# The shipped build has no test hooks, and code behind cfg(not(feature = "test-hooks")) is only
+# compiled, and so only linted, without them.
+lint-shipped = "clippy --workspace --all-targets"
+
+# Match the native PowerToys conventions in Cpp.Build.props: Control Flow Guard and the
+# hybrid CRT (static VC++ runtime, in-box UCRT shared by every module).
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "control-flow-guard=yes",
+    "-C", "link-arg=/NODEFAULTLIB:libucrt.lib",
+    "-C", "link-arg=/DEFAULTLIB:ucrt.lib",
+]
+
+# Cargo joins every matching cfg() and triple section, so only the x64-only flag goes here:
+# CET shadow stacks exist on x64 only. A RUSTFLAGS or CARGO_ENCODED_RUSTFLAGS variable replaces
+# all of these flags, and so does running Cargo from outside this folder; awake/build.rs stops
+# the build when that happens.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/CETCOMPAT"]

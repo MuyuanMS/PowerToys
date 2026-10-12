@@ -1,0 +1,318 @@
+//! The terminal Awake was started from, if any.
+//!
+//! Output goes through a dedicated thread: writing to a console can block (for example while the
+//! user selects text in it), and that must never stall the window thread that holds the
+//! keep-awake request.
+
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+use std::{io, ptr};
+
+use awake_core::text::Style;
+use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
+use windows_sys::Win32::Storage::FileSystem::WriteFile;
+use windows_sys::Win32::System::Console::{
+    ENABLE_PROCESSED_OUTPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING, FreeConsole, GetConsoleMode,
+    GetConsoleProcessList, GetStdHandle, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE, SetConsoleMode, WriteConsoleW,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Output {
+    /// An interactive console window.
+    Console(Style),
+    /// A pipe or a file: plain UTF-8, no live updates.
+    Redirected,
+    /// No standard output at all.
+    None,
+}
+
+/// The output mode the console had before `detect` changed it, or `NOT_SAVED`.
+static ORIGINAL_MODE: AtomicU64 = AtomicU64::new(NOT_SAVED);
+const NOT_SAVED: u64 = u64::MAX;
+
+/// Inspects standard output and, for a console, turns on escape sequences. The mode belongs to
+/// the screen buffer the calling shell keeps using, so call [`restore_mode`] before exiting.
+pub fn detect() -> Output {
+    let handle = std_handle(STD_OUTPUT_HANDLE);
+    if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+        return Output::None;
+    }
+    let mut mode = 0;
+    // SAFETY: valid handle and out-pointer.
+    if unsafe { GetConsoleMode(handle, &mut mode) } == 0 {
+        return Output::Redirected;
+    }
+    let wanted = mode | ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    // SAFETY: as above.
+    let vt = unsafe { SetConsoleMode(handle, wanted) } != 0;
+    if vt && wanted != mode {
+        // Only the first change is remembered, so a second call cannot save Awake's own mode.
+        let _ =
+            ORIGINAL_MODE.compare_exchange(NOT_SAVED, u64::from(mode), Ordering::AcqRel, Ordering::Acquire);
+    }
+    let color = vt && std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
+    // Windows Terminal and VS Code ship fonts with the symbols the rich output uses.
+    let rich_glyphs = std::env::var_os("WT_SESSION").is_some() || std::env::var_os("TERM_PROGRAM").is_some();
+    Output::Console(Style {
+        vt,
+        color,
+        rich_glyphs,
+    })
+}
+
+/// Gives the console back the output mode it had before [`detect`], so the shell does not keep
+/// interpreting escape sequences after Awake exits. Does nothing when the mode was not changed,
+/// and only the first call restores.
+pub fn restore_mode() {
+    let saved = ORIGINAL_MODE.swap(NOT_SAVED, Ordering::AcqRel);
+    let handle = std_handle(STD_OUTPUT_HANDLE);
+    if saved == NOT_SAVED || handle.is_null() || handle == INVALID_HANDLE_VALUE {
+        return;
+    }
+    // SAFETY: valid handle; `saved` came from GetConsoleMode on this same buffer, so it fits in
+    // a u32. A failure (the console is already gone) leaves nothing to restore.
+    unsafe { SetConsoleMode(handle, saved as u32) };
+}
+
+/// The processes attached to this console, Awake included; empty without a console. Unlike
+/// `GetConsoleWindow`, this also sees a console created with `CREATE_NO_WINDOW`, which has no
+/// window at all.
+pub fn attached_processes() -> Vec<u32> {
+    let mut ids = vec![0u32; 64];
+    loop {
+        // SAFETY: the buffer holds `ids.len()` entries.
+        let count = unsafe { GetConsoleProcessList(ids.as_mut_ptr(), ids.len() as u32) } as usize;
+        // A count larger than the buffer means nothing was stored; more processes may attach
+        // before the next call, so leave some room.
+        if count > ids.len() {
+            ids.resize(count + 16, 0);
+            continue;
+        }
+        ids.truncate(count);
+        return ids;
+    }
+}
+
+pub fn write_stdout(text: &str) {
+    write(std_handle(STD_OUTPUT_HANDLE), text);
+}
+
+pub fn write_stderr(text: &str) {
+    write(std_handle(STD_ERROR_HANDLE), text);
+}
+
+fn std_handle(which: u32) -> HANDLE {
+    // SAFETY: plain value call.
+    unsafe { GetStdHandle(which) }
+}
+
+fn write(handle: HANDLE, text: &str) {
+    if handle.is_null() || handle == INVALID_HANDLE_VALUE || text.is_empty() {
+        return;
+    }
+    let mut mode = 0;
+    // SAFETY: valid handle; consoles take UTF-16 so no code page can garble the text.
+    if unsafe { GetConsoleMode(handle, &mut mode) } != 0 {
+        let units: Vec<u16> = text.encode_utf16().collect();
+        for chunk in console_chunks(&units, CONSOLE_CHUNK) {
+            let mut written = 0;
+            // SAFETY: `chunk` is valid for `len` units.
+            unsafe {
+                WriteConsoleW(
+                    handle,
+                    chunk.as_ptr().cast(),
+                    chunk.len() as u32,
+                    &mut written,
+                    ptr::null(),
+                )
+            };
+        }
+    } else {
+        // Styles follow standard output, so text for a redirected standard error can still
+        // carry escape sequences; a file or pipe gets them stripped.
+        let text = strip_escapes(text);
+        for chunk in text.as_bytes().chunks(64 * 1024) {
+            let mut written = 0;
+            // SAFETY: `chunk` is valid for `len` bytes.
+            unsafe {
+                WriteFile(
+                    handle,
+                    chunk.as_ptr(),
+                    chunk.len() as u32,
+                    &mut written,
+                    ptr::null_mut(),
+                )
+            };
+        }
+    }
+}
+
+/// Units per `WriteConsoleW` call, which keeps each call's buffer small.
+const CONSOLE_CHUNK: usize = 8192;
+
+/// Splits UTF-16 text into pieces of at most `max` units without separating a surrogate pair,
+/// which the console would otherwise show as two replacement characters.
+fn console_chunks(units: &[u16], max: usize) -> impl Iterator<Item = &[u16]> {
+    debug_assert!(max >= 2, "a chunk must fit a surrogate pair");
+    let mut rest = units;
+    std::iter::from_fn(move || {
+        if rest.is_empty() {
+            return None;
+        }
+        let mut end = rest.len().min(max);
+        if end < rest.len() && (0xD800..=0xDBFF).contains(&rest[end - 1]) {
+            end -= 1;
+        }
+        let (chunk, tail) = rest.split_at(end);
+        rest = tail;
+        Some(chunk)
+    })
+}
+
+/// Removes the CSI escape sequences (`ESC [ ... final`) the console styles produce.
+fn strip_escapes(text: &str) -> std::borrow::Cow<'_, str> {
+    if !text.contains('\x1b') {
+        return text.into();
+    }
+    let mut plain = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            plain.push(c);
+            continue;
+        }
+        if chars.clone().next() == Some('[') {
+            chars.next();
+            // Parameters and intermediates run until a final byte in '@'..='~'.
+            for c in chars.by_ref() {
+                if ('@'..='~').contains(&c) {
+                    break;
+                }
+            }
+        }
+    }
+    plain.into()
+}
+
+enum Line {
+    /// Printed as is.
+    Text(String),
+    /// Replaces the previous status line; skipped when a newer one is already queued.
+    Status(String),
+}
+
+/// The live session display.
+#[derive(Debug)]
+pub struct LiveOutput {
+    sender: Option<SyncSender<Line>>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl std::fmt::Debug for Line {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Line::Text(_) => "Text",
+            Line::Status(_) => "Status",
+        })
+    }
+}
+
+impl LiveOutput {
+    pub fn start() -> io::Result<LiveOutput> {
+        let (sender, receiver) = sync_channel(16);
+        let thread = std::thread::Builder::new()
+            .name("awake-console".into())
+            .spawn(move || render(&receiver))?;
+        Ok(LiveOutput {
+            sender: Some(sender),
+            thread: Some(thread),
+        })
+    }
+
+    pub fn print(&self, text: String) {
+        self.send(Line::Text(text));
+    }
+
+    pub fn status(&self, text: String) {
+        self.send(Line::Status(text));
+    }
+
+    fn send(&self, line: Line) {
+        if let Some(sender) = &self.sender {
+            // A full queue means the console is blocked; dropping an update beats waiting.
+            if let Err(TrySendError::Full(_)) = sender.try_send(line) {
+                log::debug!("Console output is blocked; skipped an update.");
+            }
+        }
+    }
+
+    /// Prints the last line and waits briefly for the console to take it.
+    pub fn finish(mut self, last: String, timeout: Duration) {
+        self.send(Line::Text(last));
+        self.sender = None;
+        if let Some(thread) = self.thread.take() {
+            let deadline = Instant::now() + timeout;
+            while !thread.is_finished() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            if thread.is_finished() {
+                let _ = thread.join();
+            }
+        }
+    }
+}
+
+fn render(receiver: &Receiver<Line>) {
+    while let Ok(mut line) = receiver.recv() {
+        // Coalesce: only the newest queued status line is worth drawing.
+        while let (Line::Status(_), Ok(next)) = (&line, receiver.try_recv()) {
+            line = next;
+        }
+        match line {
+            Line::Text(text) | Line::Status(text) => write_stdout(&text),
+        }
+    }
+}
+
+/// Leaves a console Awake does not need: one created just for it when a program without a
+/// console started it bound to a process or under PowerToys.
+pub fn detach() {
+    restore_mode();
+    // SAFETY: plain call; afterwards this process has no console.
+    unsafe { FreeConsole() };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn console_chunks_keep_surrogate_pairs_whole() {
+        let units: Vec<u16> = "ab😀cd".encode_utf16().collect();
+        let chunks: Vec<&[u16]> = console_chunks(&units, 3).collect();
+        // The emoji would start at unit 2 of the first chunk, so it moves to the next one.
+        assert_eq!(chunks, [&units[..2], &units[2..5], &units[5..]]);
+        for chunk in &chunks {
+            assert!(String::from_utf16(chunk).is_ok(), "no chunk holds half a pair");
+        }
+        assert_eq!(console_chunks(&units, 8192).count(), 1);
+        assert_eq!(console_chunks(&[], 8).count(), 0);
+        let long: Vec<u16> = "x".repeat(10).encode_utf16().collect();
+        assert_eq!(
+            console_chunks(&long, 4).map(<[u16]>::len).collect::<Vec<_>>(),
+            [4, 4, 2]
+        );
+    }
+
+    #[test]
+    fn escapes_are_stripped_for_files() {
+        assert_eq!(strip_escapes("plain"), "plain");
+        assert_eq!(strip_escapes("\x1b[31mError:\x1b[0m bad"), "Error: bad");
+        assert_eq!(strip_escapes("\r\x1b[2K\x1b[1;32m●\x1b[0m done"), "\r● done");
+        // A lone ESC is dropped rather than written as a control character.
+        assert_eq!(strip_escapes("a\x1bb"), "ab");
+        assert_eq!(strip_escapes("tail\x1b["), "tail");
+    }
+}

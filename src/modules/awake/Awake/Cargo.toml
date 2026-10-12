@@ -1,0 +1,59 @@
+[workspace]
+resolver = "3"
+members = ["awake-core", "awake", "awake-testkit"]
+
+[workspace.package]
+# The product version comes from src/Version.props at build time; this one is for Cargo only.
+version = "0.0.0"
+edition = "2024"
+authors = ["Den Delimarsky"]
+homepage = "https://awake.den.dev"
+repository = "https://github.com/microsoft/PowerToys"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+awake-core = { path = "awake-core" }
+awake-testkit = { path = "awake-testkit" }
+clap = { version = "4.6", default-features = false, features = ["std", "derive", "error-context", "suggestions"] }
+log = "0.4"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+windows-sys = "0.61"
+cc = "1.2"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+# Rust only checks types reachable from a crate's public API, so this covers awake-core. The
+# binary's types are all private and mostly wrap raw handles, where Debug would add nothing.
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "warn"
+# Win32 hands the same value around as i32, u32, usize or isize (sizes, WPARAM, LPARAM, HRESULT),
+# and the calendar code in time.rs and the tray menu's preset ids narrow values whose range the
+# arithmetic or a cap fixes (hour < 24, month <= 12, at most MAX_PRESETS presets). Each cast is
+# safe by reinterpretation or by range, not by accident.
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+# Win32 out-parameters take `&mut value`, coerced to a pointer for the call only; `&raw mut`
+# would spell the same thing at every call site.
+borrow_as_ptr = "allow"
+# Nearly every function returns a value nobody would drop; marking them all adds only noise.
+must_use_candidate = "allow"
+# `write!` into a String returns a Result that cannot fail; help text is built once per run.
+format_push_string = "allow"
+# A two-arm match on an Option reads as clearly as `if let ... else`.
+single_match_else = "allow"
+# The window procedure, the startup sequence and the build script's resx parser each read best
+# as one ordered list; splitting them would scatter steps that only make sense in sequence.
+too_many_lines = "allow"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = "limited"

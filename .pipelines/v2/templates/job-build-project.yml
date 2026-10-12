@@ -216,6 +216,9 @@ jobs:
       # SDK 10.0.303 contains runtime 10.0.11. Keep this aligned with DotNetRuntimePackageVersion in Directory.Packages.props.
       exactVersion: '10.0.303'
 
+  # Awake is written in Rust.
+  - template: steps-ensure-rust-toolchain.yml
+
   - ${{ if eq(parameters.runTests, true) }}:
     - task: VisualStudioTestPlatformInstaller@1
       displayName: Ensure VSTest Platform

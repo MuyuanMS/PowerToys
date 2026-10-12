@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Builds the Rust implementation of PowerToys Awake with Cargo and places PowerToys.Awake.exe (and
+  its PDB) next to the other PowerToys binaries. The Test target runs the Rust tests.
+-->
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{66dd9426-f301-46aa-a271-cd75c6ed3af4}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>Awake</RootNamespace>
+    <ProjectName>Awake</ProjectName>
+    <TargetName>PowerToys.Awake</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(RepoRoot)$(Platform)\$(Configuration)\</OutDir>
+    <CargoTriple Condition="'$(Platform)' == 'ARM64'">aarch64-pc-windows-msvc</CargoTriple>
+    <CargoTriple Condition="'$(CargoTriple)' == ''">x86_64-pc-windows-msvc</CargoTriple>
+    <CargoProfile Condition="'$(Configuration)' == 'Release'">release</CargoProfile>
+    <CargoProfile Condition="'$(CargoProfile)' == ''">dev</CargoProfile>
+    <CargoProfileDir Condition="'$(CargoProfile)' == 'release'">release</CargoProfileDir>
+    <CargoProfileDir Condition="'$(CargoProfileDir)' == ''">debug</CargoProfileDir>
+    <!-- Cargo's intermediate files go in the git-ignored target folder next to this project, not
+         under $(OutDir): the pipeline publishes, signs and indexes for symbols everything under
+         $(OutDir), and only the two files copied there below ship. -->
+    <CargoTargetDir>$(MSBuildThisFileDirectory)target\$(Platform)\$(Configuration)</CargoTargetDir>
+    <!-- Tests build with the test hooks into their own folder, so they never replace the binary
+         that ships. -->
+    <CargoTestTargetDir>$(CargoTargetDir)-test</CargoTestTargetDir>
+    <CargoOutputDir>$(CargoTargetDir)\$(CargoTriple)\$(CargoProfileDir)\</CargoOutputDir>
+    <CargoCommonArgs>--locked --target $(CargoTriple)</CargoCommonArgs>
+    <!-- One-line diagnostics that the Exec patterns below turn into MSBuild errors and warnings,
+         so they reach the Error List and the pipeline summary instead of only the log. -->
+    <CargoDiagnosticArgs>--message-format=short</CargoDiagnosticArgs>
+    <CargoErrorPattern>^(.+:\d+:\d+: )?error(\[\w+\])?: </CargoErrorPattern>
+    <CargoWarningPattern>^(.+:\d+:\d+: )?warning(\[\w+\])?: </CargoWarningPattern>
+    <!-- Inside the repository checkout, where CI's PublishTestResults@2 collects every **/*.trx. -->
+    <CargoTestResults>$(CargoTestTargetDir)\awake.trx</CargoTestResults>
+    <!-- The runner contract test (awake\tests\module_interface.rs) drives the real module DLL,
+         which logs to the real PowerToys data folder and uses the real kernel object names, so by
+         default it runs only on pipeline agents, which set TF_BUILD, and only in builds that run
+         tests, so release builds do not gain the reference below. Pass
+         -p:RunAwakeRunnerContractTest=true to run it locally. -->
+    <RunAwakeRunnerContractTest Condition="'$(RunAwakeRunnerContractTest)' == '' and '$(TF_BUILD)' != '' and '$(Platform)' == 'x64' and '$(BuildTests)' != 'false' and '$(BuildTests)' != 'False'">true</RunAwakeRunnerContractTest>
+    <!-- rc.exe from the Windows SDK this build selected, not whichever SDK is newest. -->
+    <CargoEnvironment>POWERTOYS_VERSION=$(Version);WindowsSdkVerBinPath=$(WindowsSdkDir)bin\$(TargetPlatformVersion)\</CargoEnvironment>
+  </PropertyGroup>
+  <!-- Shown in Solution Explorer only; Cargo decides what is built. The patterns stay inside the
+       source folders so they never walk a target directory. -->
+  <ItemGroup>
+    <None Include="Cargo.toml;Cargo.lock;rust-toolchain.toml;rustfmt.toml;.cargo\config.toml;Resources.resx" />
+    <None Include="awake\Cargo.toml;awake\build.rs;awake\src\**\*.rs;awake\tests\**\*.rs;awake\examples\**\*.rs" />
+    <None Include="awake\native\*.cpp;awake\native\*.manifest;awake\assets\*.ico" />
+    <None Include="awake-core\Cargo.toml;awake-core\build.rs;awake-core\build\**\*.rs;awake-core\src\**\*.rs" />
+    <None Include="awake-testkit\Cargo.toml;awake-testkit\src\**\*.rs" />
+    <None Include="tools\*.ps1" />
+    <None Include="msbuild\*.targets;msbuild\*.txt" />
+  </ItemGroup>
+  <!-- Only orders the build: nothing links against the module DLL, but the contract test needs it
+       in $(OutDir) before this project's Test target runs, and nothing else builds it first. -->
+  <ItemGroup Condition="'$(RunAwakeRunnerContractTest)' == 'true'">
+    <ProjectReference Include="..\AwakeModuleInterface\AwakeModuleInterface.vcxproj">
+      <Project>{5e7360a8-d048-4ed3-8f09-0bfd64c5529a}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="msbuild\CargoTestResults.targets" />
+  <!-- Without a Rust toolchain the first cargo call fails with MSB3073 around "'cargo' is not
+       recognized", which does not say what to install. 9009 is cmd's exit code for an unknown
+       command; any other failure is the toolchain's own, explained in the output above it. -->
+  <Target Name="CargoCheckToolchain">
+    <Exec Command="cargo --version" WorkingDirectory="$(MSBuildThisFileDirectory)" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true">
+      <Output TaskParameter="ExitCode" PropertyName="CargoVersionExitCode" />
+    </Exec>
+    <Error Condition="'$(CargoVersionExitCode)' == '9009'" Text="Awake needs the Rust toolchain, and cargo is not on PATH: install rustup (https://rustup.rs), or if it is already installed, restart Visual Studio or the shell so PATH includes %25USERPROFILE%25\.cargo\bin, then rerun the build. See src/modules/awake/README.md." />
+    <Error Condition="'$(CargoVersionExitCode)' != '0' and '$(CargoVersionExitCode)' != '9009'" Text="cargo --version failed with exit code $(CargoVersionExitCode), so Awake's Rust toolchain is not usable; the output above says why." />
+  </Target>
+  <Target Name="CargoBuild" AfterTargets="Build" DependsOnTargets="CargoCheckToolchain">
+    <Exec Command="cargo build $(CargoCommonArgs) $(CargoDiagnosticArgs) --target-dir &quot;$(CargoTargetDir)&quot; --profile $(CargoProfile) -p awake" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="$(CargoEnvironment)" CustomErrorRegularExpression="$(CargoErrorPattern)" CustomWarningRegularExpression="$(CargoWarningPattern)" />
+    <Copy SourceFiles="$(CargoOutputDir)awake.exe" DestinationFiles="$(OutDir)PowerToys.Awake.exe" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(CargoOutputDir)awake.pdb" DestinationFiles="$(OutDir)PowerToys.Awake.pdb" SkipUnchangedFiles="true" Condition="Exists('$(CargoOutputDir)awake.pdb')" />
+  </Target>
+  <!-- There are no ARM64 test agents, matching the other test projects. -->
+  <Target Name="Test" DependsOnTargets="CheckCargoTestResults;CargoCheckToolchain" Condition="'$(Platform)' != 'ARM64' and '$(BuildTests)' != 'false' and '$(BuildTests)' != 'False'">
+    <Exec Command="cargo fmt --all --check" WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Exec Command="cargo lint $(CargoCommonArgs) $(CargoDiagnosticArgs) --target-dir &quot;$(CargoTestTargetDir)&quot; --profile $(CargoProfile) -- -D warnings" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="$(CargoEnvironment)" CustomErrorRegularExpression="$(CargoErrorPattern)" CustomWarningRegularExpression="$(CargoWarningPattern)" />
+    <!-- Again without the test hooks, as shipped: code that only that build compiles is otherwise
+         never linted, and the build itself reports rustc warnings without failing. -->
+    <Exec Command="cargo lint-shipped $(CargoCommonArgs) $(CargoDiagnosticArgs) --target-dir &quot;$(CargoTestTargetDir)&quot; --profile $(CargoProfile) -- -D warnings" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="$(CargoEnvironment)" CustomErrorRegularExpression="$(CargoErrorPattern)" CustomWarningRegularExpression="$(CargoWarningPattern)" />
+    <Delete Files="$(CargoTestResults)" />
+    <!-- ErrorAndContinue still fails the build when a test fails, but lets the results file below
+         be written first, so the pipeline shows which test failed. -->
+    <Exec Command="cargo test-all $(CargoCommonArgs) $(CargoDiagnosticArgs) --target-dir &quot;$(CargoTestTargetDir)&quot; --profile $(CargoProfile)" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="$(CargoEnvironment)" CustomErrorRegularExpression="$(CargoErrorPattern)" CustomWarningRegularExpression="$(CargoWarningPattern)" ConsoleToMSBuild="true" ContinueOnError="ErrorAndContinue">
+      <Output TaskParameter="ConsoleOutput" ItemName="CargoTestOutput" />
+    </Exec>
+    <!-- Last, because it needs to be the only Awake on the machine and the tests above start many.
+         Same features and folder as above, so Cargo reuses the test binary it already built. -->
+    <Exec Condition="'$(RunAwakeRunnerContractTest)' == 'true'" Command="cargo test $(CargoCommonArgs) $(CargoDiagnosticArgs) --features awake/test-hooks --target-dir &quot;$(CargoTestTargetDir)&quot; --profile $(CargoProfile) -p awake --test module_interface -- --ignored" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="$(CargoEnvironment);POWERTOYS_AWAKE_MODULE_DIR=$(OutDir)" CustomErrorRegularExpression="$(CargoErrorPattern)" CustomWarningRegularExpression="$(CargoWarningPattern)" ConsoleToMSBuild="true" ContinueOnError="ErrorAndContinue">
+      <Output TaskParameter="ConsoleOutput" ItemName="CargoTestOutput" />
+    </Exec>
+    <WriteCargoTestResults Lines="@(CargoTestOutput)" OutputFile="$(CargoTestResults)" />
+  </Target>
+  <Target Name="CargoClean" AfterTargets="Clean">
+    <RemoveDir Directories="$(CargoTargetDir);$(CargoTestTargetDir)" />
+    <Delete Files="$(OutDir)PowerToys.Awake.exe;$(OutDir)PowerToys.Awake.pdb" />
+  </Target>
+</Project>
