@@ -1,14 +1,15 @@
-#include <filesystem>
 #include "pch.h"
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
 #include "general_settings.h"
 #include "auto_start_helper.h"
 #include "tray_icon.h"
 #include "quick_access_host.h"
 #include "Generated files/resource.h"
 #include "hotkey_conflict_detector.h"
-
-#include <fstream>
-#include <iterator>
 
 #include <common/SettingsAPI/settings_helpers.h>
 #include "powertoy_module.h"
@@ -157,7 +158,7 @@ namespace
         std::ifstream settings_file{ settings_path, std::ios::binary };
         if (!settings_file.is_open())
         {
-            Logger::warn(L"load_general_settings_checked: Failed to open existing settings.json; save skipped.");
+            Logger::warn(L"load_general_settings_checked: Failed to open existing settings.json.");
             return std::nullopt;
         }
 
@@ -165,7 +166,7 @@ namespace
         std::string contents{ isbi{ settings_file }, isbi{} };
         if (settings_file.bad())
         {
-            Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json; save skipped.");
+            Logger::warn(L"load_general_settings_checked: Failed to read existing settings.json.");
             return std::nullopt;
         }
 
@@ -184,7 +185,7 @@ namespace
         const auto backup_path = preserve_invalid_settings_file(settings_path, contents);
         if (!backup_path.has_value())
         {
-            Logger::warn(L"load_general_settings_checked: Invalid settings.json could not be safely preserved; save skipped.");
+            Logger::warn(L"load_general_settings_checked: Invalid settings.json could not be safely preserved.");
             return std::nullopt;
         }
 
