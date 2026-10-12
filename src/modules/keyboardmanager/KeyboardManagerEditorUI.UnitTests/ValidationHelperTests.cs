@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using KeyboardManagerEditorUI.Helpers;
@@ -28,6 +29,30 @@ namespace KeyboardManagerEditorUI.UnitTests
             });
 
             CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void IsKeyOrphaned_ShouldTreatShortcutOutputAsAssigned()
+        {
+            var singleKeyMappings = new[]
+            {
+                new KeyMapping { OriginalKey = VkA, TargetKey = VkB.ToString(CultureInfo.InvariantCulture) },
+            };
+            var shortcutMappings = new[]
+            {
+                new ShortcutKeyMapping
+                {
+                    OperationType = ShortcutOperationType.RemapShortcut,
+                    OriginalKeys = string.Join(";", VkControl, VkC),
+                    TargetKeys = VkA.ToString(CultureInfo.InvariantCulture),
+                },
+            };
+
+            Assert.IsFalse(ValidationHelper.IsKeyOrphaned(
+                VkA,
+                singleKeyMappings,
+                Array.Empty<KeyToTextMapping>(),
+                shortcutMappings));
         }
 
         [TestMethod]

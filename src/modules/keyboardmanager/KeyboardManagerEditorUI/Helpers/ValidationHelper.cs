@@ -261,7 +261,20 @@ namespace KeyboardManagerEditorUI.Helpers
                 return false;
             }
 
-            var mappings = mappingService.GetSingleKeyMappings()
+            return IsKeyOrphaned(
+                originalKey,
+                mappingService.GetSingleKeyMappings(),
+                mappingService.GetKeyToTextMappings(),
+                mappingService.GetShortcutMappings());
+        }
+
+        internal static bool IsKeyOrphaned(
+            int originalKey,
+            IEnumerable<KeyMapping> singleKeyMappings,
+            IEnumerable<KeyToTextMapping> keyToTextMappings,
+            IEnumerable<ShortcutKeyMapping> shortcutMappings)
+        {
+            var mappings = singleKeyMappings
                 .Select(mapping => new ShortcutKeyMapping
                 {
                     OperationType = ShortcutOperationType.RemapShortcut,
@@ -269,13 +282,14 @@ namespace KeyboardManagerEditorUI.Helpers
                     TargetKeys = mapping.TargetKey,
                     Condition = mapping.IsAlone ? SingleKeyRemapCondition.Alone : SingleKeyRemapCondition.Always,
                 })
-                .Concat(mappingService.GetKeyToTextMappings()
+                .Concat(keyToTextMappings
                     .Select(mapping => new ShortcutKeyMapping
                     {
                         OperationType = ShortcutOperationType.RemapText,
                         OriginalKeys = mapping.OriginalKey.ToString(CultureInfo.InvariantCulture),
                         TargetText = mapping.TargetText,
-                    }));
+                    }))
+                .Concat(shortcutMappings);
 
             return GetOrphanedKeys(mappings).Contains(originalKey);
         }
@@ -293,7 +307,7 @@ namespace KeyboardManagerEditorUI.Helpers
             foreach (ShortcutKeyMapping mapping in mappings)
             {
                 // App-specific remaps leave the key usable in every other app.
-                if (!string.IsNullOrEmpty(mapping.TargetApp) || !HasValidSingleKeyTarget(mapping))
+                if (!string.IsNullOrEmpty(mapping.TargetApp) || !HasValidTarget(mapping))
                 {
                     continue;
                 }
@@ -353,7 +367,7 @@ namespace KeyboardManagerEditorUI.Helpers
             return TryGetSingleKey(mapping.OriginalKeys, out int originalKey) &&
                    originalKey != 0 &&
                    string.IsNullOrEmpty(mapping.TargetApp) &&
-                   HasValidSingleKeyTarget(mapping);
+                   HasValidTarget(mapping);
         }
 
         private static ValidationErrorType ValidateProgramOrUrlMapping(
@@ -465,7 +479,7 @@ namespace KeyboardManagerEditorUI.Helpers
             return keyCode == VK_SHIFT || keyCode == VK_CONTROL || keyCode == VK_MENU || keyCode == VK_WIN_BOTH;
         }
 
-        private static bool HasValidSingleKeyTarget(ShortcutKeyMapping mapping)
+        private static bool HasValidTarget(ShortcutKeyMapping mapping)
         {
             if (mapping.OperationType == ShortcutOperationType.RemapText)
             {

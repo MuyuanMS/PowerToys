@@ -1178,6 +1178,11 @@ namespace KeyboardManagerEditorUI.Controls
 
         private void ShowAdvisoryWarningOrHide()
         {
+            if (ValidationInfoBar?.IsOpen == true && ValidationInfoBar.Severity == InfoBarSeverity.Error)
+            {
+                return;
+            }
+
             if (_advisoryWarning != null)
             {
                 ShowValidationMessage(string.Empty, _advisoryWarning, InfoBarSeverity.Warning);
