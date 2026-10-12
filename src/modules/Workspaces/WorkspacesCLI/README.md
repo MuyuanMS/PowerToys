@@ -38,9 +38,13 @@ No medium context or identity mismatch means a clear error, never an elevated fa
 Unverified elevated EXEs use the existing GUI confirmation flow end-to-end:
 `Launcher::requestApproval` owns the single pending request and talks through `LauncherUIHelper`
 to `SignatureWarningWindow`. CLI mode starts that UI lazily without the progress window.
+Without a status-window owner, the shared warning is centered on screen, topmost, and available
+in the taskbar so it cannot silently hide behind the launching terminal without a discoverable entry.
 The same rendered acknowledgement, default Skip, file pin and reply validation apply; there
 is no CLI-specific approval channel or input state machine. Ctrl+C/deadline cancel the shared
 request. Final JSON stdout remains separate from the dialog.
+The confirmation host reuses `RunnerHelper`'s wait-only process lifetime monitoring; it does not
+request broad access to the CLI worker through `Process.EnableRaisingEvents`.
 The shared UI helper waits for its receiver pipe to become available before accepting the first
 warning. Startup remains bounded and honors cancellation; process existence alone is not readiness.
 
@@ -79,9 +83,10 @@ application list matches the original snapshot; otherwise a unique unchanged mat
 The CLI initializes missing IDs through this same transaction before launching, keeps existing IDs
 unchanged, and rejects malformed/duplicate IDs. Failed persistence leaves the in-memory snapshot
 unchanged and prevents application startup. Lists do not initialize IDs or write configuration.
-Editor saves compare the last loaded/successfully saved snapshot with the current file under the
-same lock, ignoring only launch-history changes. Concurrent configuration or application-metadata
-changes reject the save and retain the open edits rather than overwriting newer IDs or package paths.
+General Editor snapshot-conflict detection and save-workflow changes are outside this CLI's scope.
+The existing Editor save behavior is retained. The shared writer provides atomic replacement and
+best-effort history preservation, not a merge of cached Editor configuration with concurrent edits.
+An Editor save from an older snapshot can still overwrite newer configuration/application metadata.
 Readers share deletion, and native/managed atomic replacement retries sharing/lock violations and
 access-denied replacement errors for up to two seconds to tolerate older short-lived readers.
 Windows can report an open destination without delete sharing as access denied; persistent permission
@@ -89,7 +94,7 @@ or sharing failures still fail without replacing the original file.
 
 Nonessential metadata failure is a warning after otherwise successful arrangement. A replaced
 file that cannot be verified remains a distinct nonzero integrity failure, not a warning or an
-asserted rollback. Editors keep edits and display a localized error when saving fails.
+asserted rollback. Additional Editor conflict notifications and edit-retention guarantees are deferred.
 
 CLI diagnostics in `Workspaces\Logs\cli.log` include only fixed command metadata. Shared domain
 messages that could contain app names, titles or arguments are not forwarded verbatim. Public
