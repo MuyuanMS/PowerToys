@@ -251,6 +251,17 @@ namespace KeyboardManagerEditorUI.UnitTests
         }
 
         [TestMethod]
+        public void GetOrphanedKeys_ShouldIgnoreKeyToTextRemap_WithWhitespaceText()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateTextRemap(VkA, "   "),
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
         public void GetOrphanedKeysCausedBy_ShouldReturnSourceKey_ForNewKeyToTextRemap()
         {
             IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
@@ -268,6 +279,17 @@ namespace KeyboardManagerEditorUI.UnitTests
                 new List<ShortcutKeyMapping>(),
                 null,
                 null);
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnEmptyList_ForNullOtherMappings()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                null,
+                null,
+                CreateKeyRemap(VkA, VkB));
 
             Assert.AreEqual(0, orphanedKeys.Count);
         }

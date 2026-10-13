@@ -339,7 +339,7 @@ namespace KeyboardManagerEditorUI.Helpers
         /// Keys that were already orphaned by other, unrelated mappings are not reported.
         /// </summary>
         public static IReadOnlyList<int> GetOrphanedKeysCausedBy(
-            IReadOnlyCollection<ShortcutKeyMapping> otherMappings,
+            IReadOnlyCollection<ShortcutKeyMapping>? otherMappings,
             ShortcutKeyMapping? replacedMapping,
             ShortcutKeyMapping? replacement)
         {
@@ -483,7 +483,7 @@ namespace KeyboardManagerEditorUI.Helpers
         {
             if (mapping.OperationType == ShortcutOperationType.RemapText)
             {
-                return !string.IsNullOrEmpty(mapping.TargetText);
+                return !string.IsNullOrWhiteSpace(mapping.TargetText);
             }
 
             if (mapping.OperationType != ShortcutOperationType.RemapShortcut || string.IsNullOrWhiteSpace(mapping.TargetKeys))
