@@ -33,11 +33,15 @@ struct GeneralSettings
     std::wstring powerToysVersion;
     json::JsonObject ignoredConflictProperties;
 
+    // Indicates whether durable settings were read or safely recovered and can be written back.
+    bool isDataLoadedSuccessfully = true;
+
     json::JsonObject to_json();
 };
 
 json::JsonObject load_general_settings();
-GeneralSettings get_general_settings();
+GeneralSettings get_general_settings(bool refresh_module_enabled_settings_from_disk = false);
+void save_general_settings(const json::JsonObject& settings);
 void apply_general_settings(const json::JsonObject& general_configs, bool save = true);
 void apply_module_status_update(const json::JsonObject& module_config, bool save = true);
 void start_enabled_powertoys();
