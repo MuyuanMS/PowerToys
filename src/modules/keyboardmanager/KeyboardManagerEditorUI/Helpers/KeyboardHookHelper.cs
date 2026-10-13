@@ -35,6 +35,8 @@ namespace KeyboardManagerEditorUI.Helpers
 
         private bool _hasCapturedKeys;
 
+        private bool _hasCapturedNonShiftKeys;
+
         private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
 
         [DllImport("user32.dll")]
@@ -69,6 +71,7 @@ namespace KeyboardManagerEditorUI.Helpers
             _currentlyPressedKeys.Clear();
             _keyPressOrder.Clear();
             _hasCapturedKeys = false;
+            _hasCapturedNonShiftKeys = false;
 
             try
             {
@@ -95,6 +98,7 @@ namespace KeyboardManagerEditorUI.Helpers
             _activeTarget = null;
             _exitRequested = false;
             _hasCapturedKeys = false;
+            _hasCapturedNonShiftKeys = false;
 
             if (_keyboardHook != null)
             {
@@ -136,44 +140,61 @@ namespace KeyboardManagerEditorUI.Helpers
             }
 
             var virtualKey = (VirtualKey)key;
-            if (IsKeyboardNavigationExit(virtualKey))
+            RecordingExitDecision exitDecision = GetRecordingExitDecision(
+                virtualKey,
+                _currentlyPressedKeys,
+                _hasCapturedKeys,
+                _hasCapturedNonShiftKeys,
+                virtualKey == VirtualKey.Tab && IsShiftPressed());
+            if (exitDecision.ShouldExitRecording)
             {
-                // The hook may have started after Shift was pressed, so check both tracked and physical state.
-                bool moveFocusBackward = ShouldMoveFocusBackward(_currentlyPressedKeys, IsShiftPressed());
-
-                // Keep the recorded keys unless nothing was captured, or the only captured key is the
-                // Shift held for Shift+Tab.
-                bool restorePreviousKeys = moveFocusBackward
-                    ? _keyPressOrder.All(IsShiftKey)
-                    : !_hasCapturedKeys;
-
                 // Defer cleanup: disposing the hook from inside its own callback is unsafe.
                 _exitRequested = true;
                 if (_dispatcherQueue == null || !_dispatcherQueue.TryEnqueue(() =>
                 {
                     if (_exitRequested)
                     {
-                        CleanupHook(restorePreviousKeys, notifyTarget: true, moveFocusBackward);
+                        CleanupHook(exitDecision.RestorePreviousKeys, notifyTarget: true, exitDecision.MoveFocusBackward);
                     }
                 }))
                 {
-                    CleanupHook(restorePreviousKeys, notifyTarget: true, moveFocusBackward);
+                    CleanupHook(exitDecision.RestorePreviousKeys, notifyTarget: true, exitDecision.MoveFocusBackward);
                 }
 
-                return moveFocusBackward;
+                return exitDecision.MoveFocusBackward;
             }
 
             return true;
         }
 
-        private bool IsKeyboardNavigationExit(VirtualKey virtualKey)
+        internal readonly record struct RecordingExitDecision(
+            bool ShouldExitRecording,
+            bool MoveFocusBackward,
+            bool RestorePreviousKeys);
+
+        internal static RecordingExitDecision GetRecordingExitDecision(
+            VirtualKey virtualKey,
+            IReadOnlyCollection<VirtualKey> currentlyPressedKeys,
+            bool hasCapturedKeys,
+            bool hasCapturedNonShiftKeys,
+            bool shiftIsPressed)
         {
-            if (virtualKey != VirtualKey.Tab)
+            bool shouldExitRecording = virtualKey == VirtualKey.Tab &&
+                (currentlyPressedKeys.Count == 0 || currentlyPressedKeys.All(IsShiftKey));
+            if (!shouldExitRecording)
             {
-                return false;
+                return new RecordingExitDecision(false, false, false);
             }
 
-            return _currentlyPressedKeys.Count == 0 || _currentlyPressedKeys.All(IsShiftKey);
+            // A hook may start after Shift is pressed, so consider both tracked and physical key state.
+            bool moveFocusBackward = ShouldMoveFocusBackward(currentlyPressedKeys, shiftIsPressed);
+
+            // Shift+Tab itself may be captured after recording, so use capture history rather than key order.
+            bool restorePreviousKeys = moveFocusBackward
+                ? !hasCapturedNonShiftKeys
+                : !hasCapturedKeys;
+
+            return new RecordingExitDecision(true, moveFocusBackward, restorePreviousKeys);
         }
 
         private static bool IsShiftKey(VirtualKey key)
@@ -234,6 +255,11 @@ namespace KeyboardManagerEditorUI.Helpers
             if (_currentlyPressedKeys.Add(virtualKey))
             {
                 _hasCapturedKeys = true;
+                if (!IsShiftKey(virtualKey))
+                {
+                    _hasCapturedNonShiftKeys = true;
+                }
+
                 _keyPressOrder.Add(virtualKey);
 
                 // When building chords, cap at 2 action keys: if a third action key arrives,
