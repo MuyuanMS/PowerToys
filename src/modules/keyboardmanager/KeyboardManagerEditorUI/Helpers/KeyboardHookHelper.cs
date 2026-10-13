@@ -89,10 +89,10 @@ namespace KeyboardManagerEditorUI.Helpers
 
         public void CleanupHook()
         {
-            CleanupHook(cancelRecording: false, notifyTarget: true);
+            CleanupHook(restorePreviousKeys: false, notifyTarget: true);
         }
 
-        private void CleanupHook(bool cancelRecording = false, bool notifyTarget = true, bool moveFocusBackward = false)
+        private void CleanupHook(bool restorePreviousKeys = false, bool notifyTarget = true, bool moveFocusBackward = false)
         {
             IKeyboardHookTarget? target = _activeTarget;
             _activeTarget = null;
@@ -111,7 +111,7 @@ namespace KeyboardManagerEditorUI.Helpers
 
             if (notifyTarget)
             {
-                target?.OnRecordingStopped(cancelRecording, moveFocusBackward);
+                target?.OnRecordingStopped(restorePreviousKeys, moveFocusBackward);
             }
         }
 
