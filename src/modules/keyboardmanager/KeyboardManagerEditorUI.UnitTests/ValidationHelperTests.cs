@@ -1,0 +1,322 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using KeyboardManagerEditorUI.Helpers;
+using KeyboardManagerEditorUI.Interop;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace KeyboardManagerEditorUI.UnitTests
+{
+    [TestClass]
+    public class ValidationHelperTests
+    {
+        private const int VkA = 0x41;
+        private const int VkB = 0x42;
+        private const int VkC = 0x43;
+        private const int VkControl = 0x11;
+        private const int VkDisabled = 0x100;
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnSourceKey_ForSingleKeyRemap()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkB),
+            });
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnEmptyList_ForNullMappings()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(null);
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void IsKeyOrphaned_ShouldTreatShortcutOutputAsAssigned()
+        {
+            var singleKeyMappings = new[]
+            {
+                new KeyMapping { OriginalKey = VkA, TargetKey = VkB.ToString(CultureInfo.InvariantCulture) },
+            };
+            var shortcutMappings = new[]
+            {
+                new ShortcutKeyMapping
+                {
+                    OperationType = ShortcutOperationType.RemapShortcut,
+                    OriginalKeys = string.Join(";", VkControl, VkC),
+                    TargetKeys = VkA.ToString(CultureInfo.InvariantCulture),
+                },
+            };
+
+            Assert.IsFalse(ValidationHelper.IsKeyOrphaned(
+                VkA,
+                singleKeyMappings,
+                Array.Empty<KeyToTextMapping>(),
+                shortcutMappings));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnEmptyList_ForSwappedKeyRemaps()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkB),
+                CreateKeyRemap(VkB, VkA),
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnSourceKey_ForDisabledKey()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkDisabled),
+            });
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnUnreachableSource_WithValidTarget()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkB, VkA),
+            });
+
+            CollectionAssert.AreEqual(new List<int> { VkB }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldNotTreatKeyInsideShortcutTargetAsAssigned()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkB),
+                CreateShortcutRemap(VkC, VkControl, VkA),
+            });
+
+            CollectionAssert.AreEqual(new List<int> { VkA, VkC }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldTreatSingleKeyShortcutOutputAsAssigned()
+        {
+            ShortcutKeyMapping shortcutToKey = CreateKeyRemap(VkC, VkA);
+            shortcutToKey.OriginalKeys = string.Join(";", VkControl, VkC);
+
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkB),
+                shortcutToKey,
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldNotReturnSourceKey_ForAloneRemap()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkControl, VkA, SingleKeyRemapCondition.Alone),
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldNotReturnSourceKey_ForAloneDisable()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkControl, VkDisabled, SingleKeyRemapCondition.Alone),
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldTreatAloneRemapTargetAsAssigned()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateKeyRemap(VkA, VkB),
+                CreateKeyRemap(VkControl, VkA, SingleKeyRemapCondition.Alone),
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldIgnoreAppSpecificRemaps()
+        {
+            ShortcutKeyMapping appSpecific = CreateKeyRemap(VkA, VkB);
+            appSpecific.TargetApp = "notepad.exe";
+
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[] { appSpecific });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldIgnoreKeysAlreadyOrphanedByOtherMappings()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new[] { CreateKeyRemap(VkA, VkB) },
+                null,
+                CreateKeyRemap(VkC, VkDisabled));
+
+            CollectionAssert.AreEqual(new List<int> { VkC }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnEmptyList_WhenNewMappingCompletesASwap()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new[] { CreateKeyRemap(VkA, VkB) },
+                null,
+                CreateKeyRemap(VkB, VkA));
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnKeyNewlyOrphanedByEdit()
+        {
+            // Editing B -> A into B -> C breaks the A/B swap, so A loses its assignment.
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new[] { CreateKeyRemap(VkA, VkB) },
+                CreateKeyRemap(VkB, VkA),
+                CreateKeyRemap(VkB, VkC));
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnOwnSourceKey_WhenItWasAlreadyOrphaned()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new List<ShortcutKeyMapping>(),
+                CreateKeyRemap(VkA, VkB),
+                CreateKeyRemap(VkA, VkC));
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnEmptyList_ForMultiKeyTrigger()
+        {
+            ShortcutKeyMapping shortcutTrigger = CreateKeyRemap(VkA, VkB);
+            shortcutTrigger.OriginalKeys = string.Join(";", VkControl, VkC);
+
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new List<ShortcutKeyMapping>(),
+                null,
+                shortcutTrigger);
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnSourceKey_ForKeyToTextRemap()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateTextRemap(VkA, "hello"),
+            });
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldIgnoreKeyToTextRemap_WithEmptyText()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateTextRemap(VkA, string.Empty),
+            });
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeys_ShouldReturnSourceKey_ForWhitespaceTextRemap()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
+            {
+                CreateTextRemap(VkA, "   "),
+            });
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnSourceKey_ForNewKeyToTextRemap()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new List<ShortcutKeyMapping>(),
+                null,
+                CreateTextRemap(VkA, "hello"));
+
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnEmptyList_ForNullReplacement()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                new List<ShortcutKeyMapping>(),
+                null,
+                null);
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        [TestMethod]
+        public void GetOrphanedKeysCausedBy_ShouldReturnEmptyList_ForNullOtherMappings()
+        {
+            IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeysCausedBy(
+                null,
+                null,
+                CreateKeyRemap(VkA, VkB));
+
+            Assert.AreEqual(0, orphanedKeys.Count);
+        }
+
+        private static ShortcutKeyMapping CreateKeyRemap(int originalKey, int targetKey, SingleKeyRemapCondition condition = SingleKeyRemapCondition.Always) =>
+            new()
+            {
+                OperationType = ShortcutOperationType.RemapShortcut,
+                OriginalKeys = originalKey.ToString(CultureInfo.InvariantCulture),
+                TargetKeys = targetKey.ToString(CultureInfo.InvariantCulture),
+                Condition = condition,
+            };
+
+        private static ShortcutKeyMapping CreateShortcutRemap(int originalKey, params int[] targetKeys) =>
+            new()
+            {
+                OperationType = ShortcutOperationType.RemapShortcut,
+                OriginalKeys = originalKey.ToString(CultureInfo.InvariantCulture),
+                TargetKeys = string.Join(";", targetKeys),
+            };
+
+        private static ShortcutKeyMapping CreateTextRemap(int originalKey, string text) =>
+            new()
+            {
+                OperationType = ShortcutOperationType.RemapText,
+                OriginalKeys = originalKey.ToString(CultureInfo.InvariantCulture),
+                TargetText = text,
+            };
+    }
+}
