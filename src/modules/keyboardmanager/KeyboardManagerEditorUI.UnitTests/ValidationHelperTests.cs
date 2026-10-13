@@ -251,14 +251,14 @@ namespace KeyboardManagerEditorUI.UnitTests
         }
 
         [TestMethod]
-        public void GetOrphanedKeys_ShouldIgnoreKeyToTextRemap_WithWhitespaceText()
+        public void GetOrphanedKeys_ShouldReturnSourceKey_ForWhitespaceTextRemap()
         {
             IReadOnlyList<int> orphanedKeys = ValidationHelper.GetOrphanedKeys(new[]
             {
                 CreateTextRemap(VkA, "   "),
             });
 
-            Assert.AreEqual(0, orphanedKeys.Count);
+            CollectionAssert.AreEqual(new List<int> { VkA }, new List<int>(orphanedKeys));
         }
 
         [TestMethod]

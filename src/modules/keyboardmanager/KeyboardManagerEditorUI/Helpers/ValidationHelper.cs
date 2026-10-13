@@ -483,7 +483,7 @@ namespace KeyboardManagerEditorUI.Helpers
         {
             if (mapping.OperationType == ShortcutOperationType.RemapText)
             {
-                return !string.IsNullOrWhiteSpace(mapping.TargetText);
+                return !string.IsNullOrEmpty(mapping.TargetText);
             }
 
             if (mapping.OperationType != ShortcutOperationType.RemapShortcut || string.IsNullOrWhiteSpace(mapping.TargetKeys))
