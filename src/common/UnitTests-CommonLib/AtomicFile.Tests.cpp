@@ -190,6 +190,55 @@ namespace UnitTestsCommonLib
             assertOnlyFile(directory, destination);
         }
 
+        TEST_METHOD (WriteFallbackFailurePreservesDestination)
+        {
+            TemporaryDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            const auto temporaryPath = directory.path() / L"settings.tmp";
+            const std::string original = "{\"enabled\":true}";
+            const std::string replacement = "{\"enabled\":false}";
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), atomic_file::write(destination.wstring(), original));
+
+            FileHandle temporary(CreateFileW(
+                temporaryPath.c_str(),
+                GENERIC_WRITE | DELETE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                nullptr,
+                CREATE_NEW,
+                FILE_ATTRIBUTE_NORMAL,
+                nullptr));
+            Assert::IsTrue(temporary.get() != INVALID_HANDLE_VALUE);
+            DWORD bytesWritten = 0;
+            Assert::IsTrue(WriteFile(temporary.get(), replacement.data(), static_cast<DWORD>(replacement.size()), &bytesWritten, nullptr));
+            Assert::AreEqual(static_cast<DWORD>(replacement.size()), bytesWritten);
+            Assert::IsTrue(FlushFileBuffers(temporary.get()));
+
+            unsigned int fallbackAttempts = 0;
+            const auto result = atomic_file::detail::publish_temporary_file(
+                temporary.get(),
+                temporaryPath.wstring(),
+                destination.wstring(),
+                [](HANDLE, FILE_INFO_BY_HANDLE_CLASS, LPVOID, DWORD) {
+                    SetLastError(ERROR_INVALID_PARAMETER);
+                    return FALSE;
+                },
+                [&](LPCWSTR source, LPCWSTR target, DWORD flags) {
+                    ++fallbackAttempts;
+                    Assert::AreEqual(temporaryPath.wstring(), std::wstring(source));
+                    Assert::AreEqual(destination.wstring(), std::wstring(target));
+                    Assert::AreEqual(static_cast<DWORD>(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH), flags);
+                    SetLastError(ERROR_DISK_FULL);
+                    return FALSE;
+                });
+
+            Assert::AreEqual(static_cast<DWORD>(ERROR_DISK_FULL), result);
+            Assert::AreEqual(1u, fallbackAttempts);
+            std::string contents;
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), readFile(destination, contents));
+            Assert::AreEqual(original, contents);
+            Assert::IsTrue(std::filesystem::exists(temporaryPath));
+        }
+
         TEST_METHOD (WriteWhenReplacementIsBlockedPreservesOriginalAndRemovesTemporaryFile)
         {
             TemporaryDirectory directory;
