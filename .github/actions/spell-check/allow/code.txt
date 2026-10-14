@@ -377,6 +377,8 @@ LWIN
 VCENTER
 VREDRAW
 
+winmm
+
 # COM/WinRT interface prefixes and type fragments
 BAlt
 BShift
