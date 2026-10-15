@@ -102,6 +102,7 @@ struct SettingsSnapshot
     bool showGeometry = false;
     bool doNotActivateOnGameMode = true;
     bool useAltResize = true;
+    bool rightDragTitleBar = true;
     std::shared_ptr<const std::vector<std::wstring>> excludedApps =
         std::make_shared<const std::vector<std::wstring>>();
     std::shared_ptr<const std::vector<std::wstring>> modifierExcludedApps =
@@ -137,6 +138,7 @@ struct InteractionState
     RECT windowRect{};
     ResizeHandle resizeHandle = ResizeHandle::None;
     bool firstUpdate = false;
+    bool fromTitleBar = false;
 };
 
 struct ActionTarget
@@ -274,6 +276,7 @@ static std::optional<SettingsSnapshot> g_pendingSettings;
 
 // Custom messages are handled only by the main message window.
 static constexpr UINT WM_APPLY_SETTINGS = WM_APP + 1;
+static constexpr UINT WM_REPLAY_CLICK = WM_APP + 2;
 
 static constexpr unsigned int ButtonBit(MouseButton button)
 {
@@ -623,6 +626,19 @@ static void CALLBACK WinEventProc(HWINEVENTHOOK, DWORD, HWND hwnd, LONG, LONG, D
     g_excludedCache.clear();
     g_modifierExcludedCache.clear();
 
+    // A title bar drag itself holds no modifier, but a modifier pressed during it
+    // can lose its key-up when focus moves to an elevated window.
+    if (g_interaction.fromTitleBar)
+    {
+        if (g_modifierSession.disposition == ModifierHoldDisposition::Passthrough &&
+            g_modifierSession.pressed &&
+            !IsModifierPhysicallyHeld(g_modifierSession.modifier))
+        {
+            g_modifierSession = {};
+        }
+        return;
+    }
+
     // Only validate modifier state when there is actually something to reset.
     // Skipping here when all flags are clear prevents spurious resets that would
     // break continuous Alt-dragging between multiple drags.
@@ -750,6 +766,11 @@ static bool TryLoadSettingsFromFile(const SettingsSnapshot& current, SettingsSna
         if (auto v = values.get_bool_value(L"useAltResize"))
         {
             updated.useAltResize = *v;
+        }
+
+        if (auto v = values.get_bool_value(L"rightDragTitleBar"))
+        {
+            updated.rightDragTitleBar = *v;
         }
 
         if (auto v = values.get_int_value(L"modifierKey"))
@@ -1750,6 +1771,16 @@ static void StopInteraction()
 #endif
 }
 
+static void ResumeModifierAfterTitleBarInteraction(bool fromTitleBar)
+{
+    if (fromTitleBar &&
+        g_modifierSession.pressed &&
+        g_modifierSession.disposition == ModifierHoldDisposition::Passthrough)
+    {
+        g_modifierSession.disposition = ModifierHoldDisposition::Undecided;
+    }
+}
+
 static ResizeHandle GetClosestHandle(POINT pt, const RECT& rc)
 {
     int cx = (rc.left + rc.right) / 2;
@@ -2020,7 +2051,7 @@ static HookDisposition EnterModifierPassthrough(MouseButton button, bool latchHo
 // real drag/resize) or the button is released first (then the absorbed input is
 // replayed so the target application receives a normal modifier+click).
 // ---------------------------------------------------------------------------
-static bool BeginInteraction(InteractionAction action, MouseButton button, HWND hwnd, POINT pt)
+static bool BeginInteraction(InteractionAction action, MouseButton button, HWND hwnd, POINT pt, bool fromTitleBar = false)
 {
     RECT windowRect{};
     if (!GetWindowRect(hwnd, &windowRect))
@@ -2037,9 +2068,13 @@ static bool BeginInteraction(InteractionAction action, MouseButton button, HWND 
     g_interaction.windowRect = windowRect;
     g_interaction.firstUpdate = true;
     g_interaction.resizeHandle = action == InteractionAction::Resize ? GetClosestHandle(pt, windowRect) : ResizeHandle::None;
+    g_interaction.fromTitleBar = fromTitleBar;
 
-    g_modifierSession.consumed = true;
-    g_modifierSession.disposition = ModifierHoldDisposition::Activated;
+    if (!fromTitleBar)
+    {
+        g_modifierSession.consumed = true;
+        g_modifierSession.disposition = ModifierHoldDisposition::Activated;
+    }
 
     PrepareOverlayMetrics(hwnd);
     ShowOverlay(
@@ -2097,6 +2132,18 @@ static void ReplayPendingClick(MouseButton button, bool completeModifier = false
             g_modifierSession = {};
             g_swallowNextModifierUpVk = virtualKey;
         }
+    }
+}
+
+static void ReplayPendingClickAfterHook(MouseButton button, bool fromTitleBar, bool completeModifier = false, MouseButton followingButton = MouseButton::None)
+{
+    if (fromTitleBar)
+    {
+        PostMessage(g_hMsgWnd, WM_REPLAY_CLICK, static_cast<WPARAM>(button), static_cast<LPARAM>(followingButton));
+    }
+    else
+    {
+        ReplayPendingClick(button, completeModifier);
     }
 }
 
@@ -2395,6 +2442,12 @@ static void TrackHeldNonModifierKey(DWORD vkCode, WPARAM message)
 
 static HookDisposition ReleaseModifierSession()
 {
+    if (g_interaction.fromTitleBar)
+    {
+        g_modifierSession = {};
+        return HookDisposition::Chain;
+    }
+
     g_modifierSession.pressed = false;
     FlushPendingClickOnModifierRelease();
 
@@ -2490,6 +2543,17 @@ static HookDisposition HandleKeyboardEvent(WPARAM message, const KBDLLHOOKSTRUCT
 
     if (!IsModifierKey(key.vkCode, g_settings.modifierKey) || !IsKeyDownMessage(message) || HasModifierSession())
     {
+        return HookDisposition::Chain;
+    }
+
+    // A title bar drag is already in progress; the modifier has no part in it.
+    if (g_interaction.fromTitleBar)
+    {
+        g_modifierSession = {};
+        g_modifierSession.modifier = g_settings.modifierKey;
+        g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
+        g_modifierSession.pressed = true;
+        g_modifierSession.key = { key.vkCode, key.scanCode, key.flags };
         return HookDisposition::Chain;
     }
 
@@ -2624,6 +2688,74 @@ static ActionTarget ResolveActionTarget(POINT point, InteractionAction action)
     return { window, TargetEligibility::Eligible };
 }
 
+// Returns the top-level window whose title bar (or custom drag area) is at the
+// point, or nullptr. Mirrors how Windows dispatches a non-client click: ask the
+// deepest window, walking up to the parent while it answers HTTRANSPARENT.
+static HWND ResolveTitleBarWindow(POINT pt)
+{
+    HWND hwnd = WindowFromPoint(pt);
+    if (!hwnd)
+    {
+        return nullptr;
+    }
+
+    const HWND root = GetAncestor(hwnd, GA_ROOT);
+    if (!root)
+    {
+        return nullptr;
+    }
+
+    constexpr UINT HIT_TEST_TOTAL_TIMEOUT_MS = 100;
+    constexpr int MAX_DEPTH = 32;
+    const ULONGLONG deadline = GetTickCount64() + HIT_TEST_TOTAL_TIMEOUT_MS;
+    for (int depth = 0; hwnd && depth < MAX_DEPTH; depth++)
+    {
+        // WM_NCHITTEST takes screen coordinates in the target's own DPI space.
+        POINT local = pt;
+        PhysicalToLogicalPointForPerMonitorDPI(hwnd, &local);
+
+        DWORD_PTR hit = 0;
+        const ULONGLONG now = GetTickCount64();
+        if (now >= deadline)
+        {
+            return nullptr;
+        }
+
+        const UINT remainingTimeoutMs = static_cast<UINT>(deadline - now);
+        if (!SendMessageTimeoutW(
+                hwnd,
+                WM_NCHITTEST,
+                0,
+                MAKELPARAM(local.x, local.y),
+                SMTO_ABORTIFHUNG,
+                remainingTimeoutMs,
+                &hit))
+        {
+            return nullptr;
+        }
+
+        const LRESULT hitTest = static_cast<LRESULT>(hit);
+        if (hitTest == HTCAPTION)
+        {
+            return root;
+        }
+        if (hitTest == HTCLIENT && hwnd != root)
+        {
+            // A custom title bar may define its drag region only in the root window.
+            hwnd = root;
+            continue;
+        }
+        if (hitTest != HTTRANSPARENT || hwnd == root)
+        {
+            return nullptr;
+        }
+
+        hwnd = GetAncestor(hwnd, GA_PARENT);
+    }
+
+    return nullptr;
+}
+
 // Forward declarations for helpers called from MouseProc
 static void HandleDragMove(POINT pt);
 static void HandleDragResize(POINT pt);
@@ -2701,28 +2833,48 @@ static HookDisposition HandleActionButtonDown(MouseButton button, POINT point)
     return HookDisposition::Swallow;
 }
 
-static void RecoverStaleInteraction(MouseButton incomingButton)
+static bool RecoverStaleInteraction(MouseButton incomingButton)
 {
     if (g_interaction.phase == InteractionPhase::Idle)
     {
-        return;
+        return false;
     }
 
     const MouseButton button = g_interaction.button;
-    if (g_interaction.phase == InteractionPhase::Pending)
+    const bool fromTitleBar = g_interaction.fromTitleBar;
+    const bool pending = g_interaction.phase == InteractionPhase::Pending;
+    if (pending)
     {
         StopInteraction();
-        ReplayPendingClick(button, true);
+        ReplayPendingClickAfterHook(button, fromTitleBar, true, fromTitleBar ? incomingButton : MouseButton::None);
     }
     else
     {
         StopInteraction();
     }
+    ResumeModifierAfterTitleBarInteraction(fromTitleBar);
 
     if (incomingButton != button)
     {
         MarkButtonUpForSwallow(button);
     }
+    return fromTitleBar && pending;
+}
+
+// A right-button press on a title bar, with no modifier involved. It is held
+// pending like a modifier+button press: dragging past the threshold moves the
+// window, releasing first replays the click so the title bar menu still opens.
+static bool TryArmTitleBarDrag(POINT point)
+{
+    const HWND window = ResolveTitleBarWindow(point);
+    if (!window || IsExcluded(window) || IsSuppressedByGameMode())
+    {
+        return false;
+    }
+
+    ArmPendingInteraction(InteractionAction::Move, MouseButton::Right, window, point);
+    g_interaction.fromTitleBar = true;
+    return true;
 }
 
 static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mouse)
@@ -2747,7 +2899,10 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
 
     if (downButton != MouseButton::None && !IsActivationModifierPressed())
     {
-        RecoverStaleInteraction(downButton);
+        if (RecoverStaleInteraction(downButton))
+        {
+            return HookDisposition::Swallow;
+        }
     }
 
     if (g_interaction.phase == InteractionPhase::Idle &&
@@ -2766,6 +2921,15 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
             return EnterModifierPassthrough(downButton, false);
         }
         return HandleActionButtonDown(downButton, mouse.pt);
+    }
+
+    if (downButton == MouseButton::Right &&
+        g_settings.rightDragTitleBar &&
+        !HasModifierSession() &&
+        g_interaction.phase == InteractionPhase::Idle &&
+        TryArmTitleBarDrag(mouse.pt))
+    {
+        return HookDisposition::Swallow;
     }
 
     if (message == WM_MOUSEMOVE && g_interaction.phase == InteractionPhase::Pending)
@@ -2789,7 +2953,8 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
                     pending.action,
                     pending.button,
                     pending.target,
-                    pending.startPoint))
+                    pending.startPoint,
+                    pending.fromTitleBar))
             {
                 if (pending.action == InteractionAction::Resize)
                 {
@@ -2802,8 +2967,12 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
             }
             else
             {
-                g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
-                ReplayPendingClick(pending.button);
+                if (!pending.fromTitleBar)
+                {
+                    g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
+                }
+                ReplayPendingClickAfterHook(pending.button, pending.fromTitleBar);
+                ResumeModifierAfterTitleBarInteraction(pending.fromTitleBar);
                 MarkButtonUpForSwallow(pending.button);
             }
         }
@@ -2834,10 +3003,15 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
         upButton == g_interaction.button &&
         g_interaction.phase == InteractionPhase::Pending)
     {
-        g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
+        if (!g_interaction.fromTitleBar)
+        {
+            g_modifierSession.disposition = ModifierHoldDisposition::Passthrough;
+        }
         const MouseButton button = g_interaction.button;
+        const bool fromTitleBar = g_interaction.fromTitleBar;
         StopInteraction();
-        ReplayPendingClick(button);
+        ReplayPendingClickAfterHook(button, fromTitleBar);
+        ResumeModifierAfterTitleBarInteraction(fromTitleBar);
         return HookDisposition::Swallow;
     }
 
@@ -2869,7 +3043,9 @@ static HookDisposition HandleMouseEvent(WPARAM message, const MSLLHOOKSTRUCT& mo
                 true);
         }
 
+        const bool fromTitleBar = g_interaction.fromTitleBar;
         StopInteraction();
+        ResumeModifierAfterTitleBarInteraction(fromTitleBar);
         return HookDisposition::Swallow;
     }
 
@@ -3167,6 +3343,17 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     {
     case WM_APPLY_SETTINGS:
         ApplyPendingSettings();
+        return 0;
+
+    case WM_REPLAY_CLICK:
+        ReplayPendingClick(static_cast<MouseButton>(wParam));
+        if (lParam != 0)
+        {
+            INPUT input{};
+            input.type = INPUT_MOUSE;
+            input.mi.dwFlags = MouseEventFlagForButton(static_cast<MouseButton>(lParam), false);
+            SendInput(1, &input, sizeof(INPUT));
+        }
         return 0;
 
     case WM_CLOSE:
