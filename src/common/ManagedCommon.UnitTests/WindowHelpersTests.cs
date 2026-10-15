@@ -159,8 +159,38 @@ public sealed class WindowHelpersTests
             Volatile.Write(ref messageHandled, true);
             release.Set();
             WaitUntilIdle(injector);
-            uiThread.Join(Deadline);
+            JoinOrAssertExited(uiThread, Deadline);
         }
+    }
+
+    [TestMethod]
+    public void JoinOrAssertExitedFailsWhenThreadOutlivesDeadline()
+    {
+        using var started = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        var worker = new Thread(() =>
+        {
+            started.Set();
+            release.Wait();
+        });
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
+
+        try
+        {
+            Assert.IsTrue(started.Wait(Deadline), "The worker thread did not start.");
+            Assert.ThrowsException<AssertFailedException>(() => JoinOrAssertExited(worker, TimeSpan.Zero));
+        }
+        finally
+        {
+            release.Set();
+            Assert.IsTrue(worker.Join(Deadline), "The worker thread did not exit after release.");
+        }
+    }
+
+    private static void JoinOrAssertExited(Thread thread, TimeSpan timeout)
+    {
+        Assert.IsTrue(thread.Join(timeout), "The STA test window thread did not exit during cleanup.");
     }
 
     private static void WaitUntilIdle(ForegroundInputInjector injector)
