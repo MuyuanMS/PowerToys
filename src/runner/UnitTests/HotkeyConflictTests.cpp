@@ -35,20 +35,16 @@ namespace RunnerUnitTests
             Assert::AreEqual(static_cast<int>(InAppConflict), static_cast<int>(manager.HasConflict(hotkey, L"ModuleB", 1)));
         }
 
-        TEST_METHOD(HasConflict_LegacyWinShiftC_OnWindows11_NoConflict)
+        TEST_METHOD(HasConflict_LegacyWinShiftC_OperatingSystemBehavior)
         {
             using namespace HotkeyConflictDetector;
 
-            // Windows 10 still reserves this shortcut for Cortana.
-            if (!IsWindows11OrGreater())
-            {
-                return;
-            }
-
             auto& manager = HotkeyConflictManager::GetInstance();
             const Hotkey hotkey{ .win = true, .ctrl = false, .shift = true, .alt = false, .key = 'C' };
+            const auto expectedConflict = IsWindows11OrGreater() ? NoConflict : SystemConflict;
 
-            Assert::AreEqual(static_cast<int>(NoConflict), static_cast<int>(manager.HasConflict(hotkey)));
+            // Windows 10 still reserves this shortcut for Cortana.
+            Assert::AreEqual(static_cast<int>(expectedConflict), static_cast<int>(manager.HasConflict(hotkey)));
         }
 
     private:
