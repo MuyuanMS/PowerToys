@@ -310,7 +310,7 @@ public sealed partial class ZoomItTests
                 }
             }
 
-            mismatch = "matched";
+            mismatch = "last sample matched; stable wait not completed";
             return true;
         }
 
