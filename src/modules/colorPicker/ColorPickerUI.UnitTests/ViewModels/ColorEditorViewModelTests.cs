@@ -312,6 +312,103 @@ namespace ColorPicker.UnitTests.ViewModels
         }
 
         [TestMethod]
+        [DataRow(20, 20)]
+        [DataRow(3, 3)]
+        [DataRow(3, 5)]
+        public void SelectedColorChangedCommand_Execute_NewColorTrimsHistoryToConfiguredLimit(int historyLimit, int initialHistoryCount)
+        {
+            var settings = new StubUserSettings();
+            settings.ColorHistoryLimit.Value = historyLimit;
+            var viewModel = new ColorEditorViewModel(settings);
+            var history = Enumerable.Range(1, initialHistoryCount)
+                .Select(value => new Color { A = 255, R = (byte)value, G = 20, B = 30 })
+                .ToArray();
+            foreach (var color in history)
+            {
+                viewModel.ColorsHistory.Add(color);
+            }
+
+            viewModel.SelectedColorIndex = initialHistoryCount - 1;
+
+            viewModel.SelectedColorChangedCommand.Execute(AnyColor);
+
+            var expectedHistory = new[] { AnyColor }.Concat(history.Take(historyLimit - 1)).ToArray();
+            CollectionAssert.AreEqual(expectedHistory, viewModel.ColorsHistory.ToArray());
+            CollectionAssert.AreEqual(
+                expectedHistory.Select(color => color.A + "|" + color.R + "|" + color.G + "|" + color.B).ToArray(),
+                settings.ColorHistory.ToArray());
+            Assert.AreEqual(0, viewModel.SelectedColorIndex);
+            Assert.AreEqual(AnyColor, viewModel.SelectedColor);
+        }
+
+        [TestMethod]
+        public void SelectedColorChangedCommand_Execute_TrimmingHistoryPersistsOnce()
+        {
+            var settings = new StubUserSettings();
+            settings.ColorHistoryLimit.Value = 2;
+            var viewModel = new ColorEditorViewModel(settings);
+            foreach (var color in Enumerable.Range(1, 5).Select(value => new Color { A = 255, R = (byte)value, G = 20, B = 30 }))
+            {
+                viewModel.ColorsHistory.Add(color);
+            }
+
+            var persistenceNotifications = 0;
+            settings.ColorHistory.CollectionChanged += (_, _) => persistenceNotifications++;
+
+            viewModel.SelectedColorChangedCommand.Execute(AnyColor);
+
+            Assert.AreEqual(1, persistenceNotifications);
+            CollectionAssert.AreEqual(
+                new[] { AnyColor, new Color { A = 255, R = 1, G = 20, B = 30 } },
+                viewModel.ColorsHistory.ToArray());
+        }
+
+        [TestMethod]
+        public void SelectedColorChangedCommand_Execute_ZeroHistoryLimitKeepsColorSelectedWithoutHistory()
+        {
+            var settings = new StubUserSettings();
+            settings.ColorHistoryLimit.Value = 0;
+            var viewModel = new ColorEditorViewModel(settings);
+            viewModel.ColorsHistory.Add(AnyColor);
+
+            viewModel.SelectedColorChangedCommand.Execute(new Color { A = 255, R = 12, G = 34, B = 56 });
+
+            Assert.AreEqual(0, viewModel.ColorsHistory.Count);
+            Assert.AreEqual(0, settings.ColorHistory.Count);
+            Assert.AreEqual(-1, viewModel.SelectedColorIndex);
+            Assert.AreEqual(new Color { A = 255, R = 12, G = 34, B = 56 }, viewModel.SelectedColor);
+        }
+
+        [TestMethod]
+        [DataRow(0)]
+        [DataRow(10)]
+        [DataRow(19)]
+        public void SelectedColorChangedCommand_Execute_ExistingColorAtLimitPreservesOtherColors(int selectedIndex)
+        {
+            var settings = new StubUserSettings();
+            var viewModel = new ColorEditorViewModel(settings);
+            var history = Enumerable.Range(1, settings.ColorHistoryLimit.Value)
+                .Select(value => new Color { A = 255, R = (byte)value, G = 20, B = 30 })
+                .ToArray();
+            foreach (var color in history)
+            {
+                viewModel.ColorsHistory.Add(color);
+            }
+
+            var selected = history[selectedIndex];
+
+            viewModel.SelectedColorChangedCommand.Execute(selected);
+
+            var expectedHistory = new[] { selected }.Concat(history.Where(color => color != selected)).ToArray();
+            CollectionAssert.AreEqual(expectedHistory, viewModel.ColorsHistory.ToArray());
+            CollectionAssert.AreEqual(
+                expectedHistory.Select(color => color.A + "|" + color.R + "|" + color.G + "|" + color.B).ToArray(),
+                settings.ColorHistory.ToArray());
+            Assert.AreEqual(0, viewModel.SelectedColorIndex);
+            Assert.AreEqual(selected, viewModel.SelectedColor);
+        }
+
+        [TestMethod]
         public void SelectedColorChangedCommand_Execute_ExistingColorMovesToFrontWithoutDuplicate()
         {
             var first = new Color { A = 255, R = 10, G = 20, B = 30 };

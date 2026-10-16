@@ -43,12 +43,38 @@ namespace ColorPicker.ViewModels
             ExportColorsGroupedByFormatCommand = new AsyncRelayCommand<object>(ExportSelectedColorsByFormat, IsNonEmptyList);
             SelectedColorChangedCommand = new RelayCommand<object>((newColor) =>
             {
-                if (ColorsHistory.Contains((Color)newColor))
+                if (_userSettings.ColorHistoryLimit.Value <= 0)
                 {
-                    ColorsHistory.Remove((Color)newColor);
+                    ColorsHistory.Clear();
+                    SelectedColor = (Color)newColor;
+                    SelectedColorIndex = -1;
+                    return;
                 }
 
-                ColorsHistory.Insert(0, (Color)newColor);
+                ColorsHistory.CollectionChanged -= ColorsHistory_CollectionChanged;
+                try
+                {
+                    if (ColorsHistory.Contains((Color)newColor))
+                    {
+                        ColorsHistory.Remove((Color)newColor);
+                    }
+
+                    ColorsHistory.Insert(0, (Color)newColor);
+                    while (ColorsHistory.Count > _userSettings.ColorHistoryLimit.Value)
+                    {
+                        ColorsHistory.RemoveAt(ColorsHistory.Count - 1);
+                    }
+                }
+                finally
+                {
+                    ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
+                }
+
+                ColorsHistory_CollectionChanged(
+                    ColorsHistory,
+                    new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
+                        System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
+
                 SelectedColorIndex = 0;
             });
             ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
@@ -165,14 +191,19 @@ namespace ColorPicker.ViewModels
         {
             if (!_initializing)
             {
-                _userSettings.ColorHistory.ClearWithoutNotification();
-                foreach (var item in ColorsHistory)
-                {
-                    _userSettings.ColorHistory.AddWithoutNotification(item.A + "|" + item.R + "|" + item.G + "|" + item.B);
-                }
-
-                _userSettings.ColorHistory.ReleaseNotification();
+                SyncColorHistoryToSettings();
             }
+        }
+
+        private void SyncColorHistoryToSettings()
+        {
+            _userSettings.ColorHistory.ClearWithoutNotification();
+            foreach (var item in ColorsHistory)
+            {
+                _userSettings.ColorHistory.AddWithoutNotification(item.A + "|" + item.R + "|" + item.G + "|" + item.B);
+            }
+
+            _userSettings.ColorHistory.ReleaseNotification();
         }
 
         private static bool IsNonEmptyList(object parameter) =>
