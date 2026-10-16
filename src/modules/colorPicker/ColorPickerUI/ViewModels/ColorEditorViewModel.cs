@@ -43,6 +43,14 @@ namespace ColorPicker.ViewModels
             ExportColorsGroupedByFormatCommand = new AsyncRelayCommand<object>(ExportSelectedColorsByFormat, IsNonEmptyList);
             SelectedColorChangedCommand = new RelayCommand<object>((newColor) =>
             {
+                if (_userSettings.ColorHistoryLimit.Value <= 0)
+                {
+                    ColorsHistory.Clear();
+                    SelectedColor = (Color)newColor;
+                    SelectedColorIndex = -1;
+                    return;
+                }
+
                 if (ColorsHistory.Contains((Color)newColor))
                 {
                     ColorsHistory.Remove((Color)newColor);
@@ -54,15 +62,7 @@ namespace ColorPicker.ViewModels
                     ColorsHistory.RemoveAt(ColorsHistory.Count - 1);
                 }
 
-                if (ColorsHistory.Count > 0)
-                {
-                    SelectedColorIndex = 0;
-                }
-                else
-                {
-                    SelectedColor = (Color)newColor;
-                    SelectedColorIndex = -1;
-                }
+                SelectedColorIndex = 0;
             });
             ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
             _userSettings = userSettings;
