@@ -19,22 +19,33 @@ static bool IsSameName(_In_ PCWSTR first, _In_ PCWSTR second)
         return true;
     }
 
-    auto normalize = [](PCWSTR name) {
-        std::wstring normalized(name);
+    const bool firstIsNormalized = IsNormalizedString(NormalizationC, first, -1);
+    const bool secondIsNormalized = IsNormalizedString(NormalizationC, second, -1);
+    if (firstIsNormalized && secondIsNormalized)
+    {
+        return false;
+    }
+
+    auto normalize = [](PCWSTR name, std::wstring& buffer) -> PCWSTR {
         int size = NormalizeString(NormalizationC, name, -1, nullptr, 0);
         if (size > 0)
         {
-            std::wstring buffer(size, L'\0');
+            buffer.resize(size);
             size = NormalizeString(NormalizationC, name, -1, buffer.data(), size);
             if (size > 0)
             {
                 buffer.resize(static_cast<size_t>(size) - 1);
-                normalized = std::move(buffer);
+                return buffer.c_str();
             }
         }
-        return normalized;
+        return name;
     };
-    return normalize(first) == normalize(second);
+
+    std::wstring normalizedFirst;
+    std::wstring normalizedSecond;
+    const PCWSTR firstToCompare = firstIsNormalized ? first : normalize(first, normalizedFirst);
+    const PCWSTR secondToCompare = secondIsNormalized ? second : normalize(second, normalizedSecond);
+    return wcscmp(firstToCompare, secondToCompare) == 0;
 }
 
 bool DoRename(CComPtr<IPowerRenameRegEx>& spRenameRegEx, unsigned long& itemEnumIndex, CComPtr<IPowerRenameItem>& spItem)
