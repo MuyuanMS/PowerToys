@@ -342,6 +342,22 @@ namespace ColorPicker.UnitTests.ViewModels
         }
 
         [TestMethod]
+        public void SelectedColorChangedCommand_Execute_ZeroHistoryLimitKeepsColorSelectedWithoutHistory()
+        {
+            var settings = new StubUserSettings();
+            settings.ColorHistoryLimit.Value = 0;
+            var viewModel = new ColorEditorViewModel(settings);
+            viewModel.ColorsHistory.Add(AnyColor);
+
+            viewModel.SelectedColorChangedCommand.Execute(new Color { A = 255, R = 12, G = 34, B = 56 });
+
+            Assert.AreEqual(0, viewModel.ColorsHistory.Count);
+            Assert.AreEqual(0, settings.ColorHistory.Count);
+            Assert.AreEqual(-1, viewModel.SelectedColorIndex);
+            Assert.AreEqual(new Color { A = 255, R = 12, G = 34, B = 56 }, viewModel.SelectedColor);
+        }
+
+        [TestMethod]
         [DataRow(0)]
         [DataRow(10)]
         [DataRow(19)]

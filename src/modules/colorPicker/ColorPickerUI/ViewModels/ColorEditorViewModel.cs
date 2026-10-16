@@ -54,7 +54,15 @@ namespace ColorPicker.ViewModels
                     ColorsHistory.RemoveAt(ColorsHistory.Count - 1);
                 }
 
-                SelectedColorIndex = 0;
+                if (ColorsHistory.Count > 0)
+                {
+                    SelectedColorIndex = 0;
+                }
+                else
+                {
+                    SelectedColor = (Color)newColor;
+                    SelectedColorIndex = -1;
+                }
             });
             ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
             _userSettings = userSettings;
