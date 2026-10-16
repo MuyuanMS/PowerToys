@@ -70,10 +70,10 @@ namespace ColorPicker.ViewModels
                     ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
                 }
 
-                if (!_initializing)
-                {
-                    SyncColorHistoryToSettings();
-                }
+                ColorsHistory_CollectionChanged(
+                    ColorsHistory,
+                    new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
+                        System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
 
                 SelectedColorIndex = 0;
             });
