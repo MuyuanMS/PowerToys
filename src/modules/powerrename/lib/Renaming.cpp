@@ -10,6 +10,44 @@
 #include "PowerRenameRegEx.h"
 namespace fs = std::filesystem;
 
+// Names that differ only in Unicode normalization form (NFD vs. NFC) are the same name.
+// Unlike lstrcmp, linguistically equal names such as U+00DF (sharp s) and "ss" are different.
+static bool IsSameName(_In_ PCWSTR first, _In_ PCWSTR second)
+{
+    if (wcscmp(first, second) == 0)
+    {
+        return true;
+    }
+
+    const bool firstIsNormalized = IsNormalizedString(NormalizationC, first, -1);
+    const bool secondIsNormalized = IsNormalizedString(NormalizationC, second, -1);
+    if (firstIsNormalized && secondIsNormalized)
+    {
+        return false;
+    }
+
+    auto normalize = [](PCWSTR name, std::wstring& buffer) -> PCWSTR {
+        int size = NormalizeString(NormalizationC, name, -1, nullptr, 0);
+        if (size > 0)
+        {
+            buffer.resize(size);
+            size = NormalizeString(NormalizationC, name, -1, buffer.data(), size);
+            if (size > 0)
+            {
+                buffer.resize(static_cast<size_t>(size) - 1);
+                return buffer.c_str();
+            }
+        }
+        return name;
+    };
+
+    std::wstring normalizedFirst;
+    std::wstring normalizedSecond;
+    const PCWSTR firstToCompare = firstIsNormalized ? first : normalize(first, normalizedFirst);
+    const PCWSTR secondToCompare = secondIsNormalized ? second : normalize(second, normalizedSecond);
+    return wcscmp(firstToCompare, secondToCompare) == 0;
+}
+
 bool DoRename(CComPtr<IPowerRenameRegEx>& spRenameRegEx, unsigned long& itemEnumIndex, CComPtr<IPowerRenameItem>& spItem)
 {
     bool wouldRename = false;
@@ -239,7 +277,7 @@ bool DoRename(CComPtr<IPowerRenameRegEx>& spRenameRegEx, unsigned long& itemEnum
 
     // No change from originalName so set newName to
     // null so we clear it from our UI as well.
-    if (lstrcmp(originalName, newNameToUse) == 0)
+    if (newNameToUse != nullptr && IsSameName(originalName, newNameToUse))
     {
         newNameToUse = nullptr;
     }
