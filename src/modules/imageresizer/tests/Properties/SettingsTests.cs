@@ -168,6 +168,11 @@ namespace ImageResizer.Properties
         {
             // Mirrors the CLI first run: Reload() saves defaults because settings.json is missing,
             // then the --filename option is applied.
+            if (System.IO.File.Exists(Settings.SettingsPath))
+            {
+                System.IO.File.Delete(Settings.SettingsPath);
+            }
+
             var settings = new Settings();
             Assert.IsFalse(System.IO.File.Exists(Settings.SettingsPath));
 
