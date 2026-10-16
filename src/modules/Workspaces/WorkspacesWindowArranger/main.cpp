@@ -18,21 +18,22 @@
 
 namespace
 {
-    int RunCliArranger(int argc, wchar_t** argv)
+    int RunSessionArranger(int argc, wchar_t** argv)
     {
         Logger::init(std::vector<spdlog::sink_ptr>{ std::make_shared<spdlog::sinks::null_sink_mt>() });
         try
         {
             winrt::init_apartment();
             if (argc != 6)
-                throw WorkspacesCli::Error(2, L"invalidArguments", "Invalid CLI arranger arguments.");
+                throw WorkspacesCli::Error(2, L"invalidArguments", "Invalid session arranger arguments.");
             const auto operationId = WorkspacesCli::NormalizeId(argv[3]);
             const auto parentPid = std::stoul(argv[4]);
             const auto seconds = std::stoul(argv[5]);
-            if (!parentPid || !seconds || seconds > 600)
+            if (!parentPid || seconds > 600)
                 throw WorkspacesCli::Error(2, L"invalidArguments", "Invalid operation lifetime.");
-            WorkspacesCli::OperationLifetime lifetime(parentPid, seconds * 1000 + 5000);
-            WorkspacesCli::CheckEnabled();
+            WorkspacesSession::OperationLifetime lifetime(parentPid, seconds ? seconds * 1000 + 5000 : INFINITE);
+            if (powertoys_gpo::getConfiguredWorkspacesEnabledValue() == powertoys_gpo::gpo_rule_configured_disabled)
+                throw WorkspacesCli::Error(6, L"disabledByPolicy", "Workspaces is disabled by policy.");
             SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
             std::mutex mutex;
             std::condition_variable received;
@@ -63,11 +64,14 @@ namespace
                     }
                     received.notify_one();
                 },
-                IPCHelper::ModulePeer(L"PowerToys.WorkspacesCLI.exe", parentPid));
+                IPCHelper::SessionPeer(parentPid));
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            if (!pipe->WaitForReady(10000))
+                throw WorkspacesCli::Error(9, L"outcomeUnknown", "Operation snapshot pipes did not become ready.");
             pipe->send(L"snapshot-request");
             {
                 std::unique_lock lock(mutex);
-                if (!received.wait_for(lock, std::chrono::seconds(10), [&] { return project.has_value() || invalid; }) || invalid)
+                if (!received.wait_until(lock, deadline, [&] { return project.has_value() || invalid; }) || invalid)
                     throw WorkspacesCli::Error(9, L"outcomeUnknown", "No valid operation snapshot received.");
             }
             WindowArranger arranger(*project, std::move(pipe), operationId);
@@ -98,8 +102,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, LPSTR cmdline, int cm
     int argc = 0;
     auto argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     auto freeArguments = wil::scope_exit([&] { LocalFree(argv); });
-    if (argv && argc > 2 && std::wstring_view(argv[2]) == L"--cli-worker")
-        return RunCliArranger(argc, argv);
+    if (argv && argc > 2 && std::wstring_view(argv[2]) == L"--session-worker")
+        return RunSessionArranger(argc, argv);
     LoggerHelpers::init_logger(moduleName, internalPath, LogSettings::workspacesWindowArrangerLoggerName);
     InitUnhandledExceptionHandler();  
 

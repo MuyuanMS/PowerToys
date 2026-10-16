@@ -23,6 +23,15 @@
     <ClInclude Include="CliCommands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="LaunchSession.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionHandoff.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionLogging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="OperationLifetime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -92,6 +101,30 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CliCommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LaunchSession.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LaunchExecution.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\WorkspacesLauncher\AppLauncher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\WorkspacesLauncher\Launcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\WorkspacesLauncher\LauncherUIHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\WorkspacesLauncher\RegistryUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\WorkspacesLauncher\WindowArrangerHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionHandoff.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="WorkspaceStore.cpp">

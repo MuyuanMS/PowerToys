@@ -19,12 +19,16 @@ public:
     ~IPCHelper();
 
     void send(const std::wstring& message) const;
+    bool WaitForReady(DWORD timeoutMs, const std::function<bool()>& isCanceled = {}) const;
     void SetCallback(std::function<void(const std::wstring&)> messageCallback);
     static interop_auth::CallerPolicy ModulePeer(const std::wstring& executable, std::optional<DWORD> pid = std::nullopt);
+    static interop_auth::CallerPolicy SessionPeer(DWORD pid);
 
 private:
     void receive(const std::wstring& msg);
 
+    std::wstring m_currentPipeName;
+    std::wstring m_receiverPipeName;
     std::unique_ptr<TwoWayPipeMessageIPC> ipc;
     std::mutex ipcMutex;
     std::function<void(const std::wstring&)> callback;

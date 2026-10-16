@@ -80,27 +80,45 @@ part of stored workspace JSON.
 Launch results contain the workspace and operation IDs, per-application results and a separate
 persistence status. An observed arranged state does not certify that a document/tab has loaded
 or that an application is ready for business use.
+If launch-history verification fails with `persistenceUnverified`, exit code 11 is preserved:
+text mode writes the error to stderr and the observed application results to stdout; JSON mode
+includes both in its single response. Do not rerun the workspace merely to recover those results.
 
 Per-application `launched` preserves the native `Launched` state: the application launch succeeded,
 but window arrangement was not confirmed. A localized `message` explains this distinction.
 `arrangeFailed` is reserved for a native failed result without a recorded application-launch error;
 recorded launch errors remain `launchFailed`. `arranged` means the engine confirmed arrangement.
-The aggregate/exit-code rules are unchanged: unconfirmed arrangement is not counted as a fully
-restored workspace, even though it is not labeled an application-level arrangement failure.
+Aggregate state distinguishes launch progress from fully confirmed restoration:
+
+| Application outcomes | Aggregate state | Exit code |
+|---|---|---:|
+| Every application is `arranged` | `completed` | 0 |
+| At least one is `launched` or `arranged`, but not all are `arranged` | `partial` | 10 |
+| None is `launched` or `arranged` (for example, all skipped or failed) | `failed` | 10 |
+
+Thus `skipped` plus `launched` is `partial`, not `failed`. Exit codes remain unchanged:
+unconfirmed arrangement is not counted as a fully restored workspace.
+Final arranger responses must contain a known outcome for every requested application.
+`Waiting`, fractional/out-of-range numeric states, missing/duplicate applications and invalid results
+are rejected before applying or acknowledging completion. They produce `outcomeUnknown` (exit 9), not an application-level
+`unknown` with exit 10. Native `Launched` remains valid and is reported as `launched`.
 
 ## Launch behavior
 
 - Launch waits for an explicit final arranger result. There is no accepted-only/no-wait mode.
 - The default total deadline is 120 seconds; `--timeout` accepts 1 through 600.
-- At the deadline the shared launcher cancels its pending confirmation and the frontend allows up to two seconds to receive
-  the worker's final acknowledgement. An acknowledged timeout reports `timeout`; an absent,
+- At the deadline the shared launcher cancels its pending confirmation and allows up to two seconds for
+  execution to acknowledge completion. An acknowledged timeout reports `timeout`; an absent,
   malformed or unresponsive final result reports `outcomeUnknown`. This does not extend app-launch
-  or approval time, and bounded worker cleanup may take additional time.
+  or approval time. An unresponsive in-process operation retains its owned state until the Shell call
+  returns or the one-shot adapter exits after reporting the error; no unsafe thread termination is used.
 - Workspaces progress/editor windows are suppressed. The existing Workspaces signature confirmation
   dialog, application windows and normal Windows UAC remain possible.
-- Both ordinary and administrator terminals use the same command. An administrator frontend
-  starts a non-elevated worker in the same user's desktop session while keeping command output
-  in the original terminal. Existing saved elevation flags still determine individual app/UAC
+- Console applications launched as workspace targets get their own console rather than sharing
+  the CLI's console. The CLI keeps its original console and standard streams.
+- Both ordinary and administrator terminals use the same command. The shared session layer runs
+  directly inside a verified Medium caller; only an elevated caller starts a Medium Launcher host
+  in the same user's desktop session. Existing saved elevation flags still determine individual app/UAC
   behavior; the administrator caller does not implicitly elevate every app.
 - Existing windows follow the saved `move-existing-windows` setting. Another launch in the same
   session returns busy rather than queueing or taking over.
@@ -109,40 +127,79 @@ restored workspace, even though it is not labeled an application-level arrangeme
   as unknown outcome, not canceled.
 - A timeout does not mean that a Windows consent dialog was dismissed. Do not automatically retry:
   launch is not idempotent and repeating it may open more applications.
-- The worker and arranger use the same immutable selected snapshot. Final history writes read
+- The shared executor and arranger use the same immutable selected snapshot. Final history writes read
   the current file under a shared writer lock and do not replace it with the old launch snapshot.
-- Before launching legacy workspaces, the non-elevated worker assigns and safely persists only
+  The initial snapshot exchange waits for both IPC endpoints within its startup deadline before
+  sending the first request, so asynchronous pipe creation cannot discard it or its reply.
+- Before launching legacy workspaces, the Medium executor assigns and safely persists only
   missing application IDs. Existing IDs are preserved; malformed or duplicate existing IDs are
   errors. Concurrent edits or failed ID persistence stop the launch before applications start.
   Listing remains read-only, and a later canceled/timed-out launch does not undo completed ID initialization.
-- The foreground CLI restores the console's original output code page on exit. Private workers
-  do not change it, and their result stream remains JSON-only even if localization is unavailable.
+- The foreground CLI changes the console output code page only while writing output, flushes
+  those writes and restores it before returning to other work; launch waits leave it unchanged.
+  Elevated callers receive the host result through a private pipe, independent of console output and CLI localization.
 - File logging is best-effort. An unavailable log directory/file does not prevent launching;
   the final launch result includes a `loggingUnavailable` warning without changing application outcomes.
 
-### Administrator terminal handoff
+### Shared session and administrator routing
 
-The foreground CLI remains in its original context. It validates the desktop shell's user,
-session and medium integrity, creates a suspended worker using Explorer's process-creation
-context, and verifies the child's actual token before allowing any code to run.
+The CLI and GUI launcher are adapters over `WorkspacesSession::Start`. The entry and execution core
+are statically linked from `WorkspacesLib`, including the existing Launcher/AppLauncher implementation.
+`Start` selects an immutable snapshot and checks context. A Medium caller invokes the shared `Execute`
+in the same process, without another Launcher process, snapshot mapping or result pipe. An elevated
+caller creates a verified Medium `PowerToys.WorkspacesLauncher.exe` host that invokes the same `Execute`.
+Unsupported contexts fail; no path executes the core at High IL.
+`Execute` owns one preparation/launch/history flow and returns a typed outcome; only the CLI adapter
+creates the public JSON, text and exit-code representation.
+
+```mermaid
+flowchart TD
+    C["GUI Launcher / CLI"] --> S["WorkspacesSession::Start<br/>WorkspacesLib.lib"]
+    S --> M{"Execution context"}
+    M -->|"Verified Medium"| E["Execute in the caller process"]
+    M -->|"Elevated"| H["Create a verified Medium Launcher host"]
+    H --> HE["Same Execute implementation in the host"]
+    M -->|"Unsupported"| F["Fail without launching"]
+    E --> R["Typed result returned in-process"]
+    HE --> P["Private result pipe back to Start"]
+```
+
+The GUI retains progress presentation and its invocation context, including unsaved Launch-and-Edit
+drafts; CLI mode only displays required confirmation UI. No Editor save-workflow changes are added.
+Launch and Edit can start an already-saved workspace without a temporary draft. A missing
+`temp-workspaces.json` falls back to saved configuration; an existing malformed draft remains an
+error, and a valid matching draft takes precedence.
+
+The progress window's Cancel button and CLI cancellation both stop the shared launch wait and return
+an acknowledged `canceled` result without requiring normal arranger completion. Pending application
+launches stop, already-started applications remain open, and operation-owned workers and the launch
+lock are released. Non-canceled launches still require a complete, validated arranger result.
+
+For elevated callers, shared session routing validates the desktop shell's
+user/session/Medium integrity, creates a suspended host through the common
+Explorer-parent helper, and verifies the actual child's token before allowing execution.
 
 The child receives its operation handles through a bounded, read-only bootstrap pipe. The
 frontend pins the exact created PID; both sides verify the expected module image/version and
 Microsoft signature in Release. User SID/session must match, and the child must be non-elevated.
 Only a read-only snapshot, wait-only cancellation/owner-lifetime handles and the existing
-input/result endpoints are duplicated. No token handle or general administrator
+result writer are duplicated. No token handle or general administrator
 process capability is handed to the worker.
 
 The existing `run_non_elevated` helper owns Explorer selection, startup attributes and process
 creation. Its owning overload supports suspended creation and parent validation; the existing
-PID-only API delegates to that implementation. Both the Workspaces GUI launcher and CLI use
-this shared helper. `WorkerHandoff` only validates the resulting identity and transfers CLI
-capabilities; it no longer implements a separate process-creation path. Other users of
+PID-only API delegates to that implementation. The module's shared `SessionHandoff` owns bootstrap
+identity/capability transfer for both GUI and CLI; neither adapter maintains an independent
+de-elevation or worker implementation. Other users of
 `RunNonElevatedEx` retain their existing COM-based behavior.
 
 No normal same-user Explorer, a different-user administrator, wrong session, identity mismatch
 or failed transfer yields `deElevationFailed`; the CLI never falls back to elevated execution.
 No extra console is opened. UAC for individual configured elevated apps remains separate.
+The arranger accepts only the exact caller PID with a matching installed directory/version and one
+of the official CLI/Launcher executable names. Release retains signature verification. PR UI-test
+setup signs the CLI, Launcher, arranger and Launcher UI using the existing companion-signing mechanism;
+it does not disable production authentication.
 
 ## Unverified executable confirmation
 
@@ -166,7 +223,8 @@ There is no independent CLI approval state machine or terminal A/S prompt.
 - The shared launcher retains the checked file throughout confirmation and launch. Existing
   stale/duplicate reply handling and signature/UAC policies are unchanged.
 
-The worker keeps stdin=NUL. Confirmation uses the existing launcher UI message protocol on
+Only the elevated caller's host uses private NUL standard streams; inline execution leaves the
+caller's streams intact. Confirmation uses the existing launcher UI message protocol on
 operation-scoped pipes, separate from the CLI result stream. The native endpoint verifies the
 UI module image/version and requires its Microsoft signature in Release.
 
@@ -194,6 +252,15 @@ Stable machine error codes distinguish reasons such as `disabledByUser`, `disabl
 Per-app `skipped`, `confirmationRequired`, `confirmationTimedOut`, `confirmationFailed` and
 `canceled` are not aliases for a Windows UAC denial. Skipping an app means the requested workspace
 was not fully restored, so it is not reported as all-success.
+
+## CLI telemetry
+
+When optional PowerToys diagnostics are enabled, the foreground CLI emits one `Workspaces_CLICommand`
+usage event per invocation, following the Settings CLI convention. Only a fixed `CommandName`
+(`list`, `launch`, `help`, `version`, `none`, or `unknown`) and `Successful` (exit code zero) are recorded.
+Partial restoration, cancellation and command failures are not counted as successful. No workspace
+names/IDs, paths, argument values or error text are included. The Medium host does not emit this
+command event, so elevated calls are not counted twice. Existing GUI launch telemetry is unchanged.
 
 ## Compatibility boundaries
 

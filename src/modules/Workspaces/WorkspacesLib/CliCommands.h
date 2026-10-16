@@ -9,18 +9,12 @@
 
 #include "WorkspacesData.h"
 #include "LaunchDecision.h"
+#include "LaunchSession.h"
 
 namespace WorkspacesCli
 {
-    inline constexpr DWORD MaxPayload = 1024 * 1024;
-
-    struct Error : std::runtime_error
-    {
-        int exitCode;
-        std::wstring code;
-
-        Error(int exitCode, std::wstring code, const char* message);
-    };
+    inline constexpr DWORD MaxPayload = WorkspacesSession::MaxPayload;
+    using Error = WorkspacesSession::Error;
 
     struct Options
     {
@@ -34,6 +28,7 @@ namespace WorkspacesCli
 
     Options Parse(const std::vector<std::wstring>& arguments);
     bool WantsJson(const std::vector<std::wstring>& arguments);
+    const wchar_t* TelemetryCommandName(const std::vector<std::wstring>& arguments) noexcept;
     std::wstring NormalizeId(const std::wstring& id);
     void ValidateLaunch(const WorkspacesData::WorkspacesProject& project, bool allowMissingIds = false);
     void EnsureApplicationIds(const std::filesystem::path& fileName, WorkspacesData::WorkspacesProject& project);
@@ -48,6 +43,11 @@ namespace WorkspacesCli
     json::JsonObject ListResult(const std::vector<WorkspacesData::WorkspacesProject>& workspaces, bool details);
     json::JsonObject Envelope(const std::wstring& command, const std::wstring& state, const json::JsonObject& result);
     json::JsonObject Failure(const std::wstring& command, const Error& error);
+    json::JsonObject SessionResult(const WorkspacesSession::Result& result, int& exitCode);
+    WorkspacesData::LaunchingAppStateMap ParseArrangerResult(
+        const json::JsonObject& message,
+        const WorkspacesData::LaunchingAppStateMap& expected,
+        const std::wstring& operationId);
     json::JsonObject LaunchResult(
         const WorkspacesData::WorkspacesProject& project,
         const WorkspacesData::LaunchingAppStateMap& states,

@@ -82,6 +82,7 @@ Thank you for using PowerToys!
 | Microsoft.PowerToys.AdvancedPaste_Settings | Triggered when settings for Advanced Paste are accessed or modified. |
 | Microsoft.PowerToys.AdvancedPasteClipboardItemClicked | Occurs when a clipboard item is selected from the Advanced Paste menu. |
 | Microsoft.PowerToys.AdvancedPasteClipboardItemDeletedEvent | Triggered when an item is removed from the Advanced Paste clipboard history. |
+| Microsoft.PowerToys.AdvancedPaste_CLICommand | Triggered when an Advanced Paste CLI command is executed, logging only the bounded command name and success status. |
 | Microsoft.PowerToys.AdvancedPasteCustomActionErrorEvent | Records provider, model, and status details when a custom action fails. |
 | Microsoft.PowerToys.AdvancedPasteCustomFormatOutputThumbUpDownEvent | Triggered when a user gives feedback on a custom format output (thumb up/down). |
 | Microsoft.PowerToys.AdvancedPasteEndpointUsageEvent | Logs the AI provider, model, and processing duration for each endpoint call. |
@@ -466,6 +467,7 @@ Thank you for using PowerToys!
 
 | Event Name | Description |
 | --- | --- |
+| Microsoft.PowerToys.Workspaces_CLICommand | Triggered once per Workspaces CLI invocation when optional diagnostics are enabled. Records only a fixed command category (list, launch, help, version, none, or unknown) and success status. Workspace names and IDs, application paths, arguments, and error text are not collected. |
 | Microsoft.PowerToys.Workspaces_CreateEvent | Triggered when a new workspace is created. |
 | Microsoft.PowerToys.Workspaces_DeleteEvent | Triggered when a workspace is deleted. |
 | Microsoft.PowerToys.Workspaces_EditEvent | Triggered when a workspace is edited or modified. |

@@ -276,7 +276,9 @@ jobs:
 
       if ($allModules -or $selectedModules -contains 'Workspaces.UITests.Next') {
         $requiredPackages += 'Workspaces.TestApp.msix'
-        $requiredAuthenticodeFiles += 'PowerToys.QuickAccess.exe'
+        $requiredAuthenticodeFiles += 'PowerToys.QuickAccess.exe', 'PowerToys.WorkspacesCLI.exe',
+          'PowerToys.WorkspacesLauncher.exe', 'PowerToys.WorkspacesWindowArranger.exe',
+          'PowerToys.WorkspacesLauncherUI.exe'
       }
 
       if ($requiresAuthenticatedSettingsIpc) {
@@ -389,7 +391,7 @@ jobs:
       $resultsDir = "$(Common.TestResultsDirectory)"
       New-Item -ItemType Directory -Path $resultsDir -Force | Out-Null
 
-      $nonElevatedSuites = @('CropAndLock.UITests', 'Workspaces.UITests.Next')
+      $nonElevatedSuites = @('AdvancedPaste.UITests.Next', 'CropAndLock.UITests', 'Workspaces.UITests.Next')
       . "$(build.sourcesdirectory)\.pipelines\configureLightSwitchLocation.ps1"
       $locationStatePath = "$(Agent.WorkFolder)\PowerToysUiTestState\LightSwitchLocation.json"
       $failed = 0

@@ -4,6 +4,7 @@
 #include "WorkspaceStore.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cwctype>
 #include <set>
 #include <shlobj.h>
@@ -12,11 +13,6 @@
 
 namespace WorkspacesCli
 {
-    Error::Error(int exitCode, std::wstring code, const char* message) :
-        std::runtime_error(message), exitCode(exitCode), code(std::move(code))
-    {
-    }
-
     void ValidateLaunch(const WorkspacesData::WorkspacesProject& project, bool allowMissingIds)
     {
         if (project.apps.empty())
@@ -50,39 +46,7 @@ namespace WorkspacesCli
 
     void EnsureApplicationIds(const std::filesystem::path& fileName, WorkspacesData::WorkspacesProject& project)
     {
-        ValidateLaunch(project, true);
-        if (std::none_of(project.apps.begin(), project.apps.end(), [](const auto& app) { return app.id.empty(); }))
-            return;
-        auto prepared = project;
-        std::set<std::wstring> ids;
-        for (const auto& app : prepared.apps)
-        {
-            if (!app.id.empty())
-                ids.insert(NormalizeId(app.id));
-        }
-        for (auto& app : prepared.apps)
-        {
-            if (!app.id.empty())
-                continue;
-            do
-            {
-                GUID guid{};
-                winrt::check_hresult(CoCreateGuid(&guid));
-                wchar_t text[40]{};
-                if (!StringFromGUID2(guid, text, ARRAYSIZE(text)))
-                    throw Error(1, L"internalError", "Cannot format a new application ID.");
-                app.id = text;
-            } while (!ids.insert(NormalizeId(app.id)).second);
-        }
-        ValidateLaunch(prepared);
-        const auto saved = WorkspaceStore::UpdateApplicationMetadata(fileName, project, prepared);
-        if (saved == WorkspaceStore::UpdateResult::Conflict)
-            throw Error(8, L"workspaceChanged", "The saved workspace changed before application IDs could be initialized. No applications were launched.");
-        if (saved == WorkspaceStore::UpdateResult::Unverified)
-            throw Error(11, L"persistenceUnverified", "Application ID persistence could not be verified.");
-        if (saved != WorkspaceStore::UpdateResult::Updated)
-            throw Error(8, L"applicationIdSaveFailed", "Missing application IDs could not be saved. No applications were launched.");
-        project = std::move(prepared);
+        WorkspacesSession::InitializeApplicationIds(fileName, project);
     }
 
     std::wstring NormalizeId(const std::wstring& id)
@@ -112,6 +76,23 @@ namespace WorkspacesCli
         }
         std::transform(value.begin(), value.end(), value.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
         return value;
+    }
+
+    const wchar_t* TelemetryCommandName(const std::vector<std::wstring>& arguments) noexcept
+    {
+        if (arguments.empty())
+            return L"none";
+        const auto& command = arguments.front();
+        if (command == L"--help" ||
+            (arguments.size() == 2 && (command == L"list" || command == L"launch") && arguments[1] == L"--help"))
+            return L"help";
+        if (command == L"--version")
+            return L"version";
+        if (command == L"list")
+            return L"list";
+        if (command == L"launch")
+            return L"launch";
+        return L"unknown";
     }
 
     bool WantsJson(const std::vector<std::wstring>& arguments)
@@ -348,6 +329,76 @@ namespace WorkspacesCli
         return result;
     }
 
+    json::JsonObject SessionResult(const WorkspacesSession::Result& session, int& exitCode)
+    {
+        auto result = LaunchResult(session.project, session.applications, session.operationId, exitCode,
+                                   session.applicationErrors, session.approvals);
+        if (!session.loggingAvailable)
+        {
+            json::JsonObject warning;
+            warning.SetNamedValue(L"code", json::value(L"loggingUnavailable"));
+            warning.SetNamedValue(L"message", json::value(L"File logging is unavailable for this operation."));
+            result.GetNamedArray(L"warnings").Append(warning);
+        }
+        if (session.persistence)
+        {
+            const auto saved = *session.persistence;
+            result.GetNamedObject(L"result").SetNamedValue(L"persistenceStatus",
+                json::value(saved == WorkspaceStore::UpdateResult::Updated ? L"updated" :
+                            saved == WorkspaceStore::UpdateResult::Conflict ? L"conflict" :
+                            saved == WorkspaceStore::UpdateResult::Unverified ? L"unverified" : L"failed"));
+            if (saved == WorkspaceStore::UpdateResult::Unverified)
+            {
+                exitCode = 11;
+                result.SetNamedValue(L"state", json::value(L"failed"));
+                result.SetNamedValue(L"error", Failure(L"launch", { 11, L"persistenceUnverified", "Workspace persistence could not be verified." }).GetNamedObject(L"error"));
+            }
+            else if (saved != WorkspaceStore::UpdateResult::Updated)
+            {
+                json::JsonObject warning;
+                warning.SetNamedValue(L"code", json::value(saved == WorkspaceStore::UpdateResult::Conflict ? L"metadataSaveConflict" : L"metadataSaveFailed"));
+                warning.SetNamedValue(L"message", json::value(L"Launch history could not be saved. Do not relaunch only to update history."));
+                result.GetNamedArray(L"warnings").Append(warning);
+            }
+        }
+        return result;
+    }
+
+    WorkspacesData::LaunchingAppStateMap ParseArrangerResult(
+        const json::JsonObject& message,
+        const WorkspacesData::LaunchingAppStateMap& expected,
+        const std::wstring& operationId)
+    {
+        try
+        {
+            if (message.GetNamedString(L"kind") != L"arranger-result" ||
+                message.GetNamedNumber(L"protocolVersion") != 1 || message.GetNamedString(L"operationId") != operationId)
+                throw Error(9, L"outcomeUnknown", "Invalid final arranger protocol.");
+            const auto applications = message.GetNamedArray(L"applications");
+            if (applications.Size() != expected.size())
+                throw Error(9, L"outcomeUnknown", "Incomplete final arranger result.");
+            auto remaining = expected;
+            WorkspacesData::LaunchingAppStateMap result;
+            for (const auto& value : applications)
+            {
+                const auto object = value.GetObjectW();
+                const auto state = object.GetNamedNumber(L"state");
+                if (!std::isfinite(state) || std::trunc(state) != state ||
+                    state <= static_cast<int>(LaunchingState::Waiting) || state > static_cast<int>(LaunchingState::Skipped))
+                    throw Error(9, L"outcomeUnknown", "Invalid final arranger application state.");
+                const auto item = WorkspacesData::AppLaunchInfoJSON::FromJson(object);
+                if (!item || !remaining.erase(item->application))
+                    throw Error(9, L"outcomeUnknown", "Invalid final arranger application outcome.");
+                result.emplace(item->application, *item);
+            }
+            return result;
+        }
+        catch (const winrt::hresult_error&)
+        {
+            throw Error(9, L"outcomeUnknown", "Malformed final arranger result.");
+        }
+    }
+
     json::JsonObject LaunchResult(const WorkspacesData::WorkspacesProject& project,
                                   const WorkspacesData::LaunchingAppStateMap& states,
                                   const std::wstring& operationId,
@@ -357,11 +408,15 @@ namespace WorkspacesCli
     {
         json::JsonArray apps;
         size_t arranged = 0;
+        bool hasLaunchProgress = false;
         for (const auto& app : project.apps)
         {
             const auto entry = states.find(app);
             const auto state = entry == states.end() ? LaunchingState::Waiting : entry->second.state;
-            const wchar_t* name = L"unknown";
+            if (state <= LaunchingState::Waiting || state > LaunchingState::Skipped)
+                throw Error(9, L"outcomeUnknown", "No conclusive application launch outcome was received.");
+            hasLaunchProgress = hasLaunchProgress || state == LaunchingState::Launched || state == LaunchingState::LaunchedAndMoved;
+            const wchar_t* name = L"launched";
             if (state == LaunchingState::LaunchedAndMoved)
             {
                 name = L"arranged";
@@ -373,8 +428,6 @@ namespace WorkspacesCli
                 name = L"canceled";
             else if (state == LaunchingState::Skipped)
                 name = L"skipped";
-            else if (state == LaunchingState::Launched)
-                name = L"launched";
             json::JsonObject item;
             item.SetNamedValue(L"id", json::value(app.id));
             item.SetNamedValue(L"state", json::value(name));
@@ -410,7 +463,7 @@ namespace WorkspacesCli
         result.SetNamedValue(L"operationId", json::value(operationId));
         result.SetNamedValue(L"applications", apps);
         result.SetNamedValue(L"persistenceStatus", json::value(L"unchanged"));
-        auto output = Envelope(L"launch", exitCode == 0 ? L"completed" : (arranged == 0 ? L"failed" : L"partial"), result);
+        auto output = Envelope(L"launch", exitCode == 0 ? L"completed" : (hasLaunchProgress ? L"partial" : L"failed"), result);
         output.SetNamedValue(L"warnings", json::JsonArray{});
         return output;
     }
