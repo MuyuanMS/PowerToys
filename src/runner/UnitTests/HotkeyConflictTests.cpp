@@ -35,6 +35,18 @@ namespace RunnerUnitTests
             Assert::AreEqual(static_cast<int>(InAppConflict), static_cast<int>(manager.HasConflict(hotkey, L"ModuleB", 1)));
         }
 
+        TEST_METHOD(HasConflict_LegacyWinShiftC_SystemBypassIsWindows11Specific)
+        {
+            using namespace HotkeyConflictDetector;
+
+            const Hotkey legacyShortcut{ .win = true, .ctrl = false, .shift = true, .alt = false, .key = 'C' };
+            Assert::IsTrue(details::ShouldBypassLegacyWinShiftCSystemConflict(legacyShortcut, true));
+            Assert::IsFalse(details::ShouldBypassLegacyWinShiftCSystemConflict(legacyShortcut, false));
+
+            const Hotkey otherShortcut{ .win = true, .ctrl = false, .shift = true, .alt = false, .key = 'D' };
+            Assert::IsFalse(details::ShouldBypassLegacyWinShiftCSystemConflict(otherShortcut, true));
+        }
+
     private:
         static void ClearTestModules()
         {
