@@ -51,17 +51,26 @@ namespace ColorPicker.ViewModels
                     return;
                 }
 
-                if (ColorsHistory.Contains((Color)newColor))
+                ColorsHistory.CollectionChanged -= ColorsHistory_CollectionChanged;
+                try
                 {
-                    ColorsHistory.Remove((Color)newColor);
+                    if (ColorsHistory.Contains((Color)newColor))
+                    {
+                        ColorsHistory.Remove((Color)newColor);
+                    }
+
+                    ColorsHistory.Insert(0, (Color)newColor);
+                    while (ColorsHistory.Count > _userSettings.ColorHistoryLimit.Value)
+                    {
+                        ColorsHistory.RemoveAt(ColorsHistory.Count - 1);
+                    }
+                }
+                finally
+                {
+                    ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
                 }
 
-                ColorsHistory.Insert(0, (Color)newColor);
-                while (ColorsHistory.Count > _userSettings.ColorHistoryLimit.Value)
-                {
-                    ColorsHistory.RemoveAt(ColorsHistory.Count - 1);
-                }
-
+                SyncColorHistoryToSettings();
                 SelectedColorIndex = 0;
             });
             ColorsHistory.CollectionChanged += ColorsHistory_CollectionChanged;
@@ -178,14 +187,19 @@ namespace ColorPicker.ViewModels
         {
             if (!_initializing)
             {
-                _userSettings.ColorHistory.ClearWithoutNotification();
-                foreach (var item in ColorsHistory)
-                {
-                    _userSettings.ColorHistory.AddWithoutNotification(item.A + "|" + item.R + "|" + item.G + "|" + item.B);
-                }
-
-                _userSettings.ColorHistory.ReleaseNotification();
+                SyncColorHistoryToSettings();
             }
+        }
+
+        private void SyncColorHistoryToSettings()
+        {
+            _userSettings.ColorHistory.ClearWithoutNotification();
+            foreach (var item in ColorsHistory)
+            {
+                _userSettings.ColorHistory.AddWithoutNotification(item.A + "|" + item.R + "|" + item.G + "|" + item.B);
+            }
+
+            _userSettings.ColorHistory.ReleaseNotification();
         }
 
         private static bool IsNonEmptyList(object parameter) =>

@@ -342,6 +342,28 @@ namespace ColorPicker.UnitTests.ViewModels
         }
 
         [TestMethod]
+        public void SelectedColorChangedCommand_Execute_TrimmingHistoryPersistsOnce()
+        {
+            var settings = new StubUserSettings();
+            settings.ColorHistoryLimit.Value = 2;
+            var viewModel = new ColorEditorViewModel(settings);
+            foreach (var color in Enumerable.Range(1, 5).Select(value => new Color { A = 255, R = (byte)value, G = 20, B = 30 }))
+            {
+                viewModel.ColorsHistory.Add(color);
+            }
+
+            var persistenceNotifications = 0;
+            settings.ColorHistory.CollectionChanged += (_, _) => persistenceNotifications++;
+
+            viewModel.SelectedColorChangedCommand.Execute(AnyColor);
+
+            Assert.AreEqual(1, persistenceNotifications);
+            CollectionAssert.AreEqual(
+                new[] { AnyColor, new Color { A = 255, R = 1, G = 20, B = 30 } },
+                viewModel.ColorsHistory.ToArray());
+        }
+
+        [TestMethod]
         public void SelectedColorChangedCommand_Execute_ZeroHistoryLimitKeepsColorSelectedWithoutHistory()
         {
             var settings = new StubUserSettings();
