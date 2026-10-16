@@ -12,7 +12,7 @@ namespace HotkeyConflictDetector
     {
         bool IsLegacyWinShiftCShortcut(const Hotkey& hotkey)
         {
-            return hotkey.win && hotkey.shift && !hotkey.ctrl && !hotkey.alt && hotkey.key == 'C';
+            return details::ShouldBypassLegacyWinShiftCSystemConflict(hotkey, true);
         }
     }
 

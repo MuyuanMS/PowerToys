@@ -14,6 +14,14 @@ namespace HotkeyConflictDetector
     using HotkeyEx = PowertoyModuleIface::HotkeyEx;
     using Shortcut = CentralizedHotkeys::Shortcut;
 
+    namespace details
+    {
+        inline bool ShouldBypassLegacyWinShiftCSystemConflict(const Hotkey& hotkey, const bool isWindows11OrGreater)
+        {
+            return isWindows11OrGreater && hotkey.win && hotkey.shift && !hotkey.ctrl && !hotkey.alt && hotkey.key == 'C';
+        }
+    }
+
     bool IsWindows11OrGreater();
 
     struct HotkeyConflictInfo
