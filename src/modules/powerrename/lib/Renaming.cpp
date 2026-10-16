@@ -14,6 +14,11 @@ namespace fs = std::filesystem;
 // Unlike lstrcmp, linguistically equal names such as U+00DF (sharp s) and "ss" are different.
 static bool IsSameName(_In_ PCWSTR first, _In_ PCWSTR second)
 {
+    if (wcscmp(first, second) == 0)
+    {
+        return true;
+    }
+
     auto normalize = [](PCWSTR name) {
         std::wstring normalized(name);
         int size = NormalizeString(NormalizationC, name, -1, nullptr, 0);
