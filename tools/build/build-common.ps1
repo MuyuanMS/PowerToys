@@ -70,7 +70,8 @@ function RunMSBuild {
         [string]$Solution,
         [string]$ExtraArgs,
         [string]$Platform,
-        [string]$Configuration
+        [string]$Configuration,
+        [string]$ProjectSolutionDir
     )
 
     # Logs go to <repo>\artifacts\logs\<project name>\, not the project folder: the context-menu
@@ -103,7 +104,9 @@ function RunMSBuild {
         '/nologo'
     )
 
-    $cmd = $base + ($ExtraArgs -split ' ')
+    $cmd = $base
+    if ($ProjectSolutionDir) { $cmd += "/p:SolutionDir=$ProjectSolutionDir" }
+    $cmd += ($ExtraArgs -split ' ')
     Write-Host (("[MSBUILD] {0}" -f ($cmd -join ' ')))
 
     Push-Location $script:RepoRoot
@@ -210,20 +213,15 @@ function BuildProjectsInDirectory {
             RestoreThenBuild $f.FullName $ExtraArgs $Platform $Configuration $RestoreOnly
         } else {
             $buildArgs = '/m'
+            $solutionDir = $null
             if ($f.Extension -in '.csproj', '.vcxproj') {
                 # Without this, $(SolutionDir) is the project folder, so projects with IntDir/OutDir under it
                 # write intermediates there (and the context-menu projects pack them into their MSIX).
                 # ExtraArgs come later, so a caller's /p:SolutionDir still wins.
                 $solutionDir = Get-ProjectSolutionDir $f.FullName
-                if ($solutionDir -and $solutionDir.Contains(' ')) {
-                    # RunMSBuild splits ExtraArgs on spaces.
-                    Write-Warning ("[LOCAL BUILD] Not passing SolutionDir because its path contains spaces: {0}" -f $solutionDir)
-                } elseif ($solutionDir) {
-                    $buildArgs = "$buildArgs /p:SolutionDir=$solutionDir"
-                }
             }
             if ($ExtraArgs) { $buildArgs = "$buildArgs $ExtraArgs" }
-            RunMSBuild $f.FullName $buildArgs $Platform $Configuration
+            RunMSBuild $f.FullName $buildArgs $Platform $Configuration $solutionDir
         }
     }
 
