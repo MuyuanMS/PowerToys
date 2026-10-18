@@ -523,9 +523,14 @@ namespace MouseWithoutBorders
                 return false;
             }
 
+            if (!newKey.Equals(settings.MyKey, StringComparison.OrdinalIgnoreCase))
+            {
+                settings.MyKey = newKey;
+            }
+
             if (!newKey.Equals(Encryption.MyKey, StringComparison.OrdinalIgnoreCase))
             {
-                settings.MyKey = Encryption.MyKey = newKey;
+                Encryption.MyKey = newKey;
                 Encryption.GeneratedKey = false;
             }
 

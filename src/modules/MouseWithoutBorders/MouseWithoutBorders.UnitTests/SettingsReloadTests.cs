@@ -335,6 +335,24 @@ public sealed class SettingsReloadTests
     }
 
     [TestMethod]
+    public void SecurityKeyEdit_RuntimeKeyAlreadyMatches_UpdatesStaleStoredKey()
+    {
+        const string staleKey = "OriginalKeyValue1";
+        const string currentKey = "UpdatedKeyValue12";
+
+        var properties = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        properties.SecurityKey.Value = staleKey;
+        var settings = CreateSettings(properties);
+        Encryption.MyKey = currentKey;
+
+        Assert.IsTrue(FrmMatrix.TryApplySecurityKey(settings, currentKey, out _));
+
+        Assert.AreEqual(currentKey, settings.MyKey);
+        Assert.AreEqual(currentKey, properties.SecurityKey.Value);
+        Assert.AreEqual(currentKey, Encryption.MyKey);
+    }
+
+    [TestMethod]
     public void SecurityKeyEdit_InvalidKey_LeavesStoredAndRuntimeKeyUnchanged()
     {
         const string originalKey = "OriginalKeyValue1";
