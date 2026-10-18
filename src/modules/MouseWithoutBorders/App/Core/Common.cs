@@ -205,7 +205,7 @@ internal static class Common
 
     internal static int ScreenWidth => Common.screenWidth;
 
-    internal static bool Is64bitOS
+    internal static bool Is64bitProcess
     {
         get; set;
 
