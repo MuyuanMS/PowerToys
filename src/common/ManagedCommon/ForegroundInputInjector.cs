@@ -19,11 +19,18 @@ namespace ManagedCommon
     internal sealed class ForegroundInputInjector
     {
         private readonly Action _sendInput;
+        private readonly Action<Thread> _startThread;
         private int _sendInProgress;
 
         internal ForegroundInputInjector(Action sendInput)
+            : this(sendInput, static thread => thread.Start())
+        {
+        }
+
+        internal ForegroundInputInjector(Action sendInput, Action<Thread> startThread)
         {
             _sendInput = sendInput;
+            _startThread = startThread;
         }
 
         internal bool IsSendInProgress => Volatile.Read(ref _sendInProgress) != 0;
@@ -40,12 +47,20 @@ namespace ManagedCommon
                 return false;
             }
 
-            var sendThread = new Thread(Send)
+            try
             {
-                IsBackground = true,
-                Name = "PowerToys foreground input",
-            };
-            sendThread.Start();
+                var sendThread = new Thread(Send)
+                {
+                    IsBackground = true,
+                    Name = "PowerToys foreground input",
+                };
+                _startThread(sendThread);
+            }
+            catch
+            {
+                Volatile.Write(ref _sendInProgress, 0);
+                throw;
+            }
 
             // Thread.Join and WaitHandle.WaitOne pump COM and sent messages on STA threads. Polling keeps the caller
             // (usually a UI thread) from being re-entered, like the inline SendInput call this replaces.

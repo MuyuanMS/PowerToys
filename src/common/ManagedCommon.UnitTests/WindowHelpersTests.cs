@@ -102,6 +102,45 @@ public sealed class WindowHelpersTests
     }
 
     [TestMethod]
+    public void TrySendResetsGuardWhenThreadStartFails()
+    {
+        var expectedException = new InvalidOperationException("Simulated thread startup failure.");
+        int startAttempts = 0;
+        int sends = 0;
+        Thread startedThread = null;
+        var injector = new ForegroundInputInjector(
+            () => Interlocked.Increment(ref sends),
+            thread =>
+            {
+                if (Interlocked.Increment(ref startAttempts) == 1)
+                {
+                    throw expectedException;
+                }
+
+                startedThread = thread;
+                thread.Start();
+            });
+
+        try
+        {
+            Assert.AreSame(expectedException, Assert.ThrowsException<InvalidOperationException>(() => injector.TrySend(Deadline)));
+            Assert.IsFalse(injector.IsSendInProgress, "The send guard should be reset when thread startup fails.");
+
+            Assert.IsTrue(injector.TrySend(Deadline), "A later send should start after the failed startup.");
+            Assert.AreEqual(2, Volatile.Read(ref startAttempts));
+            Assert.AreEqual(1, Volatile.Read(ref sends));
+            Assert.IsFalse(injector.IsSendInProgress);
+        }
+        finally
+        {
+            if (startedThread != null && startedThread.IsAlive)
+            {
+                Assert.IsTrue(startedThread.Join(Deadline), "The retry send thread did not exit.");
+            }
+        }
+    }
+
+    [TestMethod]
     public void BringToForegroundDoesNotDispatchSentMessagesWhileWaitingForInput()
     {
         // The inline SendInput call never dispatched messages, but Thread.Join/WaitHandle.WaitOne would on an STA
