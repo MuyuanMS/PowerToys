@@ -268,7 +268,7 @@ function Get-HistoryPatchIdSet {
 
     # Stream each full history once instead of spawning git for every commit.
     $patchOutput = & {
-        & git -C $RepoPath log --format=%H --patch --cc --no-ext-diff --binary $Commit
+        & git -C $RepoPath log --format=%H --patch --cc --no-ext-diff --binary --root $Commit
         if ($LASTEXITCODE -ne 0) {
             throw "git log failed while collecting patches reachable from $Commit."
         }
