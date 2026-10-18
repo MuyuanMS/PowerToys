@@ -180,6 +180,20 @@ namespace LaserPointerUnitTests
             Assert::AreEqual(static_cast<size_t>(1), s.PointCount(), L"a stationary pointer does not pile up samples");
         }
 
+        TEST_METHOD(StationaryPointerRefreshesSampleExpiry)
+        {
+            StrokeOptions guard = DefaultOptions();
+            guard.minDistance = 2.0f;
+
+            LaserStroke s;
+            s.SetOptions(guard);
+            s.AddPoint(10.0f, 10.0f, 1000);
+            s.AddPoint(10.0f, 10.0f, 1800);
+
+            Assert::IsTrue(s.Prune(2000), L"stationary input keeps the retained sample alive");
+            Assert::IsFalse(s.Prune(2800), L"sample expires after stationary input stops");
+        }
+
         TEST_METHOD(FinishStopsAcceptingPointsAndClearResets)
         {
             LaserStroke s = MakeHorizontalStroke(1000, 10, 3.0f, DefaultOptions());
