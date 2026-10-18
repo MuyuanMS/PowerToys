@@ -34,22 +34,21 @@ namespace KeyboardManagerEditorUI.Helpers
             Func<string, string, bool> areShortcutsEqual,
             SingleKeyRemapCondition condition = SingleKeyRemapCondition.Always)
         {
+            int upperLimit = editingId != null ? 0 : (isEditMode ? 1 : 0);
             // Only rows that are active belong to the current profile's engine configuration;
             // inactive ones are retained metadata for other profiles and must not block an edit.
             // Always and Alone remaps of the same key use separate engine tables, as in HasDuplicateEditorMapping.
             int matches = entries
                 .Where(kvp => kvp.Value.IsActive)
                 .Where(kvp => editingId == null || kvp.Key != editingId)
-                .Count(kvp => areShortcutsEqual(kvp.Value.Shortcut.OriginalKeys, shortcutKeysString) &&
+                .Where(kvp => areShortcutsEqual(kvp.Value.Shortcut.OriginalKeys, shortcutKeysString) &&
                               kvp.Value.Shortcut.Condition == condition &&
                               IsSameAppScope(
                                   EffectiveTargetApp(kvp.Value.Shortcut.OriginalKeys, kvp.Value.Shortcut.TargetApp),
-                                  EffectiveTargetApp(shortcutKeysString, appName)));
+                                  EffectiveTargetApp(shortcutKeysString, appName)))
+                .Take(upperLimit + 1)
+                .Count();
 
-            // With the edited row's identity we exclude exactly that row above, so any remaining match is
-            // a genuine duplicate against a *different* row. Without it, fall back to the old tolerance
-            // (edit mode may still match its own not-yet-excluded row once).
-            int upperLimit = editingId != null ? 0 : (isEditMode ? 1 : 0);
             return matches > upperLimit;
         }
 

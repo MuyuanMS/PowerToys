@@ -173,12 +173,35 @@ namespace KeyboardManagerEditorUI.Settings
             }
         }
 
-        internal static bool HasSettingsChangedOnDisk() =>
-            !File.Exists(_settingsFilePath) || DiffersFromLoadedSettings(File.ReadAllText(_settingsFilePath));
+        internal static bool HasSettingsChangedOnDisk()
+        {
+            if (!File.Exists(_settingsFilePath))
+            {
+                return true;
+            }
+
+            try
+            {
+                return DiffersFromLoadedSettings(File.ReadAllText(_settingsFilePath));
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+        }
 
         internal static bool DiffersFromLoadedSettings(string json)
         {
-            EditorSettings settings = JsonSerializer.Deserialize<EditorSettings>(json, _jsonOptions) ?? new EditorSettings();
+            EditorSettings settings;
+            try
+            {
+                settings = JsonSerializer.Deserialize<EditorSettings>(json, _jsonOptions) ?? new EditorSettings();
+            }
+            catch (JsonException)
+            {
+                return true;
+            }
+
             NormalizeSettings(settings);
 
             // Normalize both sides: the editor's own edits can leave index order that normalization rewrites.

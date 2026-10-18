@@ -556,6 +556,31 @@ namespace KeyboardManagerEditorUI.UnitTests
             CollectionAssert.AreEqual(new List<string> { "legacy-id" }, settings.ProfileDictionary["default"]);
         }
 
+        [TestMethod]
+        public void DuplicateMapping_ShouldStopAfterFindingTheFirstDuplicate()
+        {
+            IEnumerable<KeyValuePair<string, ShortcutSettings>> Entries()
+            {
+                yield return new KeyValuePair<string, ShortcutSettings>(
+                    "duplicate-id",
+                    new ShortcutSettings
+                    {
+                        Shortcut = CreateScopedMapping(ShortcutOperationType.RemapShortcut, IssueTrigger, string.Empty),
+                        IsActive = true,
+                    });
+
+                throw new InvalidOperationException("The duplicate check enumerated beyond the first match.");
+            }
+
+            Assert.IsTrue(DuplicateMappingHelper.IsDuplicateMapping(
+                Entries(),
+                IssueTrigger,
+                isEditMode: false,
+                appName: string.Empty,
+                editingId: null,
+                AreKeysEqual));
+        }
+
         // Regression for #50933: a global mapping and app-specific overrides of the same trigger live in
         // separate engine tables, so editing the global one must not be flagged as a duplicate.
         [TestMethod]

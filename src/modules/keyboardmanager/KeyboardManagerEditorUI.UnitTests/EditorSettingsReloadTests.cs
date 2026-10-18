@@ -56,6 +56,12 @@ namespace KeyboardManagerEditorUI.UnitTests
             }
         }
 
+        [TestMethod]
+        public void DiffersFromLoadedSettings_ShouldTreatMalformedJsonAsChanged()
+        {
+            Assert.IsTrue(SettingsManager.DiffersFromLoadedSettings("{"));
+        }
+
         // The editor's own edit re-appends the edited id to its operation index, leaving index order that
         // normalization rewrites; that must not look like an external change and force a reconcile.
         [TestMethod]
