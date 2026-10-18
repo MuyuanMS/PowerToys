@@ -16,6 +16,11 @@ namespace ManagedCommon
 
         public static void BringToForeground(IntPtr handle)
         {
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+
             BringToForeground(handle, DefaultForegroundInputInjector, ForegroundInputTimeout);
         }
 
