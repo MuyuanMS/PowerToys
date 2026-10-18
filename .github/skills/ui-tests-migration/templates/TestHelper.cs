@@ -79,7 +79,8 @@ public static class TestHelper
         return ParseShortcutText(editButton.HelpText);
     }
 
-    /// <summary>Parse "Win + Ctrl + Shift + M" into a Key chord (note: "win" maps to <see cref="Key.LWin"/>).</summary>
+    /// <summary>Parse a shortcut chord while preserving spaces within key names such as "Page Down".</summary>
+    /// <exception cref="FormatException">The shortcut contains an unsupported key token.</exception>
     public static Key[] ParseShortcutText(string shortcutText)
     {
         var keys = new List<Key>();
@@ -88,9 +89,9 @@ public static class TestHelper
             return keys.ToArray();
         }
 
-        foreach (var raw in shortcutText.Split(new[] { " + ", "+", " " }, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var raw in shortcutText.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var part = raw.Trim().ToLowerInvariant();
+            var part = raw.ToLowerInvariant();
             Key? key = part switch
             {
                 "win" or "windows" => Key.LWin,
@@ -102,9 +103,26 @@ public static class TestHelper
                 _ => null,
             };
 
+            var keyName = part.Replace(" ", string.Empty) switch
+            {
+                "pgdn" => nameof(Key.PageDown),
+                "pgup" => nameof(Key.PageUp),
+                var name => name,
+            };
+            if (!key.HasValue &&
+                Enum.TryParse<Key>(keyName, ignoreCase: true, out var namedKey) &&
+                Enum.IsDefined(typeof(Key), namedKey))
+            {
+                key = namedKey;
+            }
+
             if (key.HasValue)
             {
                 keys.Add(key.Value);
+            }
+            else
+            {
+                throw new FormatException($"Unsupported shortcut key '{raw}'.");
             }
         }
 

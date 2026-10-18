@@ -103,14 +103,15 @@ var editButton = card.Find<Element>(By.AccessibilityId("EditButton"));
 ```
 
 ```csharp
-// Shortcut-string parser (ports verbatim from either example; note "win" -> Key.LWin).
+// Shortcut-string parser (note "win" -> Key.LWin; split on chords, not spaces within key names).
 private static Key[] ParseShortcutText(string s)
 {
-    var parts = s.Split(new[] { " + ", "+", " " }, StringSplitOptions.RemoveEmptyEntries);
+    var parts = s.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    // Throws FormatException when a token is unsupported.
     var keys = new List<Key>();
     foreach (var raw in parts)
     {
-        var p = raw.Trim().ToLowerInvariant();
+        var p = raw.ToLowerInvariant();
         Key? k = p switch
         {
             "win" or "windows" => Key.LWin,
@@ -120,7 +121,20 @@ private static Key[] ParseShortcutText(string s)
             _ when p.Length == 1 && p[0] >= 'a' && p[0] <= 'z' => (Key)Enum.Parse(typeof(Key), p.ToUpperInvariant()),
             _ => null,
         };
+        var keyName = p.Replace(" ", string.Empty) switch
+        {
+            "pgdn" => nameof(Key.PageDown),
+            "pgup" => nameof(Key.PageUp),
+            var name => name,
+        };
+        if (!k.HasValue && Enum.TryParse<Key>(keyName, true, out var namedKey) &&
+            Enum.IsDefined(typeof(Key), namedKey))
+        {
+            k = namedKey;
+        }
+
         if (k.HasValue) keys.Add(k.Value);
+        else throw new FormatException($"Unsupported shortcut key '{raw}'.");
     }
     return keys.ToArray();
 }
@@ -220,7 +234,7 @@ named modules and **disables every other one**, so the runner boots only what yo
 // All five ScreenRuler test classes do this; ColorPicker too. The key is the settings.json
 // "enabled" name (note spaces, e.g. "Measure Tool", "PowerToys Run") — see the enabled section of
 // %LocalAppData%\Microsoft\PowerToys\settings.json or ModuleConfigData.
-public MyTests() : base(PowerToysModule.PowerToysSettings, enableModules: new[] { "Measure Tool" }) { }
+public MyTests() : base(PowerToysModule.PowerToysSettings, enableModules: ["Measure Tool"]) { }
 ```
 
 Why it's worth doing on every per-module suite:

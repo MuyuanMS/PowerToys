@@ -21,7 +21,7 @@ public class __MODULE__EndToEndTests : UITestBase
     // fresh CI profile + isolated from other modules' hotkeys/overlays). The name is the settings.json
     // "enabled" key (note spaces, e.g. "Measure Tool", "PowerToys Run"). Add a WindowSize if needed.
     public __MODULE__EndToEndTests()
-        : base(PowerToysModule.PowerToysSettings, enableModules: new[] { "__MODULE_SETTINGS_KEY__" })
+        : base(PowerToysModule.PowerToysSettings, enableModules: ["__MODULE_SETTINGS_KEY__"])
     {
     }
 
@@ -115,13 +115,14 @@ public class __MODULE__EndToEndTests : UITestBase
     }
 
     /// <summary>Parse a UI shortcut string like "Win + Shift + C" into the Key chord.</summary>
+    /// <exception cref="FormatException">The shortcut contains an unsupported key token.</exception>
     private static Key[] ParseShortcutText(string shortcutText)
     {
-        var parts = shortcutText.Split(new[] { " + ", "+", " " }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = shortcutText.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var keys = new List<Key>();
         foreach (var raw in parts)
         {
-            var part = raw.Trim().ToLowerInvariant();
+            var part = raw.ToLowerInvariant();
             Key? key = part switch
             {
                 "win" or "windows" => Key.LWin,
@@ -133,9 +134,26 @@ public class __MODULE__EndToEndTests : UITestBase
                 _ => null,
             };
 
+            var keyName = part.Replace(" ", string.Empty) switch
+            {
+                "pgdn" => nameof(Key.PageDown),
+                "pgup" => nameof(Key.PageUp),
+                var name => name,
+            };
+            if (!key.HasValue &&
+                Enum.TryParse<Key>(keyName, ignoreCase: true, out var namedKey) &&
+                Enum.IsDefined(typeof(Key), namedKey))
+            {
+                key = namedKey;
+            }
+
             if (key.HasValue)
             {
                 keys.Add(key.Value);
+            }
+            else
+            {
+                throw new FormatException($"Unsupported shortcut key '{raw}'.");
             }
         }
 
