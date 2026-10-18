@@ -120,7 +120,13 @@ private static Key[] ParseShortcutText(string s)
             _ when p.Length == 1 && p[0] >= 'a' && p[0] <= 'z' => (Key)Enum.Parse(typeof(Key), p.ToUpperInvariant()),
             _ => null,
         };
-        if (!k.HasValue && Enum.TryParse<Key>(p.Replace(" ", string.Empty), true, out var namedKey) &&
+        var keyName = p.Replace(" ", string.Empty).ToLowerInvariant() switch
+        {
+            "pgdn" => nameof(Key.PageDown),
+            "pgup" => nameof(Key.PageUp),
+            var name => name,
+        };
+        if (!k.HasValue && Enum.TryParse<Key>(keyName, true, out var namedKey) &&
             Enum.IsDefined(typeof(Key), namedKey))
         {
             k = namedKey;

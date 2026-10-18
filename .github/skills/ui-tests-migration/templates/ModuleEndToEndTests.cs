@@ -133,8 +133,14 @@ public class __MODULE__EndToEndTests : UITestBase
                 _ => null,
             };
 
+            var keyName = part.Replace(" ", string.Empty).ToLowerInvariant() switch
+            {
+                "pgdn" => nameof(Key.PageDown),
+                "pgup" => nameof(Key.PageUp),
+                var name => name,
+            };
             if (!key.HasValue &&
-                Enum.TryParse<Key>(part.Replace(" ", string.Empty), ignoreCase: true, out var namedKey) &&
+                Enum.TryParse<Key>(keyName, ignoreCase: true, out var namedKey) &&
                 Enum.IsDefined(typeof(Key), namedKey))
             {
                 key = namedKey;
