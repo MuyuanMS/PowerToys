@@ -115,6 +115,7 @@ public class __MODULE__EndToEndTests : UITestBase
     }
 
     /// <summary>Parse a UI shortcut string like "Win + Shift + C" into the Key chord.</summary>
+    /// <exception cref="FormatException">The shortcut contains an unsupported key token.</exception>
     private static Key[] ParseShortcutText(string shortcutText)
     {
         var parts = shortcutText.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

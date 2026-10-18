@@ -107,6 +107,7 @@ var editButton = card.Find<Element>(By.AccessibilityId("EditButton"));
 private static Key[] ParseShortcutText(string s)
 {
     var parts = s.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    // Throws FormatException when a token is unsupported.
     var keys = new List<Key>();
     foreach (var raw in parts)
     {

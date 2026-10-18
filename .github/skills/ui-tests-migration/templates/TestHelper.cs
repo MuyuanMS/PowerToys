@@ -80,6 +80,7 @@ public static class TestHelper
     }
 
     /// <summary>Parse a shortcut chord while preserving spaces within key names such as "Page Down".</summary>
+    /// <exception cref="FormatException">The shortcut contains an unsupported key token.</exception>
     public static Key[] ParseShortcutText(string shortcutText)
     {
         var keys = new List<Key>();
