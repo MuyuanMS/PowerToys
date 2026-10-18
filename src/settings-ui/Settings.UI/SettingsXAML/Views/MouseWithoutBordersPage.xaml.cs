@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -11,6 +12,7 @@ using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
@@ -27,9 +29,15 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private const string PowerToyName = "MouseWithoutBorders";
 
+        private const string CopyGlyph = "";
+
+        private const string CopiedGlyph = "";
+
         private MouseWithoutBordersViewModel ViewModel { get; set; }
 
         private readonly IFileSystemWatcher watcher;
+
+        private bool _isFlashingRequiredFields;
 
         public MouseWithoutBordersPage()
         {
@@ -49,6 +57,45 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             InitializeComponent();
 
             Loaded += (s, e) => ViewModel.OnPageLoaded();
+
+            ViewModel.ConnectionSucceeded += (s, e) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ConnectPCNameTextBox.Text = string.Empty;
+                    ConnectSecurityKeyTextBox.Text = string.Empty;
+                    ClearFieldError(ConnectPCNameTextBox);
+                    ClearFieldError(ConnectSecurityKeyTextBox);
+                });
+            };
+
+            ViewModel.ConnectionFailed += (s, e) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var target = e.Target == ConnectFailureTarget.SecurityKey ? ConnectSecurityKeyTextBox : ConnectPCNameTextBox;
+                    SetFieldError(target, e.Message);
+                });
+            };
+
+            ConnectPCNameTextBox.TextChanged += (s, e) => ClearFieldError(ConnectPCNameTextBox);
+            ConnectSecurityKeyTextBox.TextChanged += (s, e) => ClearFieldError(ConnectSecurityKeyTextBox);
+        }
+
+        private static void SetFieldError(TextBox textBox, string message)
+        {
+            textBox.BorderBrush = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            textBox.BorderThickness = new Thickness(2);
+            ToolTipService.SetToolTip(textBox, message);
+            AutomationProperties.SetHelpText(textBox, message);
+        }
+
+        private static void ClearFieldError(TextBox textBox)
+        {
+            textBox.ClearValue(Control.BorderBrushProperty);
+            textBox.ClearValue(Control.BorderThicknessProperty);
+            ToolTipService.SetToolTip(textBox, null);
+            textBox.ClearValue(AutomationProperties.HelpTextProperty);
         }
 
         private void OnConfigFileUpdate()
@@ -138,32 +185,121 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             e.AcceptedOperation = DataPackageOperation.Move;
         }
 
-        public ICommand ShowConnectFieldsCommand => new RelayCommand(ShowConnectFields);
-
         public ICommand ConnectCommand => new AsyncCommand(Connect);
 
         public ICommand GenerateNewKeyCommand => new AsyncCommand(ViewModel.SubmitNewKeyRequestAsync);
 
-        public ICommand CopyPCNameCommand => new RelayCommand(ViewModel.CopyMachineNameToClipboard);
+        public ICommand CopyPCNameCommand => new RelayCommand(() =>
+        {
+            ViewModel.CopyMachineNameToClipboard();
+            _ = ShowCopiedFeedbackAsync(CopyPCNameButton);
+        });
+
+        public ICommand CopySecurityKeyCommand => new RelayCommand(() =>
+        {
+            ViewModel.CopySecurityKeyToClipboard();
+            _ = ShowCopiedFeedbackAsync(CopySecurityKeyButton);
+        });
+
+        // Briefly swaps the copy icon for a checkmark so the user can see the copy happened.
+        private static async Task ShowCopiedFeedbackAsync(Button button)
+        {
+            // Each click bumps the version, so only the latest click restores the copy icon.
+            int version = (button.Tag as int? ?? 0) + 1;
+            button.Tag = version;
+            button.Content = CreateIcon(CopiedGlyph);
+
+            await Task.Delay(1500);
+
+            if (button.Tag as int? == version)
+            {
+                button.Content = CreateIcon(CopyGlyph);
+            }
+        }
+
+        private static FontIcon CreateIcon(string glyph) => new FontIcon
+        {
+            Glyph = glyph,
+            FontSize = 16,
+            FontFamily = (FontFamily)Application.Current.Resources["SymbolThemeFontFamily"],
+        };
 
         public ICommand ReconnectCommand => new AsyncCommand(ViewModel.SubmitReconnectRequestAsync);
 
-        private void ShowConnectFields()
-        {
-            ViewModel.ConnectFieldsVisible = true;
-        }
-
         private async Task Connect()
         {
-            if (ConnectPCNameTextBox.Text.Length != 0 && ConnectSecurityKeyTextBox.Text.Length != 0)
+            if (_isFlashingRequiredFields)
             {
-                string pcName = ConnectPCNameTextBox.Text;
-                string securityKey = ConnectSecurityKeyTextBox.Text.Trim();
+                return;
+            }
 
-                await ViewModel.SubmitConnectionRequestAsync(pcName, securityKey);
+            var emptyFields = new List<TextBox>();
+            if (string.IsNullOrWhiteSpace(ConnectSecurityKeyTextBox.Text))
+            {
+                emptyFields.Add(ConnectSecurityKeyTextBox);
+            }
 
-                ConnectPCNameTextBox.Text = string.Empty;
-                ConnectSecurityKeyTextBox.Text = string.Empty;
+            if (string.IsNullOrWhiteSpace(ConnectPCNameTextBox.Text))
+            {
+                emptyFields.Add(ConnectPCNameTextBox);
+            }
+
+            if (emptyFields.Count != 0)
+            {
+                _isFlashingRequiredFields = true;
+                try
+                {
+                    await FlashRequiredFieldsAsync(emptyFields);
+                }
+                finally
+                {
+                    _isFlashingRequiredFields = false;
+                }
+
+                return;
+            }
+
+            ClearFieldError(ConnectPCNameTextBox);
+            ClearFieldError(ConnectSecurityKeyTextBox);
+
+            string pcName = ConnectPCNameTextBox.Text.Trim();
+            string securityKey = ConnectSecurityKeyTextBox.Text.Trim();
+
+            // Fields are cleared only once ViewModel confirms the connection succeeded
+            // (ConnectionSucceeded event), so a failed attempt keeps the values and
+            // surfaces an error instead of silently wiping what the user typed.
+            await ViewModel.SubmitConnectionRequestAsync(pcName, securityKey);
+        }
+
+        private static async Task FlashRequiredFieldsAsync(List<TextBox> textBoxes)
+        {
+            var flashBrush = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            var originalBrushes = new Brush[textBoxes.Count];
+            var originalThicknesses = new Thickness[textBoxes.Count];
+
+            for (int i = 0; i < textBoxes.Count; i++)
+            {
+                originalBrushes[i] = textBoxes[i].BorderBrush;
+                originalThicknesses[i] = textBoxes[i].BorderThickness;
+            }
+
+            for (int flash = 0; flash < 3; flash++)
+            {
+                foreach (var textBox in textBoxes)
+                {
+                    textBox.BorderBrush = flashBrush;
+                    textBox.BorderThickness = new Thickness(2);
+                }
+
+                await Task.Delay(150);
+
+                for (int i = 0; i < textBoxes.Count; i++)
+                {
+                    textBoxes[i].BorderBrush = originalBrushes[i];
+                    textBoxes[i].BorderThickness = originalThicknesses[i];
+                }
+
+                await Task.Delay(150);
             }
         }
 
