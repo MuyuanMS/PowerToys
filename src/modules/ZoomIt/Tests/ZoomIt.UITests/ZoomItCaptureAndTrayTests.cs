@@ -270,7 +270,7 @@ public sealed partial class ZoomItTests
         ui.Step($"Waiting for the real Shell ZoomIt tray icon to be {(expected ? "present" : "absent")}");
         ShellMenu.Dismiss();
         KeyboardHelper.SendKeys(Key.LWin, Key.B);
-        var workArea = System.Windows.Forms.SystemInformation.WorkingArea;
+        var workArea = System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
 
         // Keep the cursor off the taskbar and the right half of the screen. On Windows 10, a
         // cursor left on the chevron can end up over News and Interests when the notification
