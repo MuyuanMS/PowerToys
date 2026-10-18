@@ -203,6 +203,41 @@ namespace UnitTestsCommonLib
             Assert::IsTrue(cache.waitFor("{\"enabled\":false}"), L"The replacement was not retried after its read-sharing violation cleared");
         }
 
+        TEST_METHOD (AtomicReplacementCanProceedWhileCallbackRuns)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), atomic_file::write(destination.wstring(), "{\"version\":0}"));
+
+            std::mutex mutex;
+            std::condition_variable changed;
+            bool callbackEntered = false;
+            bool releaseCallback = false;
+            FileWatcher watcher(destination.wstring(), [&]() {
+                std::unique_lock lock(mutex);
+                callbackEntered = true;
+                changed.notify_all();
+                changed.wait_for(lock, std::chrono::seconds(5), [&]() { return releaseCallback; });
+            }, true);
+
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), atomic_file::write(destination.wstring(), "{\"version\":1}"));
+            {
+                std::unique_lock lock(mutex);
+                Assert::IsTrue(changed.wait_for(lock, std::chrono::seconds(5), [&]() { return callbackEntered; }),
+                               L"The replacement callback did not begin");
+            }
+
+            const auto writeResult = atomic_file::write(destination.wstring(), "{\"version\":2}");
+            {
+                std::lock_guard lock(mutex);
+                releaseCallback = true;
+            }
+            changed.notify_all();
+
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), writeResult,
+                             L"A callback-held read guard blocked an atomic replacement");
+        }
+
         TEST_METHOD (SuccessfulNotificationSupersedesPendingRetry)
         {
             WatcherTestDirectory directory;

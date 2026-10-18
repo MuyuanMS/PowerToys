@@ -155,6 +155,7 @@ void FileWatcher::HandleFileChange(wil::FolderChangeEvent event, PCWSTR fileName
             return;
         }
         lastWrite = time;
+        readGuard.reset();
     }
     else
     {
@@ -284,6 +285,7 @@ void FileWatcher::RetryWorker(std::stop_token stop)
         {
             continue;
         }
+        readGuard.reset();
 
         std::lock_guard callbackLock(m_callbackMutex);
         stateLock.lock();
