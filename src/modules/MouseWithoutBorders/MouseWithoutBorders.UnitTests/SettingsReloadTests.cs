@@ -20,6 +20,29 @@ public sealed class SettingsReloadTests
     private static readonly string[] UpdatedMatrix = ["third", "fourth", string.Empty, string.Empty];
     private static readonly string[] MatrixReloadEffects = ["cursor", "invalidate", "send", "save"];
 
+    private string _originalEncryptionKey = string.Empty;
+    private bool _originalGeneratedKey;
+    private uint _originalMagicNumber;
+    private bool _originalReopenSocketDueToReadError;
+
+    [TestInitialize]
+    public void CaptureGlobalState()
+    {
+        _originalEncryptionKey = Encryption.MyKey;
+        _originalGeneratedKey = Encryption.GeneratedKey;
+        _originalMagicNumber = Encryption.MagicNumber;
+        _originalReopenSocketDueToReadError = InitAndCleanup.ReopenSocketDueToReadError;
+    }
+
+    [TestCleanup]
+    public void RestoreGlobalState()
+    {
+        Encryption.MyKey = _originalEncryptionKey;
+        Encryption.GeneratedKey = _originalGeneratedKey;
+        Encryption.MagicNumber = _originalMagicNumber;
+        InitAndCleanup.ReopenSocketDueToReadError = _originalReopenSocketDueToReadError;
+    }
+
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
