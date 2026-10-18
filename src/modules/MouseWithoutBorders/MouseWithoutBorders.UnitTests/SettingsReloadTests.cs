@@ -376,6 +376,25 @@ public sealed class SettingsReloadTests
     }
 
     [TestMethod]
+    public void SecurityKeyEdit_CaseOnlyChange_UpdatesStoredAndRuntimeKey()
+    {
+        const string originalKey = "Abcdefghijklmnop";
+        const string caseChangedKey = "abcdefghijklmnop";
+
+        var properties = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        properties.SecurityKey.Value = originalKey;
+        var settings = CreateSettings(properties);
+        Encryption.MyKey = originalKey;
+        Encryption.GeneratedKey = true;
+
+        Assert.IsTrue(FrmMatrix.TryApplySecurityKey(settings, caseChangedKey, out _));
+
+        Assert.AreEqual(caseChangedKey, settings.MyKey);
+        Assert.AreEqual(caseChangedKey, properties.SecurityKey.Value);
+        Assert.AreEqual(caseChangedKey, Encryption.MyKey);
+        Assert.IsFalse(Encryption.GeneratedKey);
+    }
+    [TestMethod]
     public void SecurityKeyEdit_InvalidKey_LeavesStoredAndRuntimeKeyUnchanged()
     {
         const string originalKey = "OriginalKeyValue1";

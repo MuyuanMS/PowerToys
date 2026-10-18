@@ -523,12 +523,12 @@ namespace MouseWithoutBorders
                 return false;
             }
 
-            if (!newKey.Equals(settings.MyKey, StringComparison.OrdinalIgnoreCase))
+            if (!newKey.Equals(settings.MyKey, StringComparison.Ordinal))
             {
                 settings.MyKey = newKey;
             }
 
-            if (!newKey.Equals(Encryption.MyKey, StringComparison.OrdinalIgnoreCase))
+            if (!newKey.Equals(Encryption.MyKey, StringComparison.Ordinal))
             {
                 Encryption.MyKey = newKey;
                 Encryption.GeneratedKey = false;
