@@ -40,7 +40,9 @@ class FileWatcher
 public:
     FileWatcher(const std::wstring& path, std::function<void()> callback);
     // Enable replacement notifications for files published with an atomic rename.
-    // The callback must only read the file; a read handle is held until it returns.
+    // The callback reads the path separately; the guard handle is not a snapshot of
+    // that read. Its sharing mode prevents delete/rename replacement while the
+    // callback runs, so callbacks must not write or replace the file.
     // Replacement callbacks must not destroy this watcher or its owner.
     FileWatcher(const std::wstring& path, std::function<void()> callback, bool watchFileReplacement);
     ~FileWatcher();
