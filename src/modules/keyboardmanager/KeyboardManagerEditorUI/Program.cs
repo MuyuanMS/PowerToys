@@ -35,12 +35,19 @@ namespace KeyboardManagerEditorUI
                 return 0;
             }
 
-            Application.Start(p =>
+            try
             {
-                var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
-                SynchronizationContext.SetSynchronizationContext(context);
-                _ = new App();
-            });
+                Application.Start(p =>
+                {
+                    var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
+                    SynchronizationContext.SetSynchronizationContext(context);
+                    _ = new App();
+                });
+            }
+            finally
+            {
+                instanceMutex.ReleaseMutex();
+            }
 
             return 0;
         }
