@@ -188,6 +188,10 @@ namespace KeyboardManagerEditorUI.Settings
             {
                 return true;
             }
+            catch (UnauthorizedAccessException)
+            {
+                return true;
+            }
         }
 
         internal static bool DiffersFromLoadedSettings(string json)
@@ -286,7 +290,8 @@ namespace KeyboardManagerEditorUI.Settings
                 using var service = new KeyboardMappingService();
                 if (!TryReloadSettings())
                 {
-                    if (!regenerateUnreadableSettings)
+                    // A missing file has no editor metadata to preserve; recreate it from the active mappings.
+                    if (!regenerateUnreadableSettings && File.Exists(_settingsFilePath))
                     {
                         return false;
                     }
