@@ -103,6 +103,10 @@ public class PowerDisplay
         viewModel.BatteryRefreshRateModeIndex = index;
         settings.Properties.InternalDisplayRefreshRates.Clear();
         Assert.IsFalse(viewModel.CanSetBatteryRefreshRate);
+        viewModel.BatteryRefreshRateModeIndex = (int)BatteryRefreshRateMode.Off;
+        Assert.AreEqual(BatteryRefreshRateMode.Off, settings.Properties.BatteryRefreshRateMode);
+        viewModel.BatteryRefreshRateModeIndex = index;
+        Assert.AreEqual(BatteryRefreshRateMode.Off, settings.Properties.BatteryRefreshRateMode);
     }
 
     [TestMethod]

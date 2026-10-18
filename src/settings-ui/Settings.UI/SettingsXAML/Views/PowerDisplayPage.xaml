@@ -132,8 +132,7 @@
                                 <tkcontrols:SettingsCard
                                     x:Uid="PowerDisplay_BatteryRefreshRate"
                                     BorderThickness="1,1,1,0"
-                                    CornerRadius="4,4,0,0"
-                                    IsEnabled="{x:Bind ViewModel.CanUseBatteryRefreshRate, Mode=OneWay}">
+                                    CornerRadius="4,4,0,0">
                                     <tkcontrols:SettingsCard.HeaderIcon>
                                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8BE;" />
                                     </tkcontrols:SettingsCard.HeaderIcon>
