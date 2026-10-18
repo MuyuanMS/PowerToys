@@ -115,8 +115,9 @@ inventories are stored beside MSTest's deployment directory so they survive succ
 cleanup. Failure media is captured before teardown.
 Tray-icon readiness failures retain the last mismatch even if a later observation matches,
 and report the final consecutive-match count and any last transient Shell error.
-The tray wait parks the cursor away from the taskbar after opening the overflow, so the
-Windows 10 News and Interests hover feed cannot cover the overflow icons.
+The tray wait parks the cursor within the primary screen's working area before waiting and
+after each overflow-chevron click, keeping it away from taskbar hover targets such as the
+Windows 10 News and Interests feed while the overflow icons are observed.
 
 For delivery, run the complete suite on Windows 10 and Windows 11 with both default and
 constrained VM profiles, then validate `[ZoomIt.UITests]` in UI Test Automation CI.
