@@ -225,12 +225,12 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         private async Task Connect()
         {
             var emptyFields = new List<TextBox>();
-            if (ConnectSecurityKeyTextBox.Text.Length == 0)
+            if (string.IsNullOrWhiteSpace(ConnectSecurityKeyTextBox.Text))
             {
                 emptyFields.Add(ConnectSecurityKeyTextBox);
             }
 
-            if (ConnectPCNameTextBox.Text.Length == 0)
+            if (string.IsNullOrWhiteSpace(ConnectPCNameTextBox.Text))
             {
                 emptyFields.Add(ConnectPCNameTextBox);
             }
