@@ -103,10 +103,10 @@ var editButton = card.Find<Element>(By.AccessibilityId("EditButton"));
 ```
 
 ```csharp
-// Shortcut-string parser (ports verbatim from either example; note "win" -> Key.LWin).
+// Shortcut-string parser (note "win" -> Key.LWin; split on chords, not spaces within key names).
 private static Key[] ParseShortcutText(string s)
 {
-    var parts = s.Split(new[] { " + ", "+", " " }, StringSplitOptions.RemoveEmptyEntries);
+    var parts = s.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     var keys = new List<Key>();
     foreach (var raw in parts)
     {
@@ -120,7 +120,14 @@ private static Key[] ParseShortcutText(string s)
             _ when p.Length == 1 && p[0] >= 'a' && p[0] <= 'z' => (Key)Enum.Parse(typeof(Key), p.ToUpperInvariant()),
             _ => null,
         };
+        if (!k.HasValue && Enum.TryParse<Key>(p.Replace(" ", string.Empty), true, out var namedKey) &&
+            Enum.IsDefined(typeof(Key), namedKey))
+        {
+            k = namedKey;
+        }
+
         if (k.HasValue) keys.Add(k.Value);
+        else throw new FormatException($"Unsupported shortcut key '{raw}'.");
     }
     return keys.ToArray();
 }

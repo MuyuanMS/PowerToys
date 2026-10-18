@@ -114,12 +114,10 @@ public class __MODULE__EndToEndTests : UITestBase
         return false;
     }
 
-    private static readonly string[] ShortcutSeparators = { " + ", "+", " " };
-
     /// <summary>Parse a UI shortcut string like "Win + Shift + C" into the Key chord.</summary>
     private static Key[] ParseShortcutText(string shortcutText)
     {
-        var parts = shortcutText.Split(ShortcutSeparators, StringSplitOptions.RemoveEmptyEntries);
+        var parts = shortcutText.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var keys = new List<Key>();
         foreach (var raw in parts)
         {
@@ -135,9 +133,20 @@ public class __MODULE__EndToEndTests : UITestBase
                 _ => null,
             };
 
+            if (!key.HasValue &&
+                Enum.TryParse<Key>(part.Replace(" ", string.Empty), ignoreCase: true, out var namedKey) &&
+                Enum.IsDefined(typeof(Key), namedKey))
+            {
+                key = namedKey;
+            }
+
             if (key.HasValue)
             {
                 keys.Add(key.Value);
+            }
+            else
+            {
+                throw new FormatException($"Unsupported shortcut key '{raw}'.");
             }
         }
 

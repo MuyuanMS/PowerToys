@@ -30,10 +30,6 @@ public static class TestHelper
     public const string ToggleId = "Toggle___MODULE__";
     public const string ShortcutCardId = "Shortcut___MODULE__";
 
-    // Separators accepted when parsing a ShortcutControl's HelpText (e.g. "Win + Shift + M"). Hoisted
-    // to a field so the Split call below doesn't allocate an inline array literal (CA1861).
-    private static readonly string[] ShortcutSeparators = { " + ", "+", " " };
-
     // ── Navigation ────────────────────────────────────────────────────────────────────────────
 
     /// <summary>Navigate to the module's Settings page (expanding its parent nav group if needed).</summary>
@@ -83,7 +79,7 @@ public static class TestHelper
         return ParseShortcutText(editButton.HelpText);
     }
 
-    /// <summary>Parse "Win + Ctrl + Shift + M" into a Key chord (note: "win" maps to <see cref="Key.LWin"/>).</summary>
+    /// <summary>Parse a shortcut chord while preserving spaces within key names such as "Page Down".</summary>
     public static Key[] ParseShortcutText(string shortcutText)
     {
         var keys = new List<Key>();
@@ -92,7 +88,7 @@ public static class TestHelper
             return keys.ToArray();
         }
 
-        foreach (var raw in shortcutText.Split(ShortcutSeparators, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var raw in shortcutText.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var part = raw.Trim().ToLowerInvariant();
             Key? key = part switch
@@ -106,9 +102,20 @@ public static class TestHelper
                 _ => null,
             };
 
+            if (!key.HasValue &&
+                Enum.TryParse<Key>(part.Replace(" ", string.Empty), ignoreCase: true, out var namedKey) &&
+                Enum.IsDefined(typeof(Key), namedKey))
+            {
+                key = namedKey;
+            }
+
             if (key.HasValue)
             {
                 keys.Add(key.Value);
+            }
+            else
+            {
+                throw new FormatException($"Unsupported shortcut key '{raw}'.");
             }
         }
 
