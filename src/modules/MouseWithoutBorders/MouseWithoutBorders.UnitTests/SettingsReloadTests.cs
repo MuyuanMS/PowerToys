@@ -20,6 +20,29 @@ public sealed class SettingsReloadTests
     private static readonly string[] UpdatedMatrix = ["third", "fourth", string.Empty, string.Empty];
     private static readonly string[] MatrixReloadEffects = ["cursor", "invalidate", "send", "save"];
 
+    private string _originalEncryptionKey = string.Empty;
+    private bool _originalGeneratedKey;
+    private uint _originalMagicNumber;
+    private bool _originalReopenSocketDueToReadError;
+
+    [TestInitialize]
+    public void CaptureGlobalState()
+    {
+        _originalEncryptionKey = Encryption.MyKey;
+        _originalGeneratedKey = Encryption.GeneratedKey;
+        _originalMagicNumber = Encryption.MagicNumber;
+        _originalReopenSocketDueToReadError = InitAndCleanup.ReopenSocketDueToReadError;
+    }
+
+    [TestCleanup]
+    public void RestoreGlobalState()
+    {
+        Encryption.MyKey = _originalEncryptionKey;
+        Encryption.GeneratedKey = _originalGeneratedKey;
+        Encryption.MagicNumber = _originalMagicNumber;
+        InitAndCleanup.ReopenSocketDueToReadError = _originalReopenSocketDueToReadError;
+    }
+
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
@@ -292,6 +315,106 @@ public sealed class SettingsReloadTests
         CollectionAssert.AreEqual(expected, effects);
         CollectionAssert.AreEqual(OriginalMatrix, previous.MachineMatrixString);
         Assert.AreEqual(string.Join(",", loaded.MachineMatrixString), settings.MachineMatrixString);
+    }
+
+    [TestMethod]
+    public void SecurityKeyEdit_ValidKey_PersistsAcrossSettingsReload()
+    {
+        const string originalKey = "OriginalKeyValue1";
+        const string updatedKey = "UpdatedKeyValue12";
+
+        var previous = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        previous.SecurityKey.Value = originalKey;
+        var settings = CreateSettings(previous);
+        Encryption.MyKey = originalKey;
+        Encryption.GeneratedKey = true;
+
+        // The legacy matrix form stores the edited key through Settings.MyKey.
+        // A reload must keep that value instead of restoring the previous key.
+        Assert.IsTrue(FrmMatrix.TryApplySecurityKey(settings, updatedKey, out _));
+
+        Assert.IsFalse(Encryption.GeneratedKey);
+        Assert.AreEqual(updatedKey, settings.MyKey);
+        Assert.AreEqual(updatedKey, previous.SecurityKey.Value);
+        Assert.AreEqual(updatedKey, Encryption.MyKey);
+
+        var loaded = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        loaded.SecurityKey.Value = settings.MyKey;
+        InitAndCleanup.ReopenSocketDueToReadError = false;
+        settings.ApplyLoadedSettings(
+            new MouseWithoutBordersSettings { Properties = loaded },
+            () => { },
+            () => { },
+            () => { },
+            () => { });
+
+        Assert.IsFalse(InitAndCleanup.ReopenSocketDueToReadError);
+        Assert.AreEqual(updatedKey, settings.MyKey);
+        Assert.AreEqual(updatedKey, Encryption.MyKey);
+        Assert.AreEqual(updatedKey, loaded.SecurityKey.Value);
+        Assert.AreEqual(updatedKey, previous.SecurityKey.Value);
+        CollectionAssert.AreEqual(OriginalMatrix, previous.MachineMatrixString);
+        CollectionAssert.AreEqual(OriginalMatrix, loaded.MachineMatrixString);
+    }
+
+    [TestMethod]
+    public void SecurityKeyEdit_RuntimeKeyAlreadyMatches_UpdatesStaleStoredKey()
+    {
+        const string staleKey = "OriginalKeyValue1";
+        const string currentKey = "UpdatedKeyValue12";
+
+        var properties = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        properties.SecurityKey.Value = staleKey;
+        var settings = CreateSettings(properties);
+        Encryption.MyKey = currentKey;
+
+        Assert.IsTrue(FrmMatrix.TryApplySecurityKey(settings, currentKey, out _));
+
+        Assert.AreEqual(currentKey, settings.MyKey);
+        Assert.AreEqual(currentKey, properties.SecurityKey.Value);
+        Assert.AreEqual(currentKey, Encryption.MyKey);
+    }
+
+    [TestMethod]
+    public void SecurityKeyEdit_CaseOnlyChange_UpdatesStoredAndRuntimeKey()
+    {
+        const string originalKey = "Abcdefghijklmnop";
+        const string caseChangedKey = "abcdefghijklmnop";
+
+        var properties = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        properties.SecurityKey.Value = originalKey;
+        var settings = CreateSettings(properties);
+        Encryption.MyKey = originalKey;
+        Encryption.GeneratedKey = true;
+
+        Assert.IsTrue(FrmMatrix.TryApplySecurityKey(settings, caseChangedKey, out _));
+
+        Assert.AreEqual(caseChangedKey, settings.MyKey);
+        Assert.AreEqual(caseChangedKey, properties.SecurityKey.Value);
+        Assert.AreEqual(caseChangedKey, Encryption.MyKey);
+        Assert.IsFalse(Encryption.GeneratedKey);
+    }
+    [TestMethod]
+    public void SecurityKeyEdit_InvalidKey_LeavesStoredAndRuntimeKeyUnchanged()
+    {
+        const string originalKey = "OriginalKeyValue1";
+        const string invalidKey = "too-short";
+
+        var properties = new MouseWithoutBordersProperties { MachineMatrixString = new(OriginalMatrix) };
+        properties.SecurityKey.Value = originalKey;
+        var settings = CreateSettings(properties);
+        Encryption.MyKey = originalKey;
+        Encryption.GeneratedKey = true;
+        var magicNumber = Encryption.MagicNumber;
+
+        Assert.IsFalse(FrmMatrix.TryApplySecurityKey(settings, invalidKey, out var error));
+
+        Assert.IsFalse(string.IsNullOrEmpty(error));
+        Assert.IsTrue(Encryption.GeneratedKey);
+        Assert.AreEqual(magicNumber, Encryption.MagicNumber);
+        Assert.AreEqual(originalKey, settings.MyKey);
+        Assert.AreEqual(originalKey, properties.SecurityKey.Value);
+        Assert.AreEqual(originalKey, Encryption.MyKey);
     }
 
     private static bool ApplySettings(MwbSettings settings, MouseWithoutBordersProperties loaded)

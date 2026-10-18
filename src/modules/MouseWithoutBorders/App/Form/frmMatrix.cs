@@ -505,13 +505,30 @@ namespace MouseWithoutBorders
 
         private bool UpdateKey(string newKey)
         {
-            if (!Encryption.IsKeyValid(newKey, out string rv))
+            if (!TryApplySecurityKey(Setting.Values, newKey, out string rv))
             {
                 ShowKeyErrorMsg(rv);
                 return false;
             }
 
-            if (!newKey.Equals(Encryption.MyKey, StringComparison.OrdinalIgnoreCase))
+            return true;
+        }
+
+        // Settings.MyKey is the value written to settings.json. Encryption.MyKey is the live session only,
+        // so leaving the persisted property unchanged makes a later reload restore the previous key.
+        internal static bool TryApplySecurityKey(Settings settings, string newKey, out string error)
+        {
+            if (!Encryption.IsKeyValid(newKey, out error))
+            {
+                return false;
+            }
+
+            if (!newKey.Equals(settings.MyKey, StringComparison.Ordinal))
+            {
+                settings.MyKey = newKey;
+            }
+
+            if (!newKey.Equals(Encryption.MyKey, StringComparison.Ordinal))
             {
                 Encryption.MyKey = newKey;
                 Encryption.GeneratedKey = false;
