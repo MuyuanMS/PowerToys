@@ -278,4 +278,3 @@ internal static class InitAndCleanup
         }
     }
 }
-
