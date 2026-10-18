@@ -2,12 +2,14 @@
 #include <common/SettingsAPI/FileWatcher.h>
 #include <common/utils/atomic_file.h>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <iterator>
 #include <mutex>
 #include <string>
@@ -93,6 +95,55 @@ namespace UnitTestsCommonLib
             DWORD m_lastReadError = ERROR_SUCCESS;
         };
 
+        wil::unique_hfile createBlockedReplacement(const std::filesystem::path& directory,
+                                                   const std::filesystem::path& destination,
+                                                   const std::string& contents,
+                                                   bool preserveTimestamp = false)
+        {
+            const auto staged = directory / L"settings.tmp";
+            {
+                std::ofstream stream(staged, std::ios::binary);
+                stream << contents;
+            }
+
+            if (preserveTimestamp)
+            {
+                WIN32_FILE_ATTRIBUTE_DATA attributes{};
+                Assert::IsTrue(GetFileAttributesExW(destination.c_str(), GetFileExInfoStandard, &attributes) != FALSE);
+                wil::unique_hfile stagedFile(CreateFileW(staged.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr));
+                Assert::IsTrue(static_cast<bool>(stagedFile));
+                Assert::IsTrue(SetFileTime(stagedFile.get(), nullptr, nullptr, &attributes.ftLastWriteTime) != FALSE);
+            }
+
+            wil::unique_hfile blocker(CreateFileW(staged.c_str(), GENERIC_READ | DELETE, FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr));
+            Assert::IsTrue(static_cast<bool>(blocker));
+
+            const auto destinationName = destination.wstring();
+            const auto nameLength = destinationName.size() * sizeof(wchar_t);
+            std::vector<std::byte> renameBuffer(sizeof(FILE_RENAME_INFO) + nameLength);
+            auto rename = reinterpret_cast<FILE_RENAME_INFO*>(renameBuffer.data());
+            rename->Flags = FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS;
+            rename->RootDirectory = nullptr;
+            rename->FileNameLength = static_cast<DWORD>(nameLength);
+            std::memcpy(rename->FileName, destinationName.data(), nameLength);
+            Assert::IsTrue(SetFileInformationByHandle(blocker.get(), FileRenameInfoEx, rename, static_cast<DWORD>(renameBuffer.size())) != FALSE);
+            return blocker;
+        }
+
+        bool waitForCallbackCount(const std::atomic<unsigned int>& callbackCount, unsigned int expected)
+        {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                if (callbackCount.load() >= expected)
+                {
+                    return true;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            return callbackCount.load() >= expected;
+        }
+
     }
 
     TEST_CLASS (FileWatcherTests)
@@ -136,6 +187,113 @@ namespace UnitTestsCommonLib
             const std::string contents = "{\"enabled\":false}";
             Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), atomic_file::write(destination.wstring(), contents));
             Assert::IsTrue(cache.waitFor(contents), L"The first atomic creation did not refresh the cache");
+        }
+
+        TEST_METHOD (AtomicCreationRetriesAfterReadSharingViolation)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            WatchedFileCache cache;
+            FileWatcher watcher(destination.wstring(), [&]() { cache.reload(destination); }, true);
+
+            auto blocker = createBlockedReplacement(directory.path(), destination, "{\"enabled\":false}");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1700));
+            blocker.reset();
+
+            Assert::IsTrue(cache.waitFor("{\"enabled\":false}"), L"The replacement was not retried after its read-sharing violation cleared");
+        }
+
+        TEST_METHOD (SuccessfulNotificationSupersedesPendingRetry)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            WatchedFileCache cache;
+            std::atomic<unsigned int> callbackCount = 0;
+            FileWatcher watcher(destination.wstring(), [&]() {
+                ++callbackCount;
+                cache.reload(destination);
+            }, true);
+
+            auto blocker = createBlockedReplacement(directory.path(), destination, "{\"version\":1}");
+            std::this_thread::sleep_for(std::chrono::milliseconds(700));
+            blocker.reset();
+
+            const std::string newest = "{\"version\":2}";
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), atomic_file::write(destination.wstring(), newest));
+            Assert::IsTrue(cache.waitFor(newest), L"The later successful notification did not refresh the cache");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            Assert::AreEqual(1u, callbackCount.load(), L"The superseded retry invoked a duplicate callback");
+        }
+
+        TEST_METHOD (SameTimestampReplacementRetriesAfterReadSharingViolation)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            const std::string original = "{\"version\":1}";
+            const std::string replacement = "{\"version\":2}";
+            Assert::AreEqual(static_cast<DWORD>(ERROR_SUCCESS), atomic_file::write(destination.wstring(), original));
+
+            WatchedFileCache cache;
+            cache.reload(destination);
+            FileWatcher watcher(destination.wstring(), [&]() { cache.reload(destination); }, true);
+            auto blocker = createBlockedReplacement(directory.path(), destination, replacement, true);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1700));
+            blocker.reset();
+
+            Assert::IsTrue(cache.waitFor(replacement), L"A same-timestamp replacement was not refreshed after retry");
+        }
+
+        TEST_METHOD (PendingRetryIsCancelledWhenWatcherIsDisposed)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            std::atomic<unsigned int> callbackCount = 0;
+            auto watcher = std::make_unique<FileWatcher>(destination.wstring(), [&]() { ++callbackCount; }, true);
+
+            auto blocker = createBlockedReplacement(directory.path(), destination, "{\"enabled\":false}");
+            std::this_thread::sleep_for(std::chrono::milliseconds(700));
+            watcher.reset();
+            blocker.reset();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+
+            Assert::AreEqual(0u, callbackCount.load(), L"A pending retry invoked the callback after watcher disposal");
+        }
+
+        TEST_METHOD (RemovedFileCancelsPendingRetry)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            std::atomic<unsigned int> callbackCount = 0;
+            FileWatcher watcher(destination.wstring(), [&]() { ++callbackCount; }, true);
+
+            auto blocker = createBlockedReplacement(directory.path(), destination, "{\"enabled\":false}");
+            std::this_thread::sleep_for(std::chrono::milliseconds(700));
+            Assert::IsTrue(DeleteFileW(destination.c_str()) != FALSE);
+            blocker.reset();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+
+            Assert::AreEqual(0u, callbackCount.load(), L"A deleted file's pending retry invoked the callback");
+        }
+
+        TEST_METHOD (RetryCallbackExceptionDoesNotStopRetryWorker)
+        {
+            WatcherTestDirectory directory;
+            const auto destination = directory.path() / L"settings.json";
+            std::atomic<unsigned int> callbackCount = 0;
+            FileWatcher watcher(destination.wstring(), [&]() {
+                ++callbackCount;
+                throw std::runtime_error("callback failure");
+            }, true);
+
+            auto firstBlocker = createBlockedReplacement(directory.path(), destination, "{\"version\":1}");
+            std::this_thread::sleep_for(std::chrono::milliseconds(700));
+            firstBlocker.reset();
+            Assert::IsTrue(waitForCallbackCount(callbackCount, 1), L"The retry callback was not invoked");
+
+            auto secondBlocker = createBlockedReplacement(directory.path(), destination, "{\"version\":2}");
+            std::this_thread::sleep_for(std::chrono::milliseconds(700));
+            secondBlocker.reset();
+            Assert::IsTrue(waitForCallbackCount(callbackCount, 2), L"The retry worker did not survive a callback exception");
         }
 
         TEST_METHOD (FirstAtomicReplacementRefreshesCache)
