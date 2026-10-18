@@ -486,7 +486,7 @@ public partial class MonitorViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError($"[{Id}] Exception setting refresh rate: {ex.Message}");
+            Logger.LogError($"[{Id}] Exception setting refresh rate: {ex}");
             OnPropertyChanged(nameof(SelectedRefreshRate));
         }
     }
