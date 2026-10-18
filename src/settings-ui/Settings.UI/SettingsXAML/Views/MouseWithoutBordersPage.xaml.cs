@@ -244,7 +244,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             ClearFieldError(ConnectPCNameTextBox);
             ClearFieldError(ConnectSecurityKeyTextBox);
 
-            string pcName = ConnectPCNameTextBox.Text;
+            string pcName = ConnectPCNameTextBox.Text.Trim();
             string securityKey = ConnectSecurityKeyTextBox.Text.Trim();
 
             // Fields are cleared only once ViewModel confirms the connection succeeded
