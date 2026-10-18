@@ -15,14 +15,15 @@ internal static partial class PowerSettingsNative
 {
     /// <summary>
     /// GUID_CONSOLE_DISPLAY_STATE — Windows fires this whenever the console
-    /// display's power state changes. Data byte is 0 (off), 1 (on), 2 (dimmed).
+    /// display's power state changes. The DWORD data is 0 (off), 1 (on), or
+    /// 2 (dimmed).
     /// Reliable on both S3 and S0ix, and also fires for idle-blank / lid /
     /// screensaver transitions that never enter system sleep.
     /// </summary>
     internal static readonly Guid GuidConsoleDisplayState =
         new("6fe69556-704a-47a0-8f24-c28d936fda47");
 
-    // Windows 11 Energy Saver: DWORD 0 = off, 1 = standard, 2 = high savings.
+    // GUID_ENERGY_SAVER_STATUS: DWORD 0 = off, 1 = standard, 2 = high savings.
     // Older systems continue using Windows.System.Power's Battery Saver notification.
     internal static readonly Guid GuidEnergySaverStatus =
         new("550e8400-e29b-41d4-a716-446655440000");
@@ -72,7 +73,7 @@ internal static partial class PowerSettingsNative
     /// <summary>
     /// POWERBROADCAST_SETTING — the payload Windows passes to the callback.
     /// PowerSetting (16 bytes) + DataLength (4 bytes) precede a variable-length
-    /// Data array whose first byte holds the new display state.
+    /// Data array whose DWORD payload holds the new display state.
     /// </summary>
     internal const int PowerBroadcastSettingDataOffset = 20;
 
