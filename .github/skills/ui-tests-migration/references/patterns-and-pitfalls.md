@@ -110,7 +110,7 @@ private static Key[] ParseShortcutText(string s)
     var keys = new List<Key>();
     foreach (var raw in parts)
     {
-        var p = raw.Trim().ToLowerInvariant();
+        var p = raw.ToLowerInvariant();
         Key? k = p switch
         {
             "win" or "windows" => Key.LWin,
@@ -120,7 +120,7 @@ private static Key[] ParseShortcutText(string s)
             _ when p.Length == 1 && p[0] >= 'a' && p[0] <= 'z' => (Key)Enum.Parse(typeof(Key), p.ToUpperInvariant()),
             _ => null,
         };
-        var keyName = p.Replace(" ", string.Empty).ToLowerInvariant() switch
+        var keyName = p.Replace(" ", string.Empty) switch
         {
             "pgdn" => nameof(Key.PageDown),
             "pgup" => nameof(Key.PageUp),

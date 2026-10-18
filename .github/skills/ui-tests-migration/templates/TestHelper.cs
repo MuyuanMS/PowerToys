@@ -90,7 +90,7 @@ public static class TestHelper
 
         foreach (var raw in shortcutText.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var part = raw.Trim().ToLowerInvariant();
+            var part = raw.ToLowerInvariant();
             Key? key = part switch
             {
                 "win" or "windows" => Key.LWin,
@@ -102,7 +102,7 @@ public static class TestHelper
                 _ => null,
             };
 
-            var keyName = part.Replace(" ", string.Empty).ToLowerInvariant() switch
+            var keyName = part.Replace(" ", string.Empty) switch
             {
                 "pgdn" => nameof(Key.PageDown),
                 "pgup" => nameof(Key.PageUp),

@@ -121,7 +121,7 @@ public class __MODULE__EndToEndTests : UITestBase
         var keys = new List<Key>();
         foreach (var raw in parts)
         {
-            var part = raw.Trim().ToLowerInvariant();
+            var part = raw.ToLowerInvariant();
             Key? key = part switch
             {
                 "win" or "windows" => Key.LWin,
@@ -133,7 +133,7 @@ public class __MODULE__EndToEndTests : UITestBase
                 _ => null,
             };
 
-            var keyName = part.Replace(" ", string.Empty).ToLowerInvariant() switch
+            var keyName = part.Replace(" ", string.Empty) switch
             {
                 "pgdn" => nameof(Key.PageDown),
                 "pgup" => nameof(Key.PageUp),
