@@ -710,7 +710,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
 
             // A generic failure is far more likely to be caused by the legacy app holding our ports
             // than by the network, so point the user at the actual fix.
-            if (status != SocketStatus.InvalidKey && IsLegacyMouseWithoutBordersPresent())
+            if (status is not (SocketStatus.InvalidKey or SocketStatus.HostNotFound) && IsLegacyMouseWithoutBordersPresent())
             {
                 return resourceLoader.GetString("MouseWithoutBorders_ConnectErrorLegacyAppConflict");
             }

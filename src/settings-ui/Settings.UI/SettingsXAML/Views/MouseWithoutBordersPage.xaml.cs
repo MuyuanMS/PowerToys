@@ -11,8 +11,8 @@ using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.PowerToys.Settings.UI.Library.Utilities;
 using Microsoft.PowerToys.Settings.UI.ViewModels;
-using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
@@ -36,6 +36,8 @@ namespace Microsoft.PowerToys.Settings.UI.Views
         private MouseWithoutBordersViewModel ViewModel { get; set; }
 
         private readonly IFileSystemWatcher watcher;
+
+        private bool _isFlashingRequiredFields;
 
         public MouseWithoutBordersPage()
         {
@@ -82,9 +84,10 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private static void SetFieldError(TextBox textBox, string message)
         {
-            textBox.BorderBrush = new SolidColorBrush(Colors.Red);
+            textBox.BorderBrush = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
             textBox.BorderThickness = new Thickness(2);
             ToolTipService.SetToolTip(textBox, message);
+            AutomationProperties.SetHelpText(textBox, message);
         }
 
         private static void ClearFieldError(TextBox textBox)
@@ -92,6 +95,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
             textBox.ClearValue(Control.BorderBrushProperty);
             textBox.ClearValue(Control.BorderThicknessProperty);
             ToolTipService.SetToolTip(textBox, null);
+            textBox.ClearValue(AutomationProperties.HelpTextProperty);
         }
 
         private void OnConfigFileUpdate()
@@ -224,6 +228,11 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private async Task Connect()
         {
+            if (_isFlashingRequiredFields)
+            {
+                return;
+            }
+
             var emptyFields = new List<TextBox>();
             if (string.IsNullOrWhiteSpace(ConnectSecurityKeyTextBox.Text))
             {
@@ -237,7 +246,16 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
             if (emptyFields.Count != 0)
             {
-                await FlashRequiredFieldsAsync(emptyFields);
+                _isFlashingRequiredFields = true;
+                try
+                {
+                    await FlashRequiredFieldsAsync(emptyFields);
+                }
+                finally
+                {
+                    _isFlashingRequiredFields = false;
+                }
+
                 return;
             }
 
@@ -255,7 +273,7 @@ namespace Microsoft.PowerToys.Settings.UI.Views
 
         private static async Task FlashRequiredFieldsAsync(List<TextBox> textBoxes)
         {
-            var flashBrush = new SolidColorBrush(Colors.Red);
+            var flashBrush = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
             var originalBrushes = new Brush[textBoxes.Count];
             var originalThicknesses = new Thickness[textBoxes.Count];
 
