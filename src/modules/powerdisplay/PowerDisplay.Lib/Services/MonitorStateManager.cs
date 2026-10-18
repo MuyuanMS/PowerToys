@@ -141,7 +141,7 @@ namespace PowerDisplay.Common.Services
         /// Get saved parameters for a monitor using Monitor.Id.
         /// </summary>
         /// <param name="monitorId">The monitor's unique Id (new DevicePath-based format, e.g., <c>\\?\DISPLAY#DELD1A8#5&amp;abc&amp;0&amp;UID1</c>).</param>
-        /// <returns>A tuple of (Brightness, ColorTemperatureVcp, Contrast, Volume) or null if not found.</returns>
+        /// <returns>A tuple of (Brightness, ColorTemperatureVcp, Contrast, Volume, RefreshRate) or null if not found.</returns>
         public (int? Brightness, int? ColorTemperatureVcp, int? Contrast, int? Volume, int? RefreshRate)? GetMonitorParameters(string monitorId)
         {
             if (string.IsNullOrEmpty(monitorId))

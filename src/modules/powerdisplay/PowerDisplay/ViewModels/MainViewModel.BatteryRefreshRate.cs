@@ -49,7 +49,7 @@ public partial class MainViewModel
         }
         catch (Exception ex)
         {
-            Logger.LogError($"[BatteryRefreshRate] Failed to apply power-source settings: {ex.Message}");
+            Logger.LogError($"[BatteryRefreshRate] Failed to apply power-source settings: {ex}");
         }
     }
 }
