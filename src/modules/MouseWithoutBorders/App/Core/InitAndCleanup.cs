@@ -110,7 +110,7 @@ internal static class InitAndCleanup
             Logger.Log(e.Message);
         }
 
-        Common.Is64bitOS = IntPtr.Size == 8;
+        Common.Is64bitProcess = IntPtr.Size == 8;
 
         try
         {

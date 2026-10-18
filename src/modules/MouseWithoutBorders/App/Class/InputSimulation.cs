@@ -53,7 +53,7 @@ namespace MouseWithoutBorders.Class
             Common.PaintCount = 0;
 
             uint rv = 0;
-            if (Common.Is64bitOS)
+            if (Common.Is64bitProcess)
             {
                 NativeMethods.INPUT64 input64 = default;
                 input64.type = input.type;
