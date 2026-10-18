@@ -7,6 +7,7 @@ namespace Microsoft.PowerToys.KeyboardManager.UITests;
 internal static class KeyboardManagerTestConstants
 {
     public const string EditorProcessName = "PowerToys.KeyboardManagerEditorUI";
+    public const string EditorWindowEventName = "PowerToys_KeyboardManager_Event_EditorWindow";
     public const string ModuleName = "Keyboard Manager";
     public const string SettingsChangedEventName = "PowerToys_KeyboardManager_Event_Settings";
     public const ulong SingleKeyInjectedFlag = 0x11;

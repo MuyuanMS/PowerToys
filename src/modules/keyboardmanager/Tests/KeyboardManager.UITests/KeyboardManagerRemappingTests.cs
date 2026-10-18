@@ -48,6 +48,85 @@ public sealed class KeyboardManagerRemappingTests : KeyboardManagerTestBase
     [TestCleanup]
     public Task CleanupTest() => CleanupKeyboardManagerTestAsync();
 
+    [TestMethod("KeyboardManager.Remapping.EditorDialogSuspensionSurvivesSecondEditorLaunch")]
+    [TestCategory("Keyboard Manager")]
+    public void EditorDialogSuspensionSurvivesSecondEditorLaunch()
+    {
+        using var input = new NotepadInputWindow();
+        using var recorder = new KeyboardEventRecorder();
+        ApplyProfileAndVerify(
+            input,
+            recorder,
+            KeyboardManagerSettings.BuildProfile(
+                singleKeyRemaps: new[] { KeyboardManagerSettings.SingleKeyRemap(A, B) }));
+
+        var editor = OpenEditor();
+        editor.Find<Button>(By.AccessibilityId("NewRemappingBtn"), timeoutMS: 10_000).Invoke(msPostAction: 300);
+        var editorProcess = Session.FromProcess(KeyboardManagerTestConstants.EditorProcessName);
+        Assert.IsTrue(
+            editorProcess.WaitForElement(By.AccessibilityId("TriggerKeyToggleBtn"), timeoutMS: 15_000),
+            "The Add new remapping dialog did not finish loading.");
+
+        using var engineSuspension = EventWaitHandle.OpenExisting(KeyboardManagerTestConstants.EditorWindowEventName);
+        Assert.IsTrue(
+            editor.WaitFor(() => engineSuspension.WaitOne(0), timeoutMS: 5_000, pollIntervalMS: 100),
+            "The remapping dialog did not signal the Keyboard Manager engine suspension event.");
+
+        string editorExecutable;
+        using (var firstEditorProcess = Process.GetProcessById(editor.ProcessId))
+        {
+            editorExecutable = firstEditorProcess.MainModule?.FileName ??
+                throw new InvalidOperationException("The running editor executable path could not be resolved.");
+        }
+
+        Step("Attempting a second editor launch while the first remapping dialog is open");
+        using var secondEditorProcess = Process.Start(new ProcessStartInfo
+        {
+            FileName = editorExecutable,
+            WorkingDirectory = Path.GetDirectoryName(editorExecutable)!,
+            UseShellExecute = false,
+        });
+        Assert.IsNotNull(secondEditorProcess, "The second Keyboard Manager editor process could not be started.");
+        try
+        {
+            Assert.IsTrue(
+                secondEditorProcess!.WaitForExit(10_000),
+                "The second editor did not exit promptly while the first editor owned the instance mutex.");
+            Assert.AreEqual(0, secondEditorProcess.ExitCode, "The second editor did not exit cleanly after detecting the existing instance.");
+            Assert.IsTrue(
+                engineSuspension.WaitOne(0),
+                "The second editor launch reset the engine suspension event while the first dialog remained open.");
+
+            Step("Verifying the configured A to B remap is bypassed while the dialog is open");
+            Assert.IsTrue(input.FocusInput(), "Notepad did not own foreground for the suspended-remap probe.");
+            KeyboardHelper.SendKey(Key.A);
+            Assert.IsTrue(
+                input.WaitForText("a", timeoutMS: 3_000),
+                "The editor dialog did not bypass A to B; Notepad did not receive the physical A.");
+
+            Step("Closing the first remapping dialog and verifying the A to B remap resumes");
+            editor.EnsureForeground();
+            KeyboardHelper.SendKey(Key.Esc);
+            Assert.IsTrue(
+                editor.WaitFor(() => !engineSuspension.WaitOne(0), timeoutMS: 5_000, pollIntervalMS: 100),
+                "Closing the remapping dialog did not reset the engine suspension event.");
+
+            Assert.IsTrue(input.FocusInput(), "Notepad did not regain foreground for the resumed-remap probe.");
+            KeyboardHelper.SendKey(Key.A);
+            Assert.IsTrue(
+                input.WaitForText("ab", timeoutMS: 5_000),
+                "The A to B remap did not resume after the remapping dialog closed.");
+        }
+        finally
+        {
+            if (!secondEditorProcess!.HasExited)
+            {
+                secondEditorProcess.Kill(entireProcessTree: true);
+                _ = secondEditorProcess.WaitForExit(5_000);
+            }
+        }
+    }
+
     [TestMethod("KeyboardManager.Remapping.SingleKey")]
     [TestCategory("Keyboard Manager")]
     [DataRow("A", A, "B", B)]
