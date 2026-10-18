@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 #pragma once
+#pragma comment(lib, "Ole32.lib")
 
 #include <Windows.h>
 #include <objbase.h>
