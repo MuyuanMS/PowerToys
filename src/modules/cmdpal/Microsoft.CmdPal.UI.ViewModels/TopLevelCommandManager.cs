@@ -719,7 +719,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         bool isRegistered;
         lock (_commandProvidersLock)
         {
-            isRegistered = _commandProviders.Contains(provider);
+            isRegistered = _commandProviders.Any(candidate => ReferenceEquals(candidate, provider));
         }
 
         if (ct.IsCancellationRequested || !isRegistered || !provider.TryPublishTopLevelCommands(prepared, _serviceProvider))
