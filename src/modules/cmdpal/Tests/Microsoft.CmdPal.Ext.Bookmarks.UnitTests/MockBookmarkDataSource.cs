@@ -13,7 +13,7 @@ internal sealed class MockBookmarkDataSource : IBookmarkDataSource
     private string _jsonData;
     private int _saveCount;
 
-    public Action BeforeSave { get; set; }
+    public Action? BeforeSave { get; set; }
 
     public MockBookmarkDataSource(string initialJsonData = "[]")
     {
