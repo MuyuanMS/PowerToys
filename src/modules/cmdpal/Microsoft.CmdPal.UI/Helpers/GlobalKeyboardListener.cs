@@ -255,13 +255,16 @@ internal sealed partial class GlobalKeyboardListener : IGlobalKeyboardListener
                 var ownerThread = Thread.CurrentThread;
                 try
                 {
-                    _tryEnqueue(() =>
+                    if (!_tryEnqueue(() =>
                     {
                         if (_thread == ownerThread)
                         {
                             _hookFailed(ex);
                         }
-                    });
+                    }))
+                    {
+                        QueueErrorReport(new InvalidOperationException("The UI dispatcher rejected the global keyboard failure notification."));
+                    }
                 }
                 catch (Exception dispatchError)
                 {
@@ -320,7 +323,10 @@ internal sealed partial class GlobalKeyboardListener : IGlobalKeyboardListener
 
     private void EnqueueCommand(string commandId, long timestamp, string?[]?[] snapshot)
     {
-        _tryEnqueue(() => ProcessCommand(commandId, timestamp, snapshot));
+        if (!_tryEnqueue(() => ProcessCommand(commandId, timestamp, snapshot)))
+        {
+            QueueErrorReport(new InvalidOperationException("The UI dispatcher rejected a global keyboard command."));
+        }
     }
 
     private void ProcessCommand(string commandId, long timestamp, string?[]?[] snapshot)

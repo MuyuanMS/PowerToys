@@ -207,9 +207,11 @@ public partial class GlobalKeyboardListenerTests
         Assert.AreEqual(0, harness.Hook.Forwarded);
         Assert.AreEqual(1, harness.Hook.DummyKeys);
         Assert.IsTrue(harness.UiWork.IsEmpty);
-        if (throws)
+        var error = await harness.ReportedError.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.IsInstanceOfType<InvalidOperationException>(error);
+        if (!throws)
         {
-            Assert.IsInstanceOfType<InvalidOperationException>(await harness.ReportedError.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.AreEqual("The UI dispatcher rejected a global keyboard command.", error.Message);
         }
     }
 
