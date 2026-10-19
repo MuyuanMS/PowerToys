@@ -59,7 +59,7 @@ public sealed partial class SupersedingAsyncValueGateTests
             _ =>
             {
                 applyStarted.SetResult();
-                releaseApply.Wait();
+                WaitForRelease(releaseApply);
                 Interlocked.Increment(ref applied);
             });
         var request = gate.ExecuteAsync();
@@ -73,7 +73,8 @@ public sealed partial class SupersedingAsyncValueGateTests
                 gate.Dispose();
             });
             await disposeStarted.Task.WaitAsync(WaitTimeout);
-            await Assert.ThrowsExactlyAsync<TimeoutException>(() => disposal.WaitAsync(TimeSpan.FromMilliseconds(100)));
+            await Task.Delay(WaitTimeout / 5);
+            Assert.IsFalse(disposal.IsCompleted);
             releaseApply.Set();
             await disposal.WaitAsync(WaitTimeout);
             Assert.AreEqual(1, applied);
@@ -103,7 +104,7 @@ public sealed partial class SupersedingAsyncValueGateTests
             _ =>
             {
                 applyStarted.TrySetResult();
-                releaseApply.Wait();
+                WaitForRelease(releaseApply);
             });
         var request = gate.ExecuteAsync();
         Task? disposal = null;
@@ -148,7 +149,7 @@ public sealed partial class SupersedingAsyncValueGateTests
             _ =>
             {
                 applyStarted.SetResult();
-                releaseApply.Wait();
+                WaitForRelease(releaseApply);
             });
         var request = gate.ExecuteAsync();
         Task? invocation = null;
@@ -385,7 +386,7 @@ public sealed partial class SupersedingAsyncValueGateTests
                 token.Register(() =>
                 {
                     callbackEntered.SetResult();
-                    releaseCallback.Wait();
+                    WaitForRelease(releaseCallback);
                 });
                 started.SetResult();
                 return CompleteFactoryAsync();
@@ -420,6 +421,14 @@ public sealed partial class SupersedingAsyncValueGateTests
         {
             await releaseFactory.Task.ConfigureAwait(false);
             return 42;
+        }
+    }
+
+    private static void WaitForRelease(ManualResetEventSlim signal)
+    {
+        if (!signal.Wait(WaitTimeout))
+        {
+            throw new TimeoutException("The test did not release the blocked callback in time.");
         }
     }
 
