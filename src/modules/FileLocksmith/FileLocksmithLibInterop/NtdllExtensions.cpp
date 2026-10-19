@@ -3,6 +3,12 @@
 #include "NtdllExtensions.h"
 #include <thread>
 #include <atomic>
+#include <memory>
+#include <mutex>
+
+#ifndef FILELOCKSMITH_LIB_STATIC
+#include <winrt/base.h>
+#endif
 
 #define STATUS_INFO_LENGTH_MISMATCH ((LONG)0xC0000004)
 
@@ -39,6 +45,45 @@ namespace
     }
 
     constexpr size_t DefaultModulesResultSize = 512;
+    constexpr int MaxConcurrentHandleEnumerationWorkers = 4;
+    std::atomic<int> active_handle_enumeration_workers{ 0 };
+
+    bool try_reserve_handle_enumeration_worker()
+    {
+        int active_workers = active_handle_enumeration_workers.load();
+        while (active_workers < MaxConcurrentHandleEnumerationWorkers)
+        {
+            if (active_handle_enumeration_workers.compare_exchange_weak(active_workers, active_workers + 1))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void release_handle_enumeration_worker()
+    {
+        active_handle_enumeration_workers--;
+    }
+
+    struct ModuleLockGuard
+    {
+#ifndef FILELOCKSMITH_LIB_STATIC
+        ModuleLockGuard()
+        {
+            ++winrt::get_module_lock();
+        }
+
+        ~ModuleLockGuard()
+        {
+            --winrt::get_module_lock();
+        }
+
+        ModuleLockGuard(const ModuleLockGuard&) = delete;
+        ModuleLockGuard& operator=(const ModuleLockGuard&) = delete;
+#endif
+    };
 
     std::vector<std::wstring> process_modules(DWORD pid)
     {
@@ -160,131 +205,236 @@ std::vector<NtdllExtensions::HandleInfo> NtdllExtensions::handles() noexcept
         return {};
     }
 
-    auto info_ptr = reinterpret_cast<SYSTEM_HANDLE_INFORMATION_EX*>(get_info_result.memory.data());
-
-    std::map<ULONG_PTR, HANDLE> pid_to_handle;
-    std::vector<HandleInfo> result;
-
-    std::vector<BYTE> object_info_buffer(DefaultResultBufferSize);
-
-    std::atomic<ULONG> i = 0;
-    std::atomic<ULONG_PTR> handle_count = info_ptr->NumberOfHandles;
-    std::atomic<HANDLE> process_handle = NULL;
-    std::atomic<HANDLE> handle_copy = NULL;
-    ULONG previous_i;
-
-
-    while (i < handle_count)
+    // A worker blocked inside NtQueryObject cannot be stopped safely, so this function never
+    // terminates one.
+    //
+    // This previously called TerminateThread(offload_function.native_handle(), 1) on a
+    // std::thread that had already been detached. On the MSVC STL detach() clears the internal
+    // handle, so native_handle() returns null and the call fails with ERROR_INVALID_HANDLE:
+    // nothing was terminated, the stuck worker kept running, and the loop started another one
+    // on the same std::map, std::vector and scratch buffer with no synchronization. Had the
+    // terminate landed it would be no better, since killing a thread inside a syscall can
+    // leave the CRT heap lock held or a container half-updated.
+    //
+    // Instead a stuck worker is abandoned. Everything it can still reach is either owned by it
+    // outright or kept alive by this shared_ptr, so it stays harmless whether it eventually
+    // returns or blocks forever.
+    struct SharedState
     {
-        previous_i = i;
+        MemoryLoopResult info;
+        SYSTEM_HANDLE_INFORMATION_EX* info_ptr = nullptr;
+        ULONG_PTR handle_count = 0;
 
-        // The system calls we use in this block were reported to hang on some machines.
-        // We need to offload the cycle to another thread and keep track of progress to terminate and resume when needed.
-        // Unfortunately, there are no alternative APIs to what we're using that accept timeouts. (NtQueryObject and GetFileType)
-        auto offload_function = std::thread([&] {
-            for (; i < handle_count; i++)
-            {
-                process_handle = NULL;
-                handle_copy = NULL;
+        // Index of the next handle to hand out. Drives termination.
+        std::atomic<ULONG_PTR> next_index{ 0 };
+        // Handles fully inspected. Only used as the watchdog's progress signal; it advances
+        // for skipped handles too, so only a genuinely stuck query looks like a stall.
+        std::atomic<ULONG_PTR> processed{ 0 };
 
-                auto handle_info = info_ptr->Handles + i;
-                auto pid = handle_info->UniqueProcessId;
+        std::mutex work_mutex;
+        std::mutex result_mutex;
+        std::vector<HandleInfo> result;
+    };
 
-                auto iter = pid_to_handle.find(pid);
-                if (iter != pid_to_handle.end())
-                {
-                    process_handle = iter->second;
-                }
-                else
-                {
-                    process_handle = OpenProcess(PROCESS_DUP_HANDLE, FALSE, static_cast<DWORD>(pid));
-                    if (!process_handle)
-                    {
-                        continue;
-                    }
-                    pid_to_handle[pid] = process_handle;
-                }
+    auto state = std::make_shared<SharedState>();
+    state->info = std::move(get_info_result);
+    state->info_ptr = reinterpret_cast<SYSTEM_HANDLE_INFORMATION_EX*>(state->info.memory.data());
+    state->handle_count = state->info_ptr->NumberOfHandles;
 
-                // According to this:
-                // https://stackoverflow.com/questions/46384048/enumerate-handles
-                // NtQueryObject could hang
+    using NtQueryObject_t = NTSTATUS(NTAPI*)(
+        HANDLE ObjectHandle,
+        ULONG ObjectInformationClass,
+        PVOID ObjectInformation,
+        ULONG ObjectInformationLength,
+        PULONG ReturnLength);
 
-                // TODO uncomment and investigate
-                // if (handle_info->GrantedAccess == 0x0012019f) {
-                //     continue;
-                // }
+    const auto ntdll_module = GetModuleHandleW(L"ntdll.dll");
+    if (ntdll_module == nullptr)
+    {
+        return {};
+    }
 
-                HANDLE local_handle_copy;
-                auto dh_result = DuplicateHandle(process_handle, reinterpret_cast<HANDLE>(handle_info->HandleValue), GetCurrentProcess(), &local_handle_copy, 0, 0, DUPLICATE_SAME_ACCESS);
-                if (dh_result == 0)
-                {
-                    // Ignore this handle.
-                    continue;
-                }
-                handle_copy = local_handle_copy;
+    const auto nt_query_object = reinterpret_cast<NtQueryObject_t>(GetProcAddress(ntdll_module, "NtQueryObject"));
+    if (nt_query_object == nullptr)
+    {
+        return {};
+    }
 
-                ULONG return_length;
-                auto status = NtQueryObject(handle_copy, ObjectTypeInformation, object_info_buffer.data(), static_cast<ULONG>(object_info_buffer.size()), &return_length);
-                if (NT_ERROR(status))
-                {
-                    // Ignore this handle.
-                    CloseHandle(handle_copy);
-                    handle_copy = NULL;
-                    continue;
-                }
-
-                auto object_type_info = reinterpret_cast<OBJECT_TYPE_INFORMATION*>(object_info_buffer.data());
-                auto type_name = unicode_to_str(object_type_info->Name);
-
-                std::wstring file_name;
-
-                if (type_name == L"File")
-                {
-                    file_name = file_handle_to_kernel_name(handle_copy, object_info_buffer);
-                    result.push_back(HandleInfo{ pid, handle_info->HandleValue, type_name, file_name });
-                }
-
-                CloseHandle(handle_copy);
-                handle_copy = NULL;
-            }
-        });
-
-        offload_function.detach();
-        do
+    auto worker_file_handle_to_kernel_name = [nt_query_object](HANDLE file_handle, std::vector<BYTE>& buffer) -> std::wstring {
+        if (GetFileType(file_handle) != FILE_TYPE_DISK)
         {
-            Sleep(200); // Timeout in milliseconds for detecting that the system hang on getting information for a handle.
-            if (i >= handle_count)
+            return L"";
+        }
+
+        ULONG return_length;
+        auto status = nt_query_object(file_handle, ObjectNameInformation, buffer.data(), static_cast<ULONG>(buffer.size()), &return_length);
+        if (NT_SUCCESS(status))
+        {
+            auto object_name_info = reinterpret_cast<UNICODE_STRING*>(buffer.data());
+            return unicode_to_str(*object_name_info);
+        }
+
+        return L"";
+    };
+
+    // Each worker owns its scratch buffer and its process-handle cache outright, so an
+    // abandoned worker shares no mutable state. `result` is the one exception and is only
+    // touched while holding `result_mutex`, never across a blocking call.
+    auto worker = [state, nt_query_object, worker_file_handle_to_kernel_name](std::shared_ptr<std::atomic_bool> abandon_requested, std::shared_ptr<std::atomic_bool> worker_slot_reserved, std::shared_ptr<ModuleLockGuard> module_lock) {
+        (void)module_lock;
+
+        std::vector<BYTE> object_info_buffer(DefaultResultBufferSize);
+        std::map<ULONG_PTR, HANDLE> pid_to_handle;
+
+        for (;;)
+        {
+            ULONG_PTR index;
             {
-                // We're done.
-                break;
-            }
-
-            if (previous_i >= i)
-            {
-                // The thread looks like it's hanging on some handle. Let's kill it and resume.
-
-                // HACK: This is unsafe and may leak something, but looks like there's no way to properly clean up a thread when it's hanging on a system call.
-                TerminateThread(offload_function.native_handle(), 1);
-
-                // Close Handles that might be lingering.
-                if (handle_copy!=NULL)
+                std::scoped_lock lock{ state->work_mutex };
+                if (abandon_requested->load())
                 {
-                    CloseHandle(handle_copy);
+                    break;
                 }
-                i++;
+
+                index = state->next_index++;
+                if (index >= state->handle_count)
+                {
+                    break;
+                }
+            }
+
+            auto handle_info = state->info_ptr->Handles + index;
+            auto pid = handle_info->UniqueProcessId;
+
+            // A `GrantedAccess == 0x0012019f` skip used to sit here behind a "TODO uncomment
+            // and investigate", suggested as the cure for the NtQueryObject hang. It does stop
+            // the hang, but it also stops the tool from finding anything: 0x0012019F is exactly
+            // FILE_GENERIC_READ | FILE_GENERIC_WRITE (0x120089 | 0x120116), the granted access
+            // of an ordinary read-write file handle, which is the case File Locksmith exists to
+            // report. With it enabled, a process holding a file opened with FILE_SHARE_NONE is
+            // no longer listed. The stall is handled below instead, by abandoning the stuck
+            // worker safely.
+
+            HANDLE process_handle = NULL;
+            auto iter = pid_to_handle.find(pid);
+            if (iter != pid_to_handle.end())
+            {
+                process_handle = iter->second;
+            }
+            else
+            {
+                process_handle = OpenProcess(PROCESS_DUP_HANDLE, FALSE, static_cast<DWORD>(pid));
+                if (!process_handle)
+                {
+                    state->processed++;
+                    continue;
+                }
+                pid_to_handle[pid] = process_handle;
+            }
+
+            HANDLE handle_copy = NULL;
+            auto dh_result = DuplicateHandle(process_handle, reinterpret_cast<HANDLE>(handle_info->HandleValue), GetCurrentProcess(), &handle_copy, 0, 0, DUPLICATE_SAME_ACCESS);
+            if (dh_result == 0)
+            {
+                // Ignore this handle.
+                state->processed++;
+                continue;
+            }
+
+            ULONG return_length;
+            auto status = nt_query_object(handle_copy, ObjectTypeInformation, object_info_buffer.data(), static_cast<ULONG>(object_info_buffer.size()), &return_length);
+            if (NT_ERROR(status))
+            {
+                // Ignore this handle.
+                CloseHandle(handle_copy);
+                state->processed++;
+                continue;
+            }
+
+            auto object_type_info = reinterpret_cast<OBJECT_TYPE_INFORMATION*>(object_info_buffer.data());
+            auto type_name = unicode_to_str(object_type_info->Name);
+
+            if (type_name == L"File")
+            {
+                auto file_name = worker_file_handle_to_kernel_name(handle_copy, object_info_buffer);
+
+                std::scoped_lock lock{ state->result_mutex };
+                state->result.push_back(HandleInfo{ pid, handle_info->HandleValue, type_name, file_name });
+            }
+
+            CloseHandle(handle_copy);
+            state->processed++;
+        }
+
+        for (auto [pid, handle] : pid_to_handle)
+        {
+            CloseHandle(handle);
+        }
+
+        if (worker_slot_reserved->exchange(false))
+        {
+            release_handle_enumeration_worker();
+        }
+    };
+
+    constexpr DWORD poll_interval_ms = 200;
+    // A worker is only declared stuck after several consecutive polls with no progress at
+    // all. The previous code treated a single missed 200 ms tick as a hang, so a merely slow
+    // query on a busy machine was enough to trigger the recovery path.
+    constexpr int stalled_polls_before_abandon = 10;
+
+    while (state->next_index < state->handle_count)
+    {
+        if (!try_reserve_handle_enumeration_worker())
+        {
+            break;
+        }
+
+        auto abandon_requested = std::make_shared<std::atomic_bool>(false);
+        auto worker_slot_reserved = std::make_shared<std::atomic_bool>(true);
+        auto module_lock = std::make_shared<ModuleLockGuard>();
+        std::thread worker_thread(worker, abandon_requested, worker_slot_reserved, module_lock);
+
+        ULONG_PTR last_processed = state->processed;
+        int stalled_polls = 0;
+
+        for (;;)
+        {
+            // Valid here precisely because the thread has not been detached yet.
+            if (WaitForSingleObject(worker_thread.native_handle(), poll_interval_ms) == WAIT_OBJECT_0)
+            {
+                worker_thread.join();
                 break;
             }
-            previous_i = i;
-        } while (1);
 
+            const ULONG_PTR processed_now = state->processed;
+            if (processed_now != last_processed)
+            {
+                last_processed = processed_now;
+                stalled_polls = 0;
+                continue;
+            }
+
+            if (++stalled_polls < stalled_polls_before_abandon)
+            {
+                continue;
+            }
+
+            // Stuck in a call we cannot interrupt. Let it go and continue with a fresh
+            // worker; `next_index` has already moved past the offending handle. The flag and
+            // the next-index claim share a lock so a detached worker cannot claim more work
+            // after it has been abandoned.
+            {
+                std::scoped_lock lock{ state->work_mutex };
+                abandon_requested->store(true);
+            }
+            worker_thread.detach();
+            break;
+        }
     }
 
-    for (auto [pid, handle] : pid_to_handle)
-    {
-        CloseHandle(handle);
-    }
-
-    return result;
+    std::scoped_lock lock{ state->result_mutex };
+    return std::move(state->result);
 }
 
 // Returns the list of all processes.
