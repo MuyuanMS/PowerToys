@@ -18,6 +18,79 @@ namespace Microsoft.CmdPal.UI.ViewModels.UnitTests;
 public partial class TopLevelCommandManagerTests
 {
     [TestMethod]
+    public async Task ProviderEnable_LateResultAfterTimeout_RemovedWrapperDoesNotPublishWhenAnotherProviderRemains()
+    {
+        const string CommandId = "removed-provider-late-command";
+        using var services = CreateServices();
+        var provider = new LoadingTestCommandProvider { Id = "removed-loading-provider" };
+        var remainingProvider = new LoadingTestCommandProvider { Id = "remaining-loading-provider" };
+        var wrapper = new CommandProviderWrapper(provider, TaskScheduler.Default);
+        var remainingWrapper = new CommandProviderWrapper(remainingProvider, TaskScheduler.Default);
+        var extensionService = new Mock<IExtensionService>();
+        extensionService
+            .Setup(service => service.LoadProvidersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([wrapper, remainingWrapper]);
+        var timeProvider = CreateEnableTimeProvider(out var timerCreated);
+        using var manager = new TopLevelCommandManager(services, [extensionService.Object], timeProvider);
+        await manager.LoadExternalProvidersAsync();
+
+        var started = LoadingSignal();
+        var cleaned = LoadingSignal();
+        var published = LoadingSignal();
+        using var release = new ManualResetEventSlim();
+        var item = new Mock<ICommandItem>();
+        item.SetupGet(i => i.Command).Returns(new NoOpCommand { Id = CommandId });
+        item.SetupRemove(i => i.PropChanged -= It.IsAny<TypedEventHandler<object, IPropChangedEventArgs>>())
+            .Callback(() => cleaned.TrySetResult());
+        provider.OnLoad = () =>
+        {
+            started.TrySetResult();
+            release.Wait();
+            provider.Commands = [item.Object];
+        };
+        manager.TopLevelCommands.CollectionChanged += (_, _) =>
+        {
+            if (manager.TopLevelCommands.Any(command => command.Id == CommandId))
+            {
+                published.TrySetResult();
+            }
+        };
+
+        try
+        {
+            await Task.Run(() => manager.Receive(new ProviderEnabledStateChangedMessage(provider.Id, true)));
+            await started.Task.WaitAsync(LoadingTimeout);
+            var expire = await timerCreated.WaitAsync(LoadingTimeout);
+            expire();
+            await manager.WaitForCurrentLoadAsync().WaitAsync(LoadingTimeout);
+
+            extensionService.Raise(
+                service => service.OnProviderRemoved += null,
+                extensionService.Object,
+                new[] { wrapper });
+            var removed = await Task.Run(() => SpinWait.SpinUntil(
+                () => manager.CommandProviders.All(candidate => !ReferenceEquals(candidate, wrapper)),
+                LoadingTimeout));
+            Assert.IsTrue(removed, "The extension-service removal should unregister the timed-out wrapper.");
+
+            release.Set();
+            await Task.WhenAny(published.Task, cleaned.Task).WaitAsync(LoadingTimeout);
+            await manager.WaitForCurrentLoadAsync().WaitAsync(LoadingTimeout);
+            Assert.IsFalse(published.Task.IsCompleted, "A removed provider must not publish a late enable result.");
+            Assert.IsTrue(cleaned.Task.IsCompleted, "The unpublished late result should be cleaned up.");
+            Assert.IsTrue(manager.CommandProviders.Any(candidate => ReferenceEquals(candidate, remainingWrapper)));
+            Assert.IsEmpty(manager.TopLevelCommands);
+            item.VerifyAdd(i => i.PropChanged += It.IsAny<TypedEventHandler<object, IPropChangedEventArgs>>(), Times.Once);
+            item.VerifyRemove(i => i.PropChanged -= It.IsAny<TypedEventHandler<object, IPropChangedEventArgs>>(), Times.Once);
+        }
+        finally
+        {
+            release.Set();
+            await manager.DisposeAsync().AsTask().WaitAsync(LoadingTimeout);
+        }
+    }
+
+    [TestMethod]
     [DataRow("command")]
     [DataRow("fallback")]
     [DataRow("band")]
