@@ -29,15 +29,15 @@ public sealed partial class SupersedingAsyncValueGateTests
         });
         var first = gate.ExecuteAsync();
         var continuation = first.ContinueWith(
-            _ => gate.ExecuteAsync().Wait(WaitTimeout),
+            _ => gate.ExecuteAsync(),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+            TaskScheduler.Default).Unwrap();
         try
         {
             await started.Task.WaitAsync(WaitTimeout);
             release.SetResult();
-            Assert.IsTrue(await continuation.WaitAsync(WaitTimeout + WaitTimeout));
+            Assert.AreEqual(42, await continuation.WaitAsync(WaitTimeout + WaitTimeout));
             Assert.AreEqual(2, calls);
         }
         finally
@@ -59,7 +59,10 @@ public sealed partial class SupersedingAsyncValueGateTests
             _ =>
             {
                 applyStarted.SetResult();
-                releaseApply.Wait();
+                if (!releaseApply.Wait(WaitTimeout))
+                {
+                    throw new TimeoutException("The apply callback was not released in time.");
+                }
                 Interlocked.Increment(ref applied);
             });
         var request = gate.ExecuteAsync();
@@ -103,7 +106,10 @@ public sealed partial class SupersedingAsyncValueGateTests
             _ =>
             {
                 applyStarted.TrySetResult();
-                releaseApply.Wait();
+                if (!releaseApply.Wait(WaitTimeout))
+                {
+                    throw new TimeoutException("The apply callback was not released in time.");
+                }
             });
         var request = gate.ExecuteAsync();
         Task? disposal = null;
@@ -148,7 +154,10 @@ public sealed partial class SupersedingAsyncValueGateTests
             _ =>
             {
                 applyStarted.SetResult();
-                releaseApply.Wait();
+                if (!releaseApply.Wait(WaitTimeout))
+                {
+                    throw new TimeoutException("The apply callback was not released in time.");
+                }
             });
         var request = gate.ExecuteAsync();
         Task? invocation = null;
@@ -385,7 +394,10 @@ public sealed partial class SupersedingAsyncValueGateTests
                 token.Register(() =>
                 {
                     callbackEntered.SetResult();
-                    releaseCallback.Wait();
+                    if (!releaseCallback.Wait(WaitTimeout))
+                    {
+                        throw new TimeoutException("The cancellation callback was not released in time.");
+                    }
                 });
                 started.SetResult();
                 return CompleteFactoryAsync();
