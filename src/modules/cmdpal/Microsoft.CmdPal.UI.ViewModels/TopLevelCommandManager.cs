@@ -503,7 +503,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
                 {
                     if (_disposing)
                     {
-                        throw new OperationCanceledException(_currentExtensionLoadCancellationToken);
+                        throw new OperationCanceledException();
                     }
 
                     previousLoad = _extensionLoadCts;
@@ -616,22 +616,25 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             // If disabled, we'll remove that providers commands from top level commands, dock bands, and pinned commands.
             if (!isEnabled)
             {
-                provider?.InvalidatePendingCommands();
                 List<TopLevelViewModel> commandsToRemove;
-                lock (TopLevelCommands)
-                {
-                    commandsToRemove = TopLevelCommands.Where(c => c.CommandProviderId == providerId).ToList();
-                    foreach (var command in commandsToRemove)
-                    {
-                        TopLevelCommands.Remove(command);
-                    }
-                }
-
                 List<TopLevelViewModel> dockBandsToRemove;
-                lock (_dockBandsLock)
+                lock (_providerPublicationLock)
                 {
-                    dockBandsToRemove = DockBands.Where(b => b.CommandProviderId == providerId).ToList();
-                    DockBands.RemoveRange(dockBandsToRemove);
+                    provider?.InvalidatePendingCommands();
+                    lock (TopLevelCommands)
+                    {
+                        commandsToRemove = TopLevelCommands.Where(c => c.CommandProviderId == providerId).ToList();
+                        foreach (var command in commandsToRemove)
+                        {
+                            TopLevelCommands.Remove(command);
+                        }
+                    }
+
+                    lock (_dockBandsLock)
+                    {
+                        dockBandsToRemove = DockBands.Where(b => b.CommandProviderId == providerId).ToList();
+                        DockBands.RemoveRange(dockBandsToRemove);
+                    }
                 }
 
                 // Re-enabling the provider reloads its commands, which builds
