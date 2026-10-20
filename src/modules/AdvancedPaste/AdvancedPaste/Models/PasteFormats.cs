@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -28,6 +28,17 @@ public enum PasteFormats
         KernelFunctionDescription = "Takes clipboard text and formats it as markdown text.")]
     Markdown,
 
+    // Preserve existing format IDs; new formats must use unused values.
+    [PasteFormatMetadata(
+        IsCoreAction = true,
+        ResourceId = "PasteAsRichText",
+        IconGlyph = "\uE8C8",
+        RequiresAIService = false,
+        CanPreview = false,
+        SupportedClipboardFormats = ClipboardFormat.Text,
+        KernelFunctionDescription = "Takes markdown or plain text from the clipboard and formats it as rich HTML text.")]
+    RichText = 12,
+
     [PasteFormatMetadata(
         IsCoreAction = true,
         ResourceId = "PasteAsJson",
@@ -36,7 +47,7 @@ public enum PasteFormats
         CanPreview = false,
         SupportedClipboardFormats = ClipboardFormat.Text,
         KernelFunctionDescription = "Takes clipboard text and formats it as JSON text.")]
-    Json,
+    Json = 2,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
