@@ -1324,27 +1324,20 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     public ValueTask DisposeAsync()
     {
         TaskCompletionSource completion;
-        Task cancellation;
-        Task providerActivities;
-        lock (_providerPublicationLock)
+        lock (_stateLock)
         {
-            lock (_stateLock)
+            if (_disposeCompletion is not null)
             {
-                if (_disposeCompletion is not null)
-                {
-                    return new ValueTask(_disposeCompletion.Task);
-                }
-
-                _disposing = true;
-                _disposeCompletion = completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                _reloadCommandsRunner.Dispose();
-                cancellation = _extensionLoadCts.CancelAsync();
-                providerActivities = _providerActivitiesDrained?.Task ?? Task.CompletedTask;
+                return new ValueTask(_disposeCompletion.Task);
             }
+
+            _disposing = true;
+            _disposeCompletion = completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _reloadCommandsRunner.Dispose();
         }
 
         GC.SuppressFinalize(this);
-        _ = DisposeCoreAsync(cancellation, providerActivities, completion);
+        _ = Task.Run(() => DisposeCoreAsync(completion));
         return new ValueTask(completion.Task);
     }
 
@@ -1360,10 +1353,21 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
-    private async Task DisposeCoreAsync(Task cancellation, Task providerActivities, TaskCompletionSource completion)
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
     {
         try
         {
+            Task cancellation;
+            Task providerActivities;
+            lock (_providerPublicationLock)
+            {
+                lock (_stateLock)
+                {
+                    cancellation = _extensionLoadCts.CancelAsync();
+                    providerActivities = _providerActivitiesDrained?.Task ?? Task.CompletedTask;
+                }
+            }
+
             try
             {
                 _reloadCommandsRunner.BusyChanged -= ReloadBusyChanged;
