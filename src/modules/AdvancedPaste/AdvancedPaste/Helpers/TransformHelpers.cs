@@ -48,7 +48,7 @@ public static class TransformHelpers
     {
         Logger.LogTrace();
         var rawText = await clipboardData.GetTextOrEmptyAsync();
-        return DataPackageHelpers.CreateFromHtml(await RichTextHelper.ToRichTextAsync(clipboardData), rawText);
+        return DataPackageHelpers.CreateFromHtml(RichTextHelper.ToRichText(rawText), rawText);
     }
 
     private static async Task<DataPackage> ImageToTextAsync(DataPackageView clipboardData, CancellationToken cancellationToken)
