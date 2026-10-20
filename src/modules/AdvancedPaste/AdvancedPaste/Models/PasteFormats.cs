@@ -36,7 +36,7 @@ public enum PasteFormats
         CanPreview = false,
         SupportedClipboardFormats = ClipboardFormat.Text,
         KernelFunctionDescription = "Takes markdown or plain text from the clipboard and formats it as rich HTML text.")]
-    RichText,
+    RichText = 12,
 
     [PasteFormatMetadata(
         IsCoreAction = true,
@@ -46,7 +46,7 @@ public enum PasteFormats
         CanPreview = false,
         SupportedClipboardFormats = ClipboardFormat.Text,
         KernelFunctionDescription = "Takes clipboard text and formats it as JSON text.")]
-    Json,
+    Json = 2,
 
     [PasteFormatMetadata(
         IsCoreAction = false,
