@@ -324,10 +324,10 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
                     DockBandItems = prepared.DockBandItems;
                 }
             }
-
-            PersistFallbackDefaultsIfNeeded(prepared, serviceProvider);
-            publish();
         }
+
+        PersistFallbackDefaultsIfNeeded(prepared, serviceProvider);
+        publish();
 
         return true;
     }
