@@ -28,6 +28,7 @@ public enum PasteFormats
         KernelFunctionDescription = "Takes clipboard text and formats it as markdown text.")]
     Markdown,
 
+    // Preserve existing format IDs; new formats must use unused values.
     [PasteFormatMetadata(
         IsCoreAction = true,
         ResourceId = "PasteAsRichText",
