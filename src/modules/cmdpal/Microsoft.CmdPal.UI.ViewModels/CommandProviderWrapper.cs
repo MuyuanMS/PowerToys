@@ -26,6 +26,8 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
 
     private readonly ICommandProviderCache? _commandProviderCache;
 
+    private readonly Lock _commandPublicationLock = new();
+
     private readonly Lock _commandLoadLock = new();
 
     private long _commandLoadGeneration;
@@ -155,9 +157,12 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
     internal async Task<PreparedCommands> PrepareTopLevelCommandsAsync(IServiceProvider serviceProvider)
     {
         PreparedCommands prepared;
-        lock (_commandLoadLock)
+        lock (_commandPublicationLock)
         {
-            prepared = new PreparedCommands(++_commandLoadGeneration);
+            lock (_commandLoadLock)
+            {
+                prepared = new PreparedCommands(++_commandLoadGeneration);
+            }
         }
 
         if (!isValid)
@@ -276,9 +281,12 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
 
     internal void InvalidatePendingCommands()
     {
-        lock (_commandLoadLock)
+        lock (_commandPublicationLock)
         {
-            _commandLoadGeneration++;
+            lock (_commandLoadLock)
+            {
+                _commandLoadGeneration++;
+            }
         }
     }
 
@@ -290,36 +298,75 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
         }
     }
 
-    internal bool TryPublishTopLevelCommands(PreparedCommands prepared, IServiceProvider serviceProvider)
+    internal bool TryPublishTopLevelCommands(PreparedCommands prepared, IServiceProvider serviceProvider, Action publish)
     {
-        return PublishTopLevelCommands(prepared, serviceProvider, requireCurrentLoad: true);
+        lock (_commandPublicationLock)
+        {
+            lock (_commandLoadLock)
+            {
+                if (prepared.Generation != _commandLoadGeneration)
+                {
+                    return false;
+                }
+
+                if (prepared.TopLevelItems is not null)
+                {
+                    TopLevelItems = prepared.TopLevelItems;
+                }
+
+                if (prepared.FallbackItems is not null)
+                {
+                    FallbackItems = prepared.FallbackItems;
+                }
+
+                if (prepared.DockBandItems is not null)
+                {
+                    DockBandItems = prepared.DockBandItems;
+                }
+            }
+
+            PersistFallbackDefaultsIfNeeded(prepared, serviceProvider);
+            publish();
+        }
+
+        return true;
     }
 
     private bool PublishTopLevelCommands(PreparedCommands prepared, IServiceProvider serviceProvider, bool requireCurrentLoad)
     {
-        lock (_commandLoadLock)
+        lock (_commandPublicationLock)
         {
-            if (requireCurrentLoad && prepared.Generation != _commandLoadGeneration)
+            lock (_commandLoadLock)
             {
-                return false;
-            }
+                if (requireCurrentLoad && prepared.Generation != _commandLoadGeneration)
+                {
+                    return false;
+                }
 
-            if (prepared.TopLevelItems is not null)
-            {
-                TopLevelItems = prepared.TopLevelItems;
-            }
+                if (prepared.TopLevelItems is not null)
+                {
+                    TopLevelItems = prepared.TopLevelItems;
+                }
 
-            if (prepared.FallbackItems is not null)
-            {
-                FallbackItems = prepared.FallbackItems;
-            }
+                if (prepared.FallbackItems is not null)
+                {
+                    FallbackItems = prepared.FallbackItems;
+                }
 
-            if (prepared.DockBandItems is not null)
-            {
-                DockBandItems = prepared.DockBandItems;
+                if (prepared.DockBandItems is not null)
+                {
+                    DockBandItems = prepared.DockBandItems;
+                }
             }
         }
 
+        PersistFallbackDefaultsIfNeeded(prepared, serviceProvider);
+
+        return true;
+    }
+
+    private void PersistFallbackDefaultsIfNeeded(PreparedCommands prepared, IServiceProvider serviceProvider)
+    {
         if (prepared.IsInitialized)
         {
             try
@@ -331,8 +378,6 @@ public sealed class CommandProviderWrapper : ICommandProviderContext
                 Logger.LogError($"Failed to persist fallback defaults for provider '{ProviderId}'.", e);
             }
         }
-
-        return true;
     }
 
     /// <summary>

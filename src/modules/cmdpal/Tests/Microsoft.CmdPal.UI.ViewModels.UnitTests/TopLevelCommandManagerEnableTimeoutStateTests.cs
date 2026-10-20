@@ -342,7 +342,11 @@ public partial class TopLevelCommandManagerTests
         var publishing = LoadingSignal();
         using var releaseLoad = new ManualResetEventSlim();
         using var releasePublication = new ManualResetEventSlim();
-        provider.Commands = [new CommandItem(new NoOpCommand { Id = "late-command" })];
+        provider.Commands =
+        [
+            new CommandItem(new NoOpCommand { Id = "late-command" }),
+            new CommandItem(new NoOpCommand { Id = "late-command-2" }),
+        ];
         provider.OnLoad = () =>
         {
             started.TrySetResult();
@@ -368,7 +372,7 @@ public partial class TopLevelCommandManagerTests
             releasePublication.Set();
             await disposal.WaitAsync(LoadingTimeout);
             Assert.IsFalse(manager.IsLoading);
-            Assert.AreSame(manager.TopLevelCommands.Single(), wrapper.TopLevelItems.Single());
+            CollectionAssert.AreEqual(wrapper.TopLevelItems, manager.TopLevelCommands.ToArray());
         }
         finally
         {
