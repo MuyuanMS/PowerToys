@@ -119,8 +119,6 @@ public sealed partial class ContentFormControl : UserControl
             return;
         }
 
-        private ElementTheme CurrentHostConfigTheme => ActualTheme == ElementTheme.Light ? ElementTheme.Light : ElementTheme.Dark;
-
         _hostConfig = hostConfig;
         _renderer.HostConfig = hostConfig;
         var card = _viewModel?.Card;
@@ -130,6 +128,8 @@ public sealed partial class ContentFormControl : UserControl
             RequestDisplayCard(card);
         }
     }
+
+    private ElementTheme CurrentHostConfigTheme => ActualTheme == ElementTheme.Light ? ElementTheme.Light : ElementTheme.Dark;
 
     private static void RegisterParser<TElement, TParser>()
         where TElement : IAdaptiveCardElement, ICustomAdaptiveCardElement
