@@ -86,16 +86,23 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
                 continue;
             }
 
-            var rank = GetRank(address);
-            if (address.AddressFamily == AddressFamily.InterNetwork && rank < bestIPv4Rank)
+            if (address.AddressFamily == AddressFamily.InterNetwork)
             {
-                bestIPv4 = address;
-                bestIPv4Rank = rank;
+                var rank = GetRank(address);
+                if (rank < bestIPv4Rank)
+                {
+                    bestIPv4 = address;
+                    bestIPv4Rank = rank;
+                }
             }
-            else if (address.AddressFamily == AddressFamily.InterNetworkV6 && rank < bestIPv6Rank)
+            else if (address.AddressFamily == AddressFamily.InterNetworkV6)
             {
-                bestIPv6 = address;
-                bestIPv6Rank = rank;
+                var rank = GetRank(address);
+                if (rank < bestIPv6Rank)
+                {
+                    bestIPv6 = address;
+                    bestIPv6Rank = rank;
+                }
             }
         }
 
