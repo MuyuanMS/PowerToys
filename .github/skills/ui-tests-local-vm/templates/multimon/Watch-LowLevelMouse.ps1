@@ -138,7 +138,10 @@ $rows = @(foreach ($hookEvent in $events) {
         ExtraInfo       = '0x{0:X}' -f $hookEvent.ExtraInfo
     }
 })
-New-Item -ItemType Directory -Path (Split-Path -Path $OutputPath -Parent) -Force | Out-Null
+$outputDirectory = Split-Path -Path $OutputPath -Parent
+if ($outputDirectory) {
+    New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+}
 $rows | Export-Csv -LiteralPath $OutputPath -NoTypeInformation -Encoding utf8
 
 [pscustomobject]@{

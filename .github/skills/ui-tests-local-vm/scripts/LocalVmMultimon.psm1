@@ -33,12 +33,16 @@ function Get-MultimonSetting {
         [AllowEmptyString()][string]$Default
     )
 
-    if (-not [string]::IsNullOrWhiteSpace($Override)) {
+    if ($null -ne $Override -and ($Override.Length -eq 0 -or -not [string]::IsNullOrWhiteSpace($Override))) {
         return $Override
     }
     $multimon = $Configuration.ContainsKey('Multimon') ? $Configuration.Multimon : @{}
-    if ($multimon.ContainsKey($Name) -and -not [string]::IsNullOrWhiteSpace([string]$multimon[$Name])) {
-        return [string]$multimon[$Name]
+    if ($multimon.ContainsKey($Name)) {
+        $value = $multimon[$Name]
+        $valueText = [string]$value
+        if ($null -ne $value -and ($valueText.Length -eq 0 -or -not [string]::IsNullOrWhiteSpace($valueText))) {
+            return $valueText
+        }
     }
     return $Default
 }
