@@ -119,7 +119,7 @@ $wallpaperSource = Get-MultimonSetting -Configuration $configuration -Name 'Wall
 $platform = Get-MultimonPlatform -Configuration $configuration
 $defaultReportTool = Join-Path $repositoryRoot "$platform\Release\MonitorReportTool\PowerToys.MonitorReportTool.exe"
 $reportTool = Get-MultimonSetting -Configuration $configuration -Name 'MonitorReportToolPath' -Override $MonitorReportToolPath -Default $defaultReportTool
-$checkpointName = Get-MultimonSetting -Configuration $configuration -Name 'CheckpointName' -Override '' -Default 'multimon-baseline'
+$checkpointName = Get-MultimonSetting -Configuration $configuration -Name 'CheckpointName' -Override $null -Default 'multimon-baseline'
 
 # Single detaches every virtual monitor, so its checkpoint would hold no multi-monitor layout.
 $presets = @(Get-MultimonPreset | Where-Object { $_ -ne 'Single' })
