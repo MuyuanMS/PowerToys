@@ -67,6 +67,14 @@ public class CardFormattingTests
     }
 
     [TestMethod]
+    public void CpuSpeedUsesTheCurrentDecimalSeparator()
+    {
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+
+        Assert.AreEqual("3,00 GHz", PerformanceWidgetsPage.SpeedToString(3000));
+    }
+
+    [TestMethod]
     public void PercentIsClampedAndHandlesAnUnknownSize()
     {
         Assert.AreEqual(25d, WidgetPage.GetPercent(1, 4));

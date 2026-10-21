@@ -724,9 +724,9 @@ internal sealed partial class SystemCPUUsageWidgetPage : WidgetPage, IDisposable
         }
     }
 
-    private string SpeedToString(float cpuSpeed)
+    internal static string SpeedToString(float cpuSpeed)
     {
-        return string.Format(CultureInfo.InvariantCulture, "{0:0.00} GHz", cpuSpeed / 1000);
+        return string.Format(CultureInfo.CurrentCulture, "{0:0.00} GHz", cpuSpeed / 1000);
     }
 
     /// <summary>Formats uptime the way Task Manager does: days:hours:minutes:seconds.</summary>
@@ -788,8 +788,8 @@ internal sealed partial class SystemCPUUsageWidgetPage : WidgetPage, IDisposable
 
     protected override void Unloaded()
     {
-        base.Unloaded();
         _dataManager.GetCPUStats().RequestDetails(false);
+        base.Unloaded();
     }
 
     protected override void OnActivated() => _dataManager.Start();

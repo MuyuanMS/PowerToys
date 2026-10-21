@@ -134,6 +134,8 @@ internal sealed partial class CPUStats : PerformanceCounterSourceBase, IDisposab
         }
         catch (Exception ex)
         {
+            CoreUsage = [];
+            TopProcesses = [];
             LogFailureOnce(ref _cpuCounterReadFailureLogged, "Failed while reading CPU performance counters.", ex);
         }
     }
@@ -177,12 +179,15 @@ internal sealed partial class CPUStats : PerformanceCounterSourceBase, IDisposab
         }
         catch (Exception ex)
         {
+            TopProcesses = [];
             LogFailureOnce(ref _processReadFailureLogged, "Failed while reading process CPU times.", ex);
         }
     }
 
     private void ReadCoreUsage()
     {
+        CoreUsage = [];
+
         if (!_processorCategoryCreated)
         {
             _processorCategoryCreated = true;
@@ -225,6 +230,7 @@ internal sealed partial class CPUStats : PerformanceCounterSourceBase, IDisposab
         }
         catch (Exception ex)
         {
+            CoreUsage = [];
             LogFailureOnce(ref _coreReadFailureLogged, "Failed while reading per-processor performance counters.", ex);
         }
     }
