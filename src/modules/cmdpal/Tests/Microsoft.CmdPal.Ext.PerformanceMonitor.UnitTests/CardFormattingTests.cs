@@ -152,6 +152,8 @@ public class CardFormattingTests
         Assert.AreEqual("good", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: false, 0.8f));
         Assert.AreEqual("warning", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: false, 0.4f));
         Assert.AreEqual("attention", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: false, 0.1f));
+        Assert.AreEqual("warning", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: false, 0.5f));
+        Assert.AreEqual("attention", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: false, 0.2f));
         Assert.AreEqual("good", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: true, 0.1f));
         Assert.AreEqual("accent", SystemBatteryUsageWidgetPage.GetChargeColor(isCharging: false, -1f));
     }
@@ -162,8 +164,19 @@ public class CardFormattingTests
         Assert.AreEqual("Battery10", SystemBatteryUsageWidgetPage.GetChargeIconName(isCharging: false, 1f));
         Assert.AreEqual("Battery7", SystemBatteryUsageWidgetPage.GetChargeIconName(isCharging: false, 0.66f));
         Assert.AreEqual("Battery0", SystemBatteryUsageWidgetPage.GetChargeIconName(isCharging: false, 0.02f));
+        Assert.AreEqual("Battery1", SystemBatteryUsageWidgetPage.GetChargeIconName(isCharging: false, 0.05f));
         Assert.AreEqual("BatteryCharge", SystemBatteryUsageWidgetPage.GetChargeIconName(isCharging: true, 0.4f));
         Assert.AreEqual(string.Empty, SystemBatteryUsageWidgetPage.GetChargeIconName(isCharging: false, -1f));
+    }
+
+    [TestMethod]
+    public void BatteryPercentIsUnavailableWhenChargeIsUnknown()
+    {
+        Assert.IsNull(SystemBatteryUsageWidgetPage.GetBatteryPercent(-1f));
+        Assert.AreEqual(0d, SystemBatteryUsageWidgetPage.GetBatteryPercent(0f));
+        Assert.AreEqual(1d, SystemBatteryUsageWidgetPage.GetBatteryPercent(0.005f));
+        Assert.AreEqual(50d, SystemBatteryUsageWidgetPage.GetBatteryPercent(0.5f));
+        Assert.AreEqual(100d, SystemBatteryUsageWidgetPage.GetBatteryPercent(1.5f));
     }
 
     [TestMethod]

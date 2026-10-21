@@ -1689,7 +1689,6 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
                 ContentData["batteryTimeRemaining"] = string.Empty;
                 ContentData["batteryStatusStyle"] = "default";
                 ContentData["batteryIcon"] = string.Empty;
-                ContentJson["batteryPercent"] = 0;
                 ContentData["batteryColor"] = "accent";
                 return;
             }
@@ -1703,7 +1702,10 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
             ContentData["batteryStatusStyle"] = stats.IsCharging ? "good" : stats.IsOnAcPower ? "informative" : "accent";
             ContentData["batteryColor"] = GetChargeColor(stats.IsCharging, stats.ChargePercent);
             ContentData["batteryIcon"] = GetChargeIconName(stats.IsCharging, stats.ChargePercent);
-            ContentJson["batteryPercent"] = Math.Round(Math.Max(0, stats.ChargePercent) * 100);
+            if (GetBatteryPercent(stats.ChargePercent) is double batteryPercent)
+            {
+                ContentJson["batteryPercent"] = batteryPercent;
+            }
 
             stats.ReadReport();
             if (GetDisplayedRate(stats.IsCharging, stats.IsOnAcPower, stats.ChargeRateMilliwatts) is int rate)
@@ -1743,6 +1745,11 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
         _ => null,
     };
 
+    internal static double? GetBatteryPercent(float chargePercent) =>
+        chargePercent >= 0
+            ? Math.Round(Math.Clamp(chargePercent, 0, 1) * 100, MidpointRounding.AwayFromZero)
+            : null;
+
     /// <summary>
     /// Green while charging or above half, then warning, then attention when low. An unknown
     /// charge (-1) uses the accent color.
@@ -1764,7 +1771,7 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
     {
         < 0 => string.Empty,
         _ when isCharging => "BatteryCharge",
-        _ => "Battery" + ((int)Math.Round(Math.Min(chargePercent, 1) * 10)).ToString(CultureInfo.InvariantCulture),
+        _ => "Battery" + ((int)Math.Round(Math.Clamp(chargePercent, 0, 1) * 10, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture),
     };
 
     protected override string GetTemplatePath(WidgetPageState page)

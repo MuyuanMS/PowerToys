@@ -27,6 +27,7 @@
               "items": [
                 {
                   "type": "Chart.Gauge",
+                  "$when": "${batteryPercent != null}",
                   "value": "${batteryPercent}",
                   "min": 0,
                   "max": 100,
@@ -53,6 +54,13 @@
                     "weight": "bolder",
                     "text": "${batteryCharge}"
                   }
+                },
+                {
+                  "type": "TextBlock",
+                  "$when": "${batteryPercent == null}",
+                  "size": "extraLarge",
+                  "weight": "bolder",
+                  "text": "${batteryCharge}"
                 }
               ]
             },
