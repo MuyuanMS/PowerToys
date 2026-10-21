@@ -7,6 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Microsoft.CmdPal.AdaptiveCards.Polyfills.UnitTests;
 
 [TestClass]
+[DoNotParallelize]
 public class StackedBarChartModelTests
 {
     [TestMethod]
@@ -49,6 +50,7 @@ public class StackedBarChartModelTests
         var model = StackedBarChartModel.Parse("""{ "type": "Chart.HorizontalBar.Stacked", "data": [1, { "data": [] }] }""", warnings);
 
         Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual("Each data item must be an object.", warnings[0]);
         Assert.AreEqual(1, model.Groups.Count);
     }
 
@@ -81,6 +83,19 @@ public class StackedBarChartModelTests
         {
             ChartStrings.SetLookup(static key => key);
         }
+    }
+
+    [TestMethod]
+    public void LegendExcludesNonPositiveValuesNotRenderedAsSegments()
+    {
+        var model = StackedBarChartModel.Parse(
+            """{ "type": "Chart.HorizontalBar.Stacked", "data": [{ "data": [{ "legend": "Zero", "value": 0 }, { "legend": "Negative", "value": -1 }, { "legend": "Visible", "value": 2 }] }] }""",
+            new List<string>());
+
+        var legend = model.GetLegend();
+
+        Assert.AreEqual(1, legend.Count);
+        Assert.AreEqual(("Visible", (string?)null, 0), legend[0]);
     }
 
     [TestMethod]

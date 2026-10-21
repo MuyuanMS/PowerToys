@@ -74,7 +74,8 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
 
         Content = root;
         AutomationProperties.SetName(this, !string.IsNullOrWhiteSpace(_model.Title) ? _model.Title : ChartStrings.Get("AdaptiveChart_BarChart"));
-        AutomationProperties.SetHelpText(this, CreateSummary());
+        var summary = CreateSummary();
+        AutomationProperties.SetHelpText(this, string.IsNullOrEmpty(summary) ? null : summary);
     }
 
     private StackPanel CreateVerticalPlot(ChartAxisRange range, bool isDarkTheme, Brush secondary)

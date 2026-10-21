@@ -50,6 +50,11 @@ internal sealed class StackedBarChartModel : IAdaptiveVisualModel
         {
             foreach (var point in group.Data)
             {
+                if (point.Value <= 0)
+                {
+                    continue;
+                }
+
                 var name = GetLegendLabel(point.Label);
                 if (seen.Add(name))
                 {
@@ -78,7 +83,7 @@ internal sealed class StackedBarChartModel : IAdaptiveVisualModel
                     {
                         if (item.ValueKind != JsonValueKind.Object)
                         {
-                            warnings.Add("Each data item must be an object with a data array.");
+                            warnings.Add("Each data item must be an object.");
                             continue;
                         }
 
