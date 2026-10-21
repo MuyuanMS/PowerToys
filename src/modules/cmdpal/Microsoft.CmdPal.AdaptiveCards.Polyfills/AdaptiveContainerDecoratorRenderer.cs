@@ -70,6 +70,11 @@ internal sealed partial class AdaptiveContainerDecoratorRenderer : IAdaptiveElem
     {
         var rounded = GetBoolean(properties, RoundedCornersProperty);
         var bordered = GetBoolean(properties, ShowBorderProperty);
+        if (rounded is null || bordered is null)
+        {
+            return null;
+        }
+
         return (rounded, bordered) switch
         {
             (true, true) => RoundedBorderedStyleKey,
@@ -79,11 +84,17 @@ internal sealed partial class AdaptiveContainerDecoratorRenderer : IAdaptiveElem
         };
     }
 
-    private static bool GetBoolean(JsonObject? properties, string name) =>
-        properties is not null
-            && properties.TryGetValue(name, out var value)
-            && value.ValueType == JsonValueType.Boolean
-            && value.GetBoolean();
+    private static bool? GetBoolean(JsonObject? properties, string name)
+    {
+        if (properties is null || !properties.TryGetValue(name, out var value))
+        {
+            return false;
+        }
+
+        return value.ValueType == JsonValueType.Boolean
+            ? value.GetBoolean()
+            : null;
+    }
 
     // Containers render as a Border. A selectAction wraps that Border in a button.
     private static Border? GetBackgroundBorder(UIElement rendered) => rendered switch

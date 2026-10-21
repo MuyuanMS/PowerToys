@@ -16,6 +16,8 @@ public class AdaptiveContainerDecoratorRendererTests
     [DataRow("""{ "roundedCorners": false, "showBorder": true }""", AdaptiveContainerDecoratorRenderer.BorderedStyleKey)]
     [DataRow("""{ "roundedCorners": false, "showBorder": false }""", null)]
     [DataRow("""{ "roundedCorners": "true", "showBorder": true }""", null)]
+    [DataRow("""{ "roundedCorners": true, "showBorder": "true" }""", null)]
+    [DataRow("""{ "showBorder": true }""", AdaptiveContainerDecoratorRenderer.BorderedStyleKey)]
     public void GetStyleKeySelectsTheMatchingDecoration(string propertiesJson, string? expectedStyleKey)
     {
         var properties = JsonObject.Parse(propertiesJson);
