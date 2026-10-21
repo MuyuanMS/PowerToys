@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Threading;
+using System.Threading.Tasks;
 using CoreWidgetProvider.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -45,5 +47,34 @@ public class DataManagerTests
 
         Assert.IsTrue(DataManager.ShouldSample(cpu, 30_000));
         Assert.IsTrue(DataManager.ShouldSample(memory, 30_100));
+    }
+
+    [TestMethod]
+    public void StopWaitsForAnImmediateUpdateAlreadyInProgress()
+    {
+        using var updateStarted = new ManualResetEventSlim();
+        using var continueUpdate = new ManualResetEventSlim();
+        using var manager = new DataManager(DataType.Memory, () =>
+        {
+            updateStarted.Set();
+            continueUpdate.Wait();
+        });
+
+        try
+        {
+            manager.Start();
+            Assert.IsTrue(updateStarted.Wait(TimeSpan.FromSeconds(5)));
+
+            var stopTask = Task.Run(manager.Stop);
+            Assert.IsFalse(stopTask.Wait(TimeSpan.FromMilliseconds(100)));
+
+            continueUpdate.Set();
+            Assert.IsTrue(stopTask.Wait(TimeSpan.FromSeconds(5)));
+        }
+        finally
+        {
+            continueUpdate.Set();
+            manager.Stop();
+        }
     }
 }

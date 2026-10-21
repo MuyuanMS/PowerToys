@@ -71,7 +71,7 @@ public class CardFormattingTests
     {
         CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
 
-        Assert.AreEqual("3,00 GHz", PerformanceWidgetsPage.SpeedToString(3000));
+        Assert.AreEqual("3,00 GHz", SystemCPUUsageWidgetPage.SpeedToString(3000));
     }
 
     [TestMethod]
