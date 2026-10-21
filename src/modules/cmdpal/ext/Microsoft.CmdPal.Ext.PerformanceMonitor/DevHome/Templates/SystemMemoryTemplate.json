@@ -29,7 +29,7 @@
                   "type": "TextBlock",
                   "isSubtle": true,
                   "size": "small",
-                  "text": "%Memory_Widget_Template/InUse%"
+                  "text": "%Memory_Widget_Template/UsedMemory%"
                 },
                 {
                   "type": "TextBlock",
