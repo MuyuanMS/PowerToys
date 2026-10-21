@@ -20,7 +20,7 @@ internal sealed partial class BatteryStats
     private const byte BatteryFlagNoBattery = 0x80;
     private const byte BatteryFlagUnknown = 0xFF;
 
-    private int _reportFailureLogged;
+    private static int _reportFailureLogged;
 
     public bool HasBattery { get; set; }
 
