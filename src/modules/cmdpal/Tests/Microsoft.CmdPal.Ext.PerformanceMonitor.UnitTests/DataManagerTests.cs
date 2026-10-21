@@ -23,6 +23,7 @@ public class DataManagerTests
 
         Assert.IsTrue(DataManager.ShouldSample(stats, 10_000));
         Assert.IsFalse(DataManager.ShouldSample(stats, 10_400));
+        Assert.IsFalse(DataManager.ShouldSample(stats, 10_800));
         Assert.IsTrue(DataManager.ShouldSample(stats, 11_000));
         Assert.IsFalse(DataManager.ShouldSample(stats, 11_400));
     }
