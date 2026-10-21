@@ -30,10 +30,11 @@ function Get-MultimonSetting {
         [Parameter(Mandatory)][hashtable]$Configuration,
         [Parameter(Mandatory)][string]$Name,
         [AllowEmptyString()][string]$Override,
-        [AllowEmptyString()][string]$Default
+        [AllowEmptyString()][string]$Default,
+        [switch]$AllowEmptyOverride
     )
 
-    if ($null -ne $Override -and ($Override.Length -eq 0 -or -not [string]::IsNullOrWhiteSpace($Override))) {
+    if ($null -ne $Override -and ($AllowEmptyOverride -or -not [string]::IsNullOrWhiteSpace($Override))) {
         return $Override
     }
     $multimon = $Configuration.ContainsKey('Multimon') ? $Configuration.Multimon : @{}
