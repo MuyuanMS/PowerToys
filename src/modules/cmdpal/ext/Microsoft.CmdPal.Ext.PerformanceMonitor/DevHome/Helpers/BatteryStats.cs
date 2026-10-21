@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Threading;
 using Windows.Win32;
 using Windows.Win32.System.Power;
 
@@ -18,6 +19,8 @@ internal sealed partial class BatteryStats
     private const byte BatteryFlagCharging = 0x08;
     private const byte BatteryFlagNoBattery = 0x80;
     private const byte BatteryFlagUnknown = 0xFF;
+
+    private int _reportFailureLogged;
 
     public bool HasBattery { get; set; }
 
@@ -52,11 +55,15 @@ internal sealed partial class BatteryStats
             DesignCapacityMilliwattHours = report.DesignCapacityInMilliwattHours;
             FullChargeCapacityMilliwattHours = report.FullChargeCapacityInMilliwattHours;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             ChargeRateMilliwatts = null;
             DesignCapacityMilliwattHours = null;
             FullChargeCapacityMilliwattHours = null;
+            if (Interlocked.Exchange(ref _reportFailureLogged, 1) == 0)
+            {
+                Microsoft.CmdPal.Common.CoreLogger.LogError("Failed to read the optional aggregate battery report; report metrics will be unavailable.", ex);
+            }
         }
     }
 

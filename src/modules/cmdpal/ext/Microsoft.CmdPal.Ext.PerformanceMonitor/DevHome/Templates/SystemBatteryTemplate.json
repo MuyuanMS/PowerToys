@@ -178,7 +178,7 @@
                       "type": "TextBlock",
                       "isSubtle": true,
                       "size": "small",
-                      "text": "%Battery_Widget_Template/Full_Charge_Capacity%"
+                      "text": "%Battery_Widget_Template/FullChargeCapacity%"
                     },
                     {
                       "type": "TextBlock",

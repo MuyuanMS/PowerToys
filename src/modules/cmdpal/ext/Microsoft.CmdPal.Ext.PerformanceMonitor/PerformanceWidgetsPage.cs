@@ -1710,17 +1710,17 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
             stats.ReadReport();
             if (GetDisplayedRate(stats.IsCharging, stats.IsOnAcPower, stats.ChargeRateMilliwatts) is int rate)
             {
-                ContentData["batteryRateLabel"] = Resources.GetResource(rate > 0 ? "Battery_Widget_Template/Charge_Rate" : "Battery_Widget_Template/Discharge_Rate");
-                ContentData["batteryRate"] = string.Format(CultureInfo.CurrentCulture, "{0:0.#} W", Math.Abs(rate) / 1000.0);
+                ContentData["batteryRateLabel"] = Resources.GetResource(rate > 0 ? "Battery_Widget_Template/ChargeRate" : "Battery_Widget_Template/DischargeRate");
+                ContentData["batteryRate"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Battery_Widget_Template/RateFormat"), Math.Abs(rate) / 1000.0);
             }
 
             if (stats.FullChargeCapacityMilliwattHours is int full && full > 0)
             {
-                ContentData["batteryFullCapacity"] = string.Format(CultureInfo.CurrentCulture, "{0:0.#} Wh", full / 1000.0);
+                ContentData["batteryFullCapacity"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Battery_Widget_Template/CapacityFormat"), full / 1000.0);
                 if (stats.DesignCapacityMilliwattHours is int design && design > 0)
                 {
                     ContentData["batteryHealth"] = FloatToPercentString(Math.Min(1f, (float)full / design));
-                    ContentData["batteryDesignCapacity"] = string.Format(CultureInfo.CurrentCulture, "{0:0.#} Wh", design / 1000.0);
+                    ContentData["batteryDesignCapacity"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Battery_Widget_Template/CapacityFormat"), design / 1000.0);
                 }
             }
         }

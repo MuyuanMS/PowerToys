@@ -610,19 +610,27 @@
   <data name="Battery_Widget_Template.TimeRemaining" xml:space="preserve">
     <value>Time remaining</value>
   </data>
-  <data name="Battery_Widget_Template.Charge_Rate" xml:space="preserve">
+  <data name="Battery_Widget_Template.ChargeRate" xml:space="preserve">
     <value>Charge rate</value>
     <comment>Label for the power flowing into the battery, such as 25 W</comment>
   </data>
-  <data name="Battery_Widget_Template.Discharge_Rate" xml:space="preserve">
+  <data name="Battery_Widget_Template.DischargeRate" xml:space="preserve">
     <value>Discharge rate</value>
     <comment>Label for the power drawn from the battery, such as 9.5 W</comment>
+  </data>
+  <data name="Battery_Widget_Template.RateFormat" xml:space="preserve">
+    <value>{0:0.#} W</value>
+    <comment>{0} is a charge or discharge rate in watts</comment>
+  </data>
+  <data name="Battery_Widget_Template.CapacityFormat" xml:space="preserve">
+    <value>{0:0.#} Wh</value>
+    <comment>{0} is an energy capacity in watt-hours</comment>
   </data>
   <data name="Battery_Widget_Template.Health" xml:space="preserve">
     <value>Health</value>
     <comment>Label for the battery's full charge capacity as a percentage of its design capacity</comment>
   </data>
-  <data name="Battery_Widget_Template.Full_Charge_Capacity" xml:space="preserve">
+  <data name="Battery_Widget_Template.FullChargeCapacity" xml:space="preserve">
     <value>Full charge capacity</value>
     <comment>Label for the battery's energy when fully charged, such as 54 Wh</comment>
   </data>
