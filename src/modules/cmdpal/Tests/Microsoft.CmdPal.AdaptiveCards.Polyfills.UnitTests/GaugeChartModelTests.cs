@@ -153,6 +153,32 @@ public class GaugeChartModelTests
     }
 
     [TestMethod]
+    public void SegmentSharesAreZeroWhenRangeCannotBeRepresented()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse(
+            """{ "type": "Chart.Gauge", "min": 1e308, "segments": [{ "size": 50 }] }""",
+            warnings);
+
+        Assert.AreEqual(1, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual(model.Min, model.Max);
+        Assert.AreEqual(0d, model.GetSegmentShares()[0]);
+    }
+
+    [TestMethod]
+    public void SegmentSharesAreZeroWhenRangeOverflows()
+    {
+        var model = new GaugeChartModel
+        {
+            Min = -1e308,
+            Max = 1e308,
+            Segments = [new("A", 50, null)],
+        };
+
+        Assert.AreEqual(0d, model.GetSegmentShares()[0]);
+    }
+
+    [TestMethod]
     public void MalformedJsonWarns()
     {
         var warnings = new List<string>();

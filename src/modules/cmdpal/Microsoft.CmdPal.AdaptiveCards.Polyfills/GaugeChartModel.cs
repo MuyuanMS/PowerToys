@@ -67,6 +67,24 @@ internal sealed class GaugeChartModel : IAdaptiveVisualModel
         return -1;
     }
 
+    /// <summary>Returns the normalized share of each segment, or zero shares for an invalid range.</summary>
+    public IReadOnlyList<double> GetSegmentShares()
+    {
+        var shares = new double[Segments.Count];
+        var range = Max - Min;
+        if (!(range > 0) || !double.IsFinite(range))
+        {
+            return shares;
+        }
+
+        for (var i = 0; i < shares.Length; i++)
+        {
+            shares[i] = Math.Max(0, Segments[i].Value) / range;
+        }
+
+        return shares;
+    }
+
     public static GaugeChartModel Parse(string elementJson, ICollection<string> warnings)
     {
         try

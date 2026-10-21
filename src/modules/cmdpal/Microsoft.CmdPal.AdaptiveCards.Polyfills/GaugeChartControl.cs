@@ -171,13 +171,7 @@ internal sealed partial class GaugeChartControl : AdaptiveVisualControl
         IReadOnlyList<bool> outlines,
         bool roundEnds)
     {
-        var range = _model.Max - _model.Min;
-        var shares = new double[_model.Segments.Count];
-        for (var i = 0; i < shares.Length; i++)
-        {
-            shares[i] = Math.Max(0, _model.Segments[i].Value) / range;
-        }
-
+        var shares = _model.GetSegmentShares();
         var spans = ChartArc.GetSpans(shares, SegmentGap, closed: false);
         var first = -1;
         var last = -1;
