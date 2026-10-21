@@ -18,9 +18,6 @@ public sealed partial class DockDropZoneControl : UserControl
     public static readonly DependencyProperty IsActiveProperty =
         DependencyProperty.Register(nameof(IsActive), typeof(bool), typeof(DockDropZoneControl), new PropertyMetadata(false));
 
-    public static readonly DependencyProperty CornerRadiusProperty =
-        DependencyProperty.Register(nameof(CornerRadius), typeof(CornerRadius), typeof(DockDropZoneControl), new PropertyMetadata(default(CornerRadius)));
-
     public static readonly DependencyProperty AnimationDurationProperty =
         DependencyProperty.Register(nameof(AnimationDuration), typeof(TimeSpan), typeof(DockDropZoneControl), new PropertyMetadata(TimeSpan.FromMilliseconds(120)));
 
@@ -40,12 +37,6 @@ public sealed partial class DockDropZoneControl : UserControl
     {
         get => (bool)GetValue(IsActiveProperty);
         set => SetValue(IsActiveProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => (CornerRadius)GetValue(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
     }
 
     public TimeSpan AnimationDuration
