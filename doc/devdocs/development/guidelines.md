@@ -73,7 +73,7 @@
   - Open PR with changes
 
 ### C/C++ Runtime (Hybrid CRT)
-- `Cpp.Build.props` links the VC++ runtime and STL statically (`/MT`) and the Universal CRT from the in-box `ucrtbase.dll`, so no VC++ redistributable is needed.
+- `Cpp.Build.props` links the VC++ runtime and STL statically (`/MT`, or `/MTd` in Debug) and the Universal CRT from the in-box `ucrtbase.dll`, so no VC++ redistributable is needed.
 - Every module in a process shares that UCRT, including WinUI 3 and .NET. Don't change process-wide CRT state:
   - No `setlocale`, `std::locale::global` or named `std::locale` objects; MSVC's STL calls `setlocale` while building them. Use `_wcreate_locale` with the `_l` functions, or NLS APIs such as `LCMapStringEx`.
   - No `signal` or `_set_invalid_parameter_handler` from a DLL.
