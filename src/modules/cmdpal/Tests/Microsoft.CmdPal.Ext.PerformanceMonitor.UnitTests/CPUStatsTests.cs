@@ -4,6 +4,7 @@
 
 using CoreWidgetProvider.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Windows.Win32.System.ProcessStatus;
 using Windows.Win32.System.Power;
 
 namespace Microsoft.CmdPal.Ext.PerformanceMonitor.UnitTests;
@@ -33,5 +34,21 @@ public class CPUStatsTests
 
         Assert.AreEqual(0u, CPUStats.GetBaseSpeed(unrated));
         Assert.AreEqual(0u, CPUStats.GetBaseSpeed([]));
+    }
+
+    [TestMethod]
+    public void SystemCountsAreClearedWhenReadFails()
+    {
+        var info = new PERFORMANCE_INFORMATION { ProcessCount = 10, ThreadCount = 20, HandleCount = 30 };
+
+        Assert.AreEqual((0u, 0u, 0u), CPUStats.GetSystemCounts(false, info));
+    }
+
+    [TestMethod]
+    public void SystemCountsAreUpdatedWhenReadSucceeds()
+    {
+        var info = new PERFORMANCE_INFORMATION { ProcessCount = 10, ThreadCount = 20, HandleCount = 30 };
+
+        Assert.AreEqual((10u, 20u, 30u), CPUStats.GetSystemCounts(true, info));
     }
 }

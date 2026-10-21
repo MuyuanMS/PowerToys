@@ -147,13 +147,16 @@ internal sealed partial class CPUStats : PerformanceCounterSourceBase, IDisposab
         {
             cb = (uint)Marshal.SizeOf<Windows.Win32.System.ProcessStatus.PERFORMANCE_INFORMATION>(),
         };
-        if (PInvoke.GetPerformanceInfo(ref info, info.cb))
-        {
-            ProcessCount = info.ProcessCount;
-            ThreadCount = info.ThreadCount;
-            HandleCount = info.HandleCount;
-        }
+        var counts = GetSystemCounts(PInvoke.GetPerformanceInfo(ref info, info.cb), info);
+        ProcessCount = counts.ProcessCount;
+        ThreadCount = counts.ThreadCount;
+        HandleCount = counts.HandleCount;
     }
+
+    internal static (uint ProcessCount, uint ThreadCount, uint HandleCount) GetSystemCounts(
+        bool succeeded,
+        Windows.Win32.System.ProcessStatus.PERFORMANCE_INFORMATION info) =>
+        succeeded ? (info.ProcessCount, info.ThreadCount, info.HandleCount) : (0, 0, 0);
 
     /// <summary>
     /// Starts or stops reading per-processor utilization and the busiest processes. Only the CPU
