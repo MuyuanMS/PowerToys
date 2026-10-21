@@ -13,12 +13,32 @@ namespace Microsoft.CmdPal.AdaptiveCards.Polyfills;
 /// <summary>Renders an Adaptive Cards <c>Badge</c> element.</summary>
 internal sealed partial class BadgeControl : AdaptiveVisualControl
 {
+    private readonly Border _badge = new();
+    private readonly TextBlock _text = new()
+    {
+        FontWeight = FontWeights.SemiBold,
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+
+    private readonly FontIcon _icon = new()
+    {
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+
+    private readonly StackPanel _content = new()
+    {
+        Orientation = Orientation.Horizontal,
+        Spacing = 4,
+    };
+
     private BadgeModel _model;
 
     public BadgeControl(BadgeModel model)
     {
         _model = model;
         HorizontalAlignment = HorizontalAlignment.Left;
+        _badge.Child = _text;
+        Content = _badge;
         Render();
     }
 
@@ -38,16 +58,16 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
             _ => (12d, new Thickness(6, 1, 6, 2)),
         };
 
-        var badge = new Border
+        _badge.Padding = padding;
+        _badge.CornerRadius = _model.Shape switch
         {
-            Padding = padding,
-            CornerRadius = _model.Shape switch
-            {
-                BadgeShape.Square => new CornerRadius(2),
-                BadgeShape.Circular => new CornerRadius(fontSize * 2),
-                _ => new CornerRadius(4),
-            },
+            BadgeShape.Square => new CornerRadius(2),
+            BadgeShape.Circular => new CornerRadius(fontSize * 2),
+            _ => new CornerRadius(4),
         };
+        _badge.Background = null;
+        _badge.BorderBrush = null;
+        _badge.BorderThickness = new Thickness(0);
 
         // Badges are neutral unless they ask for a semantic style.
         Brush foreground;
@@ -56,14 +76,14 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
         {
             if (_model.Appearance == BadgeAppearance.Tint)
             {
-                badge.Background = ChartTheme.ToBrush(semantic.WithOpacity(isDarkTheme ? 0.22 : 0.14));
-                badge.BorderBrush = ChartTheme.ToBrush(semantic.WithOpacity(0.45));
-                badge.BorderThickness = new Thickness(1);
+                _badge.Background = ChartTheme.ToBrush(semantic.WithOpacity(isDarkTheme ? 0.22 : 0.14));
+                _badge.BorderBrush = ChartTheme.ToBrush(semantic.WithOpacity(0.45));
+                _badge.BorderThickness = new Thickness(1);
                 foreground = ChartTheme.ToBrush(semantic);
             }
             else
             {
-                badge.Background = ChartTheme.ToBrush(semantic);
+                _badge.Background = ChartTheme.ToBrush(semantic);
                 foreground = ChartTheme.ToBrush(ChartTheme.GetContrastingText(semantic));
             }
         }
@@ -73,49 +93,50 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
             foreground = ChartTheme.ToBrush(ChartTheme.GetTextColor(isDarkTheme, secondary: false));
         }
 
-        badge.Child = CreateContent(fontSize, foreground);
-
-        if (!string.IsNullOrWhiteSpace(_model.Tooltip))
+        _text.Text = _model.Text;
+        _text.FontSize = fontSize;
+        _text.Foreground = foreground;
+        _icon.Glyph = _model.IconGlyph ?? string.Empty;
+        _icon.FontSize = fontSize;
+        _icon.Foreground = foreground;
+        if (_model.IconGlyph is null)
         {
-            ToolTipService.SetToolTip(badge, _model.Tooltip);
+            if (_badge.Child != _text)
+            {
+                _badge.Child = null;
+                _content.Children.Clear();
+                _badge.Child = _text;
+            }
+        }
+        else if (_model.Text.Length == 0)
+        {
+            if (_badge.Child != _icon)
+            {
+                _badge.Child = null;
+                _content.Children.Clear();
+                _badge.Child = _icon;
+            }
+        }
+        else
+        {
+            var contentIsAttached = _badge.Child == _content;
+            if (!contentIsAttached)
+            {
+                _badge.Child = null;
+            }
+
+            _content.Children.Clear();
+            _content.Children.Add(_model.IconPosition == BadgeIconPosition.After ? _text : _icon);
+            _content.Children.Add(_model.IconPosition == BadgeIconPosition.After ? _icon : _text);
+            if (!contentIsAttached)
+            {
+                _badge.Child = _content;
+            }
         }
 
-        Content = badge;
+        ToolTipService.SetToolTip(_badge, _model.Tooltip);
 
         // An icon-only badge is described by its tooltip.
         AutomationProperties.SetName(this, _model.Text.Length > 0 ? _model.Text : _model.Tooltip ?? string.Empty);
-    }
-
-    private UIElement CreateContent(double fontSize, Brush foreground)
-    {
-        var text = new TextBlock
-        {
-            Text = _model.Text,
-            FontSize = fontSize,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = foreground,
-        };
-        if (_model.IconGlyph is null)
-        {
-            return text;
-        }
-
-        var icon = new FontIcon
-        {
-            Glyph = _model.IconGlyph,
-            FontSize = fontSize,
-            Foreground = foreground,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        if (_model.Text.Length == 0)
-        {
-            return icon;
-        }
-
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-        content.Children.Add(_model.IconPosition == BadgeIconPosition.After ? text : icon);
-        content.Children.Add(_model.IconPosition == BadgeIconPosition.After ? icon : text);
-        return content;
     }
 }

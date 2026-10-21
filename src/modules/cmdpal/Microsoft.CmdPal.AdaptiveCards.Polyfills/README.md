@@ -35,6 +35,8 @@ Models read only the properties that the element's page in the [Adaptive Cards e
 
 `AdaptiveCardPolyfills` lists every element with its parser and control factory. `PatchableElements` lets the incremental updater move a new model into an existing control instead of rebuilding the card, so a line chart that gains one sample scrolls instead of redrawing.
 
+When a model's `RendersItself` is false, its element shows its `fallback` instead. `AdaptiveFallbackRenderer` draws that fallback because the WinUI 3 renderer drops fallback content.
+
 `AdaptiveContainerDecoratorRenderer` wraps the built-in container, column set, and column renderers to apply the container styles.
 
 ## Theming
