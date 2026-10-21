@@ -115,7 +115,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
                 RadiusY = Math.Min(4, barWidth / 2),
                 Fill = ChartTheme.ToBrush(GetBarColor(i, isDarkTheme)),
             };
-            ToolTipService.SetToolTip(bar, $"{point.Label}: {FormatValue(point.Value)}");
+            ToolTipService.SetToolTip(bar, $"{ChartStrings.GetCategoryLabel(point.Label)}: {FormatValue(point.Value)}");
             ChartShapes.Place(bar, left, barTop);
             plot.Children.Add(bar);
 
@@ -192,7 +192,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
                 Background = ChartTheme.ToBrush(GetBarColor(i, isDarkTheme)),
                 CornerRadius = new CornerRadius(HorizontalBarHeight / 2),
             });
-            ToolTipService.SetToolTip(bar, $"{point.Label}: {FormatValue(point.Value)}");
+            ToolTipService.SetToolTip(bar, $"{ChartStrings.GetCategoryLabel(point.Label)}: {FormatValue(point.Value)}");
             Grid.SetRow(bar, i);
             Grid.SetColumn(bar, 1);
             grid.Children.Add(bar);
@@ -280,7 +280,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
                 summary.Append(", ");
             }
 
-            summary.Append(point.Label)
+            summary.Append(ChartStrings.GetCategoryLabel(point.Label))
                 .Append(' ')
                 .Append(FormatValue(point.Value));
         }

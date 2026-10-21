@@ -82,6 +82,23 @@ public class BarChartModelTests
     }
 
     [TestMethod]
+    public void HorizontalAxisRemainsFiniteWhenAllDataIsNegative()
+    {
+        var model = BarChartModel.Parse(
+            """{ "type": "Chart.HorizontalBar", "data": [{ "x": "one", "y": -10 }, { "x": "two", "y": -5 }] }""",
+            BarOrientation.Horizontal,
+            new List<string>());
+
+        var range = model.GetValueAxisRange();
+
+        Assert.IsTrue(double.IsFinite(range.Min));
+        Assert.IsTrue(double.IsFinite(range.Max));
+        Assert.AreEqual(0, range.Min);
+        Assert.IsTrue(range.Max > 0);
+        Assert.AreEqual(0, range.Normalize(0));
+    }
+
+    [TestMethod]
     [DataRow("AbsoluteWithAxis", "AbsoluteWithAxis")]
     [DataRow("absoluteNoAxis", "AbsoluteNoAxis")]
     [DataRow("PartToWhole", "PartToWhole")]

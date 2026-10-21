@@ -150,16 +150,24 @@ internal sealed partial class StackedBarChartControl : AdaptiveVisualControl
                 summary.Append(group.Title).Append(": ");
             }
 
+            var includedParts = 0;
             for (var i = 0; i < group.Data.Count; i++)
             {
-                if (i > 0)
+                var point = group.Data[i];
+                if (point.Value <= 0)
+                {
+                    continue;
+                }
+
+                if (includedParts > 0)
                 {
                     summary.Append(", ");
                 }
 
-                summary.Append(StackedBarChartModel.GetLegendLabel(group.Data[i].Label))
+                summary.Append(StackedBarChartModel.GetLegendLabel(point.Label))
                     .Append(' ')
-                    .Append(ChartValueFormatter.FormatCompact(group.Data[i].Value));
+                    .Append(ChartValueFormatter.FormatCompact(point.Value));
+                includedParts++;
             }
         }
 

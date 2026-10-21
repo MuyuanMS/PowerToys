@@ -61,8 +61,7 @@ internal sealed class StackedBarChartModel : IAdaptiveVisualModel
         return legend;
     }
 
-    internal static string GetLegendLabel(string? label) =>
-        string.IsNullOrWhiteSpace(label) ? ChartStrings.Get("AdaptiveChart_UnnamedCategory") : label;
+    internal static string GetLegendLabel(string? label) => ChartStrings.GetCategoryLabel(label);
 
     public static StackedBarChartModel Parse(string elementJson, ICollection<string> warnings)
     {

@@ -79,7 +79,8 @@ internal sealed class BarChartModel : IAdaptiveVisualModel
     {
         var (dataMin, dataMax) = GetValueExtent();
         var axisMin = Orientation == BarOrientation.Horizontal ? 0 : Math.Min(0, dataMin);
-        return ChartScale.Compute(YMin, YMax, axisMin, dataMax);
+        var axisMax = Orientation == BarOrientation.Horizontal ? Math.Max(0, dataMax) : dataMax;
+        return ChartScale.Compute(YMin, YMax, axisMin, axisMax);
     }
 
     /// <summary>Returns the sum of the positive values: the whole of a part-to-whole chart.</summary>
