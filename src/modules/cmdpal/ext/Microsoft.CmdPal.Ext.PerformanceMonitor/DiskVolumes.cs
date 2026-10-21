@@ -112,9 +112,13 @@ internal static class DiskVolumes
                     ["color"] = GetCapacityColor(usedPercent),
                 });
             }
-            catch (Exception)
+            catch (IOException)
             {
-                // Skip volumes that disappear or deny access while they're being read.
+                // The volume may disappear while its properties are being read.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // The volume may deny access while its properties are being read.
             }
         }
 
