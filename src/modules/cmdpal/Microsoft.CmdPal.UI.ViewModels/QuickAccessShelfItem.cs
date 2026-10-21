@@ -117,7 +117,16 @@ public sealed class QuickAccessShelfItem : IEquatable<QuickAccessShelfItem>
 
         var command = _item.Command ?? throw new InvalidOperationException("Quick-access items must have a command");
         var commandViewModel = new CommandViewModel(command, new(sourcePage));
-        commandViewModel.FastInitializeProperties();
+        try
+        {
+            commandViewModel.FastInitializeProperties();
+        }
+        catch (Exception)
+        {
+            // Keep the shelf's cached identity when extension metadata is no longer available.
+            commandViewModel.SetFallbackMetadata(CommandId, Title);
+        }
+
         return new PerformCommandMessage(
             commandViewModel,
             new ExtensionObject<IListItem>(_item));

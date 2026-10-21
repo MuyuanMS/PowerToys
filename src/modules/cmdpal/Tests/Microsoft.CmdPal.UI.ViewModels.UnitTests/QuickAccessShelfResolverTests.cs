@@ -4,11 +4,13 @@
 
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.UI.ViewModels.Commands;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 
@@ -153,6 +155,31 @@ public partial class QuickAccessShelfResolverTests
         Assert.IsTrue(message.Command.IsInvokableCommand);
         Assert.AreSame(item, message.CommandContext);
         Assert.IsNull(message.Context);
+    }
+
+    [TestMethod]
+    public void ShelfInvocation_UsesCachedMetadataWhenExtensionIsDisconnected()
+    {
+        var disconnected = false;
+        var exception = Marshal.GetExceptionForHR(unchecked((int)0x800706BA))!;
+        var command = new Mock<IInvokableCommand>();
+        command.SetupGet(model => model.Id).Returns(() => disconnected
+            ? throw exception
+            : "app");
+        command.SetupGet(model => model.Name).Returns(() => disconnected
+            ? throw exception
+            : "Open app");
+        var item = new ListItem(command.Object) { Title = "App" };
+        var shelfItem = QuickAccessShelfItem.CreateOrReuse([], item, shortcutIndex: 0, startsNewSection: false);
+        var sourcePage = new PageViewModel(null, TaskScheduler.Default, new TestAppExtensionHost(), CommandProviderContext.Empty);
+
+        disconnected = true;
+        var message = shelfItem.GetPerformCommandMessage(sourcePage);
+
+        Assert.AreSame(command.Object, message.Command.Model.Unsafe);
+        Assert.AreEqual("app", message.Command.Id);
+        Assert.AreEqual("App", message.Command.Name);
+        Assert.AreSame(item, message.CommandContext);
     }
 
     [TestMethod]

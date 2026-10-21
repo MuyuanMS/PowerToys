@@ -78,6 +78,12 @@ public partial class CommandViewModel : ExtensionObjectViewModel
         IsFastInitialized = true;
     }
 
+    internal void SetFallbackMetadata(string id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
+
     public override void InitializeProperties()
     {
         if (IsInitialized || IsCleanedUp)
