@@ -49,7 +49,10 @@ try {
     finally {
         $graphics.Dispose()
     }
-    New-Item -ItemType Directory -Path (Split-Path -Path $OutputPath -Parent) -Force | Out-Null
+    $outputDirectory = Split-Path -Path $OutputPath -Parent
+    if ($outputDirectory) {
+        New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+    }
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 }
 finally {
