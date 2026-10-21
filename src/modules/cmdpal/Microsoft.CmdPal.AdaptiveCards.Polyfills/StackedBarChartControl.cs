@@ -140,16 +140,7 @@ internal sealed partial class StackedBarChartControl : AdaptiveVisualControl
         var summary = new StringBuilder();
         foreach (var group in _model.Groups)
         {
-            if (summary.Length > 0)
-            {
-                summary.Append(". ");
-            }
-
-            if (!string.IsNullOrWhiteSpace(group.Title))
-            {
-                summary.Append(group.Title).Append(": ");
-            }
-
+            var groupSummary = new StringBuilder();
             var includedParts = 0;
             for (var i = 0; i < group.Data.Count; i++)
             {
@@ -161,14 +152,31 @@ internal sealed partial class StackedBarChartControl : AdaptiveVisualControl
 
                 if (includedParts > 0)
                 {
-                    summary.Append(", ");
+                    groupSummary.Append(", ");
                 }
 
-                summary.Append(StackedBarChartModel.GetLegendLabel(point.Label))
+                groupSummary.Append(StackedBarChartModel.GetLegendLabel(point.Label))
                     .Append(' ')
                     .Append(ChartValueFormatter.FormatCompact(point.Value));
                 includedParts++;
             }
+
+            if (includedParts == 0)
+            {
+                continue;
+            }
+
+            if (summary.Length > 0)
+            {
+                summary.Append(". ");
+            }
+
+            if (!string.IsNullOrWhiteSpace(group.Title))
+            {
+                summary.Append(group.Title).Append(": ");
+            }
+
+            summary.Append(groupSummary);
         }
 
         return summary.ToString();

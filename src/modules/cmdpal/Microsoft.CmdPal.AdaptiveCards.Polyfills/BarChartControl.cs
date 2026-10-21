@@ -168,7 +168,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
             var point = _model.Data[i];
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var label = ChartShapes.CreateText(point.Label ?? string.Empty, ChartShapes.BodyStyle, secondary);
+            var label = ChartShapes.CreateText(ChartStrings.GetCategoryLabel(point.Label), ChartShapes.BodyStyle, secondary);
             label.VerticalAlignment = VerticalAlignment.Center;
             label.MaxWidth = maximumLabelWidth;
             label.TextWrapping = TextWrapping.NoWrap;
