@@ -82,7 +82,7 @@ internal sealed partial class MemoryStats : PerformanceCounterSourceBase, IDispo
     /// Gets memory in use by processes, drivers, and the operating system, excluding modified
     /// pages. In use, modified, standby, and free add up to the total, as in Task Manager.
     /// </summary>
-    public ulong MemInUse => UsedMem > MemModified ? UsedMem - MemModified : UsedMem;
+    public ulong MemInUse => UsedMem > MemModified ? UsedMem - MemModified : 0;
 
     public MemoryStats()
     {
