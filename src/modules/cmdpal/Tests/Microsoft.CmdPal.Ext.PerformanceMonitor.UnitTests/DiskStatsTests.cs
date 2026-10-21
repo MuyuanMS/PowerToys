@@ -11,6 +11,17 @@ namespace Microsoft.CmdPal.Ext.PerformanceMonitor.UnitTests;
 public class DiskStatsTests
 {
     [TestMethod]
+    public void ResponseTimeIsUnknownWhenItsOptionalCounterIsUnavailable()
+    {
+        var data = new DiskStats.Data();
+
+        Assert.IsNull(data.ResponseTime);
+
+        data.ResponseTime = 0.001f;
+        Assert.AreEqual(0.001f, data.ResponseTime.Value);
+    }
+
+    [TestMethod]
     [DataRow(100f, 0f)]
     [DataRow(75f, 25f)]
     [DataRow(2.5f, 97.5f)]

@@ -1015,7 +1015,10 @@ internal sealed partial class SystemDiskUsageWidgetPage : WidgetPage, IDisposabl
             ContentData["diskWrite"] = SpeedToString(diskStats.Written);
             ContentData["diskName"] = diskName;
             ContentData["diskDisplayName"] = DiskVolumes.GetDisplayName(diskName);
-            ContentData["diskResponseTime"] = ResponseTimeToString(diskStats.ResponseTime);
+            if (diskStats.ResponseTime is float responseTime)
+            {
+                ContentData["diskResponseTime"] = ResponseTimeToString(responseTime);
+            }
             if (DiskVolumes.TryGetDiskNumber(diskName, out var diskNumber)
                 && DiskVolumes.GetTypeText(DiskDevices.Get(diskNumber)) is string diskType)
             {

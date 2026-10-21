@@ -44,7 +44,7 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
         }
 
         /// <summary>Gets or sets the average time each transfer took, in seconds.</summary>
-        public float ResponseTime
+        public float? ResponseTime
         {
             get; set;
         }
