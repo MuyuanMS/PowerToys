@@ -106,6 +106,7 @@
         },
         {
           "type": "ColumnSet",
+          "$when": "${batteryRate != null || batteryHealth != null || batteryFullCapacity != null}",
           "spacing": "medium",
           "columns": [
             {
