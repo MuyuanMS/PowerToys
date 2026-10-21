@@ -15,14 +15,20 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
+using Windows.UI.ViewManagement;
 
 namespace Microsoft.CmdPal.UI.Controls;
 
 public sealed partial class ContentFormControl : UserControl
 {
     private readonly IncrementalAdaptiveCardUpdater _cardUpdater;
+    private readonly AdaptiveCardRenderer _renderer;
+    private readonly UISettings _uiSettings = new();
+    private readonly AccessibilitySettings _accessibilitySettings = new();
     private static bool _customElementParsersRegistered;
     private ContentFormViewModel? _viewModel;
+    private AdaptiveHostConfig _hostConfig;
+    private bool _listeningForSystemColorChanges;
 
     // LOAD-BEARING: if you don't hang onto a reference to the RenderedAdaptiveCard
     // then the GC might clean it up sometime, even while the card is in the UI
@@ -50,12 +56,13 @@ public sealed partial class ContentFormControl : UserControl
     public ContentFormControl()
     {
         this.InitializeComponent();
-        var lightTheme = ActualTheme == Microsoft.UI.Xaml.ElementTheme.Light;
+        _hostConfig = AdaptiveCardsConfig.Create(CurrentHostConfigTheme);
         var renderer = new AdaptiveCardRenderer()
         {
-            HostConfig = lightTheme ? AdaptiveCardsConfig.Light : AdaptiveCardsConfig.Dark,
+            HostConfig = _hostConfig,
             OverrideStyles = CardOverrideStyles,
         };
+        _renderer = renderer;
         RegisterRenderer<AdaptiveStringListInputElement, AdaptiveStringListInputElementRenderer>(renderer);
         RegisterRenderer<AdaptiveFilePathListInputElement, AdaptiveFilePathListInputElementRenderer>(renderer);
         RegisterRenderer<AdaptiveKeyValueListInputElement, AdaptiveKeyValueListInputElementRenderer>(renderer);
@@ -66,9 +73,63 @@ public sealed partial class ContentFormControl : UserControl
             AdaptiveCardParserRegistrations.ElementParsers,
             AdaptiveCardParserRegistrations.ActionParsers);
 
-        // TODO in the future, we should handle ActualThemeChanged and replace
-        // our rendered card with one for that theme. But today is not that day
+        // The theme can differ once the control joins a window with its own requested theme.
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+        ActualThemeChanged += (_, _) => RefreshHostConfig();
     }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        RefreshHostConfig();
+        if (_listeningForSystemColorChanges)
+        {
+            return;
+        }
+
+        _uiSettings.ColorValuesChanged += OnColorValuesChanged;
+        _accessibilitySettings.HighContrastChanged += OnHighContrastChanged;
+        _listeningForSystemColorChanges = true;
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (!_listeningForSystemColorChanges)
+        {
+            return;
+        }
+
+        _uiSettings.ColorValuesChanged -= OnColorValuesChanged;
+        _accessibilitySettings.HighContrastChanged -= OnHighContrastChanged;
+        _listeningForSystemColorChanges = false;
+    }
+
+    private void OnColorValuesChanged(UISettings sender, object args) =>
+        DispatcherQueue.TryEnqueue(RefreshHostConfig);
+
+    private void OnHighContrastChanged(AccessibilitySettings sender, object args) =>
+        DispatcherQueue.TryEnqueue(RefreshHostConfig);
+
+    /// <summary>Re-renders the card for the current theme, since host config colors are baked into it.</summary>
+    private void RefreshHostConfig()
+    {
+        var hostConfig = AdaptiveCardsConfig.Create(CurrentHostConfigTheme);
+        if (ReferenceEquals(hostConfig, _hostConfig))
+        {
+            return;
+        }
+
+        _hostConfig = hostConfig;
+        _renderer.HostConfig = hostConfig;
+        var card = _viewModel?.Card;
+        ResetCard();
+        if (card is not null)
+        {
+            RequestDisplayCard(card);
+        }
+    }
+
+    private ElementTheme CurrentHostConfigTheme => ActualTheme == ElementTheme.Light ? ElementTheme.Light : ElementTheme.Dark;
 
     private static void RegisterParser<TElement, TParser>()
         where TElement : IAdaptiveCardElement, ICustomAdaptiveCardElement
