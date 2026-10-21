@@ -189,6 +189,15 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
             $results | ConvertTo-Json -Depth 5 |
                 Set-Content -LiteralPath (Join-Path $ResultsDirectory 'results.json') -Encoding utf8
         }
+        catch {
+            $persistenceFailure = $_.Exception.Message
+            if ($record.Failure) {
+                Write-Warning "Failed to persist Runner shutdown results; preserving the original failure: $persistenceFailure"
+            }
+            else {
+                throw "Failed to persist Runner shutdown results: $persistenceFailure"
+            }
+        }
         finally {
             if ($process) { $process.Dispose() }
         }
