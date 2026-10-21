@@ -58,7 +58,18 @@ internal sealed partial class GaugeChartControl : AdaptiveVisualControl
         var thickness = Math.Round(diameter * ThicknessRatio);
         var radius = (diameter - thickness) / 2;
         var center = new ChartPoint(Inset + (diameter / 2), Inset + (diameter / 2));
-        var labelHeight = _model.ShowMinMax ? 18 : 0;
+        var labelHeight = 0d;
+        if (_model.ShowMinMax)
+        {
+            var minLabel = ChartShapes.CreateText(
+                ChartValueFormatter.FormatCompact(_model.Min),
+                ChartShapes.CaptionStyle);
+            var maxLabel = ChartShapes.CreateText(
+                ChartValueFormatter.FormatCompact(_model.Max),
+                ChartShapes.CaptionStyle);
+            labelHeight = Math.Max(ChartShapes.Measure(minLabel).Height, ChartShapes.Measure(maxLabel).Height) + 4;
+        }
+
         var canvas = new Canvas
         {
             Width = diameter + (2 * Inset),
