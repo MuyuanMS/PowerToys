@@ -392,8 +392,8 @@ internal sealed partial class LineChartControl : UserControl, IIncrementalAdapti
             var y = Math.Round(layout.MapY(tick)) + 0.5;
             group.Children.Add(new LineGeometry
             {
-                StartPoint = new Point(0, y),
-                EndPoint = new Point(layout.Width, y),
+                StartPoint = new Point(layout.PlotLeft, y),
+                EndPoint = new Point(layout.PlotRight, y),
             });
         }
 
