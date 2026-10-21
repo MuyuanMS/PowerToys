@@ -22,6 +22,7 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
 
     private readonly FontIcon _icon = new()
     {
+        FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
         VerticalAlignment = VerticalAlignment.Center,
     };
 
@@ -125,9 +126,17 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
                 _badge.Child = null;
             }
 
-            _content.Children.Clear();
-            _content.Children.Add(_model.IconPosition == BadgeIconPosition.After ? _text : _icon);
-            _content.Children.Add(_model.IconPosition == BadgeIconPosition.After ? _icon : _text);
+            var first = _model.IconPosition == BadgeIconPosition.After ? _text : _icon;
+            var second = _model.IconPosition == BadgeIconPosition.After ? _icon : _text;
+            if (_content.Children.Count != 2
+                || _content.Children[0] != first
+                || _content.Children[1] != second)
+            {
+                _content.Children.Clear();
+                _content.Children.Add(first);
+                _content.Children.Add(second);
+            }
+
             if (!contentIsAttached)
             {
                 _badge.Child = _content;

@@ -5,13 +5,17 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Microsoft.CmdPal.AdaptiveCards.Polyfills;
 
 /// <summary>Renders an Adaptive Cards <c>Icon</c> element as a Segoe Fluent Icons glyph.</summary>
 internal sealed partial class IconControl : AdaptiveVisualControl
 {
-    private readonly FontIcon _icon = new();
+    private readonly FontIcon _icon = new()
+    {
+        FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+    };
     private IconModel _model;
 
     public IconControl(IconModel model)
