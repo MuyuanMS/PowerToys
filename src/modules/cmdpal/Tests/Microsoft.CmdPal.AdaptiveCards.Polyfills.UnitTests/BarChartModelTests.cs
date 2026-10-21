@@ -99,6 +99,17 @@ public class BarChartModelTests
     }
 
     [TestMethod]
+    public void HorizontalDisplayValueMatchesTheRenderedBar()
+    {
+        var horizontal = new BarChartModel { Orientation = BarOrientation.Horizontal };
+        var vertical = new BarChartModel { Orientation = BarOrientation.Vertical };
+
+        Assert.AreEqual(0, horizontal.GetDisplayValue(-5));
+        Assert.AreEqual(5, horizontal.GetDisplayValue(5));
+        Assert.AreEqual(-5, vertical.GetDisplayValue(-5));
+    }
+
+    [TestMethod]
     [DataRow("AbsoluteWithAxis", "AbsoluteWithAxis")]
     [DataRow("absoluteNoAxis", "AbsoluteNoAxis")]
     [DataRow("PartToWhole", "PartToWhole")]

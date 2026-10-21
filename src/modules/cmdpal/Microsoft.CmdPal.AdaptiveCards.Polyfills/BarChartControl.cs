@@ -177,7 +177,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
             Grid.SetRow(label, i);
             grid.Children.Add(label);
 
-            var value = Math.Max(0, point.Value);
+            var value = _model.GetDisplayValue(point.Value);
             var fraction = mode == BarDisplayMode.PartToWhole
                 ? (total > 0 ? value / total : 0)
                 : Math.Clamp(range.Normalize(value), 0, 1);
@@ -192,7 +192,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
                 Background = ChartTheme.ToBrush(GetBarColor(i, isDarkTheme)),
                 CornerRadius = new CornerRadius(HorizontalBarHeight / 2),
             });
-            ToolTipService.SetToolTip(bar, $"{ChartStrings.GetCategoryLabel(point.Label)}: {FormatValue(point.Value)}");
+            ToolTipService.SetToolTip(bar, $"{ChartStrings.GetCategoryLabel(point.Label)}: {FormatValue(value)}");
             Grid.SetRow(bar, i);
             Grid.SetColumn(bar, 1);
             grid.Children.Add(bar);
@@ -201,7 +201,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
             {
                 var text = mode == BarDisplayMode.PartToWhole
                     ? string.Format(CultureInfo.CurrentCulture, "{0:0.#}%", fraction * 100)
-                    : FormatValue(point.Value);
+                    : FormatValue(value);
                 var valueText = ChartShapes.CreateText(text, ChartShapes.BodyStrongStyle);
                 valueText.HorizontalAlignment = HorizontalAlignment.Right;
                 valueText.VerticalAlignment = VerticalAlignment.Center;
@@ -282,7 +282,7 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
 
             summary.Append(ChartStrings.GetCategoryLabel(point.Label))
                 .Append(' ')
-                .Append(FormatValue(point.Value));
+                .Append(FormatValue(_model.GetDisplayValue(point.Value)));
         }
 
         return summary.ToString();
