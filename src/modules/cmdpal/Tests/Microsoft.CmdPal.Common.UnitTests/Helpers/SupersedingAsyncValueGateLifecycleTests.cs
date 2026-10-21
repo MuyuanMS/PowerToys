@@ -17,7 +17,7 @@ public sealed partial class SupersedingAsyncValueGateTests
         var started = NewSignal();
         var release = NewSignal();
         var calls = 0;
-        using var gate = CreateGate(_ =>
+        var gate = CreateGate(_ =>
         {
             if (Interlocked.Increment(ref calls) == 1)
             {
@@ -54,7 +54,7 @@ public sealed partial class SupersedingAsyncValueGateTests
         using var releaseApply = new ManualResetEventSlim();
         var disposeStarted = NewSignal();
         var applied = 0;
-        using var gate = new SupersedingAsyncValueGate<int>(
+        var gate = new SupersedingAsyncValueGate<int>(
             _ => Task.FromResult(42),
             _ =>
             {
@@ -76,7 +76,7 @@ public sealed partial class SupersedingAsyncValueGateTests
                 gate.Dispose();
             });
             await disposeStarted.Task.WaitAsync(WaitTimeout);
-            await Assert.ThrowsExactlyAsync<TimeoutException>(() => disposal.WaitAsync(TimeSpan.FromMilliseconds(100)));
+            await Assert.ThrowsExactlyAsync<TimeoutException>(() => disposal.WaitAsync(TimeSpan.FromMilliseconds(500)));
             releaseApply.Set();
             await disposal.WaitAsync(WaitTimeout);
             Assert.AreEqual(1, applied);

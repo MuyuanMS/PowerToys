@@ -394,6 +394,8 @@ public sealed partial class SupersedingAsyncValueGateTests
                 }
                 catch (OperationCanceledException)
                 {
+                    // Cleanup cancels the continuation's token when the assertion path exits early.
+                    Assert.IsTrue(next.IsCanceled);
                 }
             }
         });
