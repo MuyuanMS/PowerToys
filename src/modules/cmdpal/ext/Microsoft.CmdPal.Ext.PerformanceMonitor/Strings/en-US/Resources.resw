@@ -267,9 +267,11 @@
   </data>
   <data name="NetworkUsage_Widget_Template.IPv4" xml:space="preserve">
     <value>IPv4 address</value>
+    <comment>Label for the current IPv4 address shown for the network adapter</comment>
   </data>
   <data name="NetworkUsage_Widget_Template.IPv6" xml:space="preserve">
     <value>IPv6 address</value>
+    <comment>Label for the current IPv6 address shown for the network adapter</comment>
   </data>
   <data name="Previous_Network_Title" xml:space="preserve">
     <value>Previous network</value>

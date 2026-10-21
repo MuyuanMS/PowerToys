@@ -24,7 +24,7 @@ public class NetworkConnectionDetailsTests
     ];
 
     [TestMethod]
-    public void PublicAddressesComeBeforePrivateAndLinkLocalOnes()
+    public void NonLinkLocalAddressesComeBeforeLinkLocalOnes()
     {
         Assert.AreEqual("192.168.1.20", NetworkConnectionDetails.PickAddress(Addresses, AddressFamily.InterNetwork));
         Assert.AreEqual("2001:db8::42", NetworkConnectionDetails.PickAddress(Addresses, AddressFamily.InterNetworkV6));

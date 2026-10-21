@@ -72,8 +72,8 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
     };
 
     /// <summary>
-    /// Picks the address to show for a family: a public (global) address first, then a private
-    /// one, and a link-local address last, since it only works on the local network segment.
+    /// Picks the first non-link-local address for a family, or a link-local address if it is the
+    /// only available one. Loopback addresses are excluded.
     /// </summary>
     internal static string PickAddress(IEnumerable<IPAddress> addresses, AddressFamily family)
     {
