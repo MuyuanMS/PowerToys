@@ -102,7 +102,6 @@ public static class MouseHookProbe
         {
             if (timer != UIntPtr.Zero) KillTimer(IntPtr.Zero, timer);
             UnhookWindowsHookEx(hook);
-            hook = IntPtr.Zero;
         }
         return events.ToArray();
     }
