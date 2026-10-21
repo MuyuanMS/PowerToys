@@ -252,8 +252,6 @@ namespace Microsoft.AdvancedPaste.UITests
             Assert.IsTrue(result.IsConsistent, "Paste as Json using shortcut failed.");
         }
 
-
-
         /*
          * Clipboard History
            - [x] Open Settings and Enable clipboard history (if not enabled already). Open Advanced Paste window with hotkey, click Clipboard history and try deleting some entry. Check OS clipboard history (Win+V), and confirm that the same entry no longer exist.
@@ -865,8 +863,6 @@ namespace Microsoft.AdvancedPaste.UITests
 
             window.Close();
         }
-
-
 
         private string DeleteAndCopyFile(string sourceFileName, string destinationFileName)
         {

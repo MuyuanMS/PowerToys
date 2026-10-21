@@ -100,7 +100,7 @@ internal static class RichTextHelper
         return IsSafeUri(url);
     }
 
-    private static bool IsSafeUri(string? url)
+    private static bool IsSafeUri(string url)
     {
         return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
             (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
