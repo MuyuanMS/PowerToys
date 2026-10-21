@@ -96,6 +96,54 @@ public sealed partial class SupersedingAsyncValueGateTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DuringCommittedApplication_DoesNotCancelCommittedFactoryToken()
+    {
+        var applyStarted = NewSignal();
+        using var releaseApply = new ManualResetEventSlim();
+        var calls = 0;
+        var committedToken = CancellationToken.None;
+        var gate = new SupersedingAsyncValueGate<int>(
+            token =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                {
+                    committedToken = token;
+                    return Task.FromResult(1);
+                }
+
+                return Task.FromResult(2);
+            },
+            value =>
+            {
+                if (value == 1)
+                {
+                    applyStarted.SetResult();
+                    if (!releaseApply.Wait(WaitTimeout))
+                    {
+                        throw new TimeoutException("The apply callback was not released in time.");
+                    }
+                }
+            });
+
+        try
+        {
+            var first = gate.ExecuteAsync();
+            await applyStarted.Task.WaitAsync(WaitTimeout);
+            var next = gate.ExecuteAsync();
+
+            Assert.IsFalse(committedToken.IsCancellationRequested);
+            releaseApply.Set();
+            Assert.AreEqual(1, await first.WaitAsync(WaitTimeout));
+            Assert.AreEqual(2, await next.WaitAsync(WaitTimeout));
+        }
+        finally
+        {
+            releaseApply.Set();
+            await gate.DisposeAsync().AsTask().WaitAsync(WaitTimeout);
+        }
+    }
+
+    [TestMethod]
     public async Task Dispose_DuringApplication_CancelsPendingAndRejectsNewRequests()
     {
         var applyStarted = NewSignal();

@@ -59,7 +59,7 @@ public sealed partial class SupersedingAsyncValueGate<T> : IDisposable, IAsyncDi
         {
             if (_disposed)
             {
-                return Task.FromCanceled<T>(new CancellationToken(true));
+                return Task.FromCanceled<T>(new CancellationToken(canceled: true));
             }
 
             _current?.Completion.TrySetCanceled(CancellationToken.None);
@@ -126,6 +126,7 @@ public sealed partial class SupersedingAsyncValueGate<T> : IDisposable, IAsyncDi
 
                         // Commit application before releasing the scheduling lock.
                         _current = null;
+                        _running = null;
                     }
 
                     try
@@ -188,6 +189,8 @@ public sealed partial class SupersedingAsyncValueGate<T> : IDisposable, IAsyncDi
     /// Cancels pending work and waits for an active application to finish. No later result is applied.
     /// </summary>
     /// <remarks>
+    /// This method may return while a non-cooperative factory or cancellation callback is still running.
+    /// Use <see cref="DisposeAsync"/> when all work and callbacks must be drained before continuing.
     /// Do not call while holding a lock or running on a thread needed by application.
     /// Await <see cref="DisposeAsync"/> instead after releasing such locks.
     /// </remarks>
