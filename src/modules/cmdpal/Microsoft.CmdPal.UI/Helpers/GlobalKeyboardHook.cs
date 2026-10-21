@@ -72,11 +72,6 @@ internal sealed class GlobalKeyboardHook : IGlobalKeyboardHook
 
             while (PInvoke.PeekMessage(out var message, HWND.Null, 0, 0, PEEK_MESSAGE_REMOVE_TYPE.PM_REMOVE))
             {
-                if (message.message == PInvoke.WM_QUIT)
-                {
-                    return;
-                }
-
                 PInvoke.TranslateMessage(message);
                 PInvoke.DispatchMessage(message);
             }

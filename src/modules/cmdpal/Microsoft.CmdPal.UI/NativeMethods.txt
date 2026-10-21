@@ -89,8 +89,6 @@ MsgWaitForMultipleObjectsEx
 PeekMessage
 TranslateMessage
 DispatchMessage
-PostThreadMessage
-WM_QUIT
 
 GetWindowLong
 SetWindowLong
