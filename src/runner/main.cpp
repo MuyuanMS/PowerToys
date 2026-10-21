@@ -599,7 +599,7 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
 
         // Join module workers before CRT exit holds the shared UCRT exit lock.
         // This guard runs before the settings CLI lock and instance mutex are released.
-        auto shutdown_modules = wil::scope_exit([]() noexcept {
+        [[maybe_unused]] auto shutdown_modules = wil::scope_exit([]() noexcept {
             const auto report_shutdown_failure = []() noexcept {
                 OutputDebugStringW(L"Runner shutdown cleanup step failed; continuing teardown.\n");
             };

@@ -80,7 +80,7 @@
   - Read environment variables with `GetEnvironmentVariableW`; the CRT's copy is a snapshot.
 - If a project sets Link `IgnoreSpecificDefaultLibraries` or `AdditionalOptions`, keep the inherited `%(...)` value.
 - A project that can't follow these rules sets `<EnableHybridCRT>false</EnableHybridCRT>` with a comment that says why. Today: PowerRename.exe and its tests (PowerRenameLib calls `std::locale::global`) and MeasureToolCore (installs a `SIGABRT` handler).
-- Debug builds need `ucrtbased.dll`, which the Windows SDK installs. Use a Release build on machines without the SDK.
+- Hybrid CRT Debug builds need `ucrtbased.dll`, which the Windows SDK installs. Use a Release build on machines without the SDK.
 
 ## Testing Requirements
 
