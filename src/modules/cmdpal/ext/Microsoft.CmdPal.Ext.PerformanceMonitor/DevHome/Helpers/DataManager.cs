@@ -11,10 +11,9 @@ namespace CoreWidgetProvider.Helpers;
 
 internal sealed partial class DataManager : IDisposable
 {
-    private const int UpdateIntervalMilliseconds = 1000;
-
-    // Leave room for timer jitter while keeping the sampling interval tied to the timer cadence.
-    internal const long MinimumSampleIntervalMilliseconds = UpdateIntervalMilliseconds * 3L / 4;
+    // Pages and dock bands that show the same metric share its stats, so it's sampled at most once
+    // per interval to keep one sample per second. The interval leaves room for timer jitter.
+    internal const long MinimumSampleIntervalMilliseconds = 750;
 
     private static readonly ConditionalWeakTable<object, StrongBox<long>> LastSampleTimes = new();
 
@@ -24,12 +23,14 @@ internal sealed partial class DataManager : IDisposable
     private readonly Action _updateAction;
     private bool _updateFailureLogged;
 
+    private const int OneSecondInMilliseconds = 1000;
+
     public DataManager(DataType type, Action updateWidget)
     {
         _updateAction = updateWidget;
         _dataType = type;
 
-        _updateTimer = new Timer(UpdateIntervalMilliseconds);
+        _updateTimer = new Timer(OneSecondInMilliseconds);
         _updateTimer.Elapsed += UpdateTimer_Elapsed;
         _updateTimer.AutoReset = true;
         _updateTimer.Enabled = false;
