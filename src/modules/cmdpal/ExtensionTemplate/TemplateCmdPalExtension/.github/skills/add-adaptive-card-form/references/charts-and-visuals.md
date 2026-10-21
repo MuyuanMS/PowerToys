@@ -15,7 +15,7 @@ Command Palette renders these elements from the current Adaptive Cards schema na
 
 Containers, column sets, and columns also accept `roundedCorners` and `showBorder`, for card-style tiles.
 
-The elements follow the [Adaptive Cards schema](https://adaptivecards.microsoft.com/). Command Palette reads only the properties that the schema defines, with the schema's defaults, so a card that renders here renders the same way in other hosts that support the elements. Older versions of Command Palette, and hosts without chart support, drop unknown elements. **Always set a `fallback`**: `"drop"`, or a simpler element such as a `TextBlock` with the value.
+The elements follow the [Adaptive Cards schema](https://adaptivecards.microsoft.com/). Command Palette renders schema-defined properties with the schema's defaults, and also supports the Command Palette-specific `roundedCorners` and `showBorder` extensions on containers, column sets, and columns; other hosts may ignore these extensions. Older versions of Command Palette, and hosts without chart support, drop unknown elements. **Always set a `fallback`**: `"drop"`, or a simpler element such as a `TextBlock` with the value.
 
 ## Bind live data
 
