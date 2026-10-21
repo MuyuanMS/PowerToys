@@ -1720,7 +1720,6 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
                 if (stats.DesignCapacityMilliwattHours is int design && design > 0)
                 {
                     ContentData["batteryHealth"] = FloatToPercentString(Math.Min(1f, (float)full / design));
-                    ContentData["batteryDesignCapacity"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Battery_Widget_Template/CapacityFormat"), design / 1000.0);
                 }
             }
         }
