@@ -89,6 +89,27 @@ public class GaugeChartModelTests
     }
 
     [TestMethod]
+    public void NegativeSegmentSizesDoNotShiftActiveSegmentRanges()
+    {
+        var model = GaugeChartModel.Parse(
+            """
+            {
+              "type": "Chart.Gauge",
+              "value": 15,
+              "segments": [
+                { "legend": "Ignored", "size": -10 },
+                { "legend": "Low", "size": 20 },
+                { "legend": "High", "size": 40 }
+              ]
+            }
+            """,
+            new List<string>());
+
+        Assert.AreEqual(60d, model.Max);
+        Assert.AreEqual(1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
     public void TheMaximumIsInTheLastSegment()
     {
         var model = new GaugeChartModel

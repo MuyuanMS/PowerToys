@@ -55,7 +55,7 @@ internal sealed class GaugeChartModel : IAdaptiveVisualModel
         var start = Min;
         for (var i = 0; i < Segments.Count; i++)
         {
-            var end = start + Segments[i].Value;
+            var end = start + Math.Max(0, Segments[i].Value);
             if (Value >= start && (Value < end || i == Segments.Count - 1))
             {
                 return i;
