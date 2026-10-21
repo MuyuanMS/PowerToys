@@ -51,6 +51,9 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
 
     protected override void RenderCore()
     {
+        var hasVisibleContent = _model.Text.Length > 0 || _model.IconGlyph is not null;
+        Visibility = hasVisibleContent ? Visibility.Visible : Visibility.Collapsed;
+
         var isDarkTheme = IsDarkTheme;
         var (fontSize, padding) = _model.Size switch
         {
