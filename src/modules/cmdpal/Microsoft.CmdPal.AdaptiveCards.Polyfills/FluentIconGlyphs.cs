@@ -165,12 +165,27 @@ internal static class FluentIconGlyphs
     }
 
     /// <summary>Reads a Badge <c>icon</c> reference, <c>name[,regular|filled]</c>; regular is the default.</summary>
-    public static (string Name, bool Filled) ParseReference(string reference)
+    public static (string Name, bool Filled) ParseReference(string reference, ICollection<string> warnings)
     {
         var comma = reference.IndexOf(',');
-        return comma < 0
-            ? (reference.Trim(), false)
-            : (reference[..comma].Trim(), reference[(comma + 1)..].Trim().Equals("filled", StringComparison.OrdinalIgnoreCase));
+        if (comma < 0)
+        {
+            return (reference.Trim(), false);
+        }
+
+        var name = reference[..comma].Trim();
+        var style = reference[(comma + 1)..].Trim();
+        if (style.Equals("filled", StringComparison.OrdinalIgnoreCase))
+        {
+            return (name, true);
+        }
+
+        if (!style.Equals("regular", StringComparison.OrdinalIgnoreCase))
+        {
+            warnings.Add($"icon '{name}' has unknown style '{style}'; using regular.");
+        }
+
+        return (name, false);
     }
 
     private readonly record struct Glyph(char Regular, char? Filled = null);

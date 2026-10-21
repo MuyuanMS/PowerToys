@@ -122,8 +122,10 @@ public class IconModelTests
     [TestMethod]
     public void IconReferencesCanAskForTheFilledStyle()
     {
-        Assert.AreEqual(("Checkmark", true), FluentIconGlyphs.ParseReference("Checkmark,filled"));
-        Assert.AreEqual(("Checkmark", false), FluentIconGlyphs.ParseReference("Checkmark, Regular"));
-        Assert.AreEqual(("Checkmark", false), FluentIconGlyphs.ParseReference(" Checkmark "));
+        var warnings = new List<string>();
+        Assert.AreEqual(("Checkmark", true), FluentIconGlyphs.ParseReference("Checkmark,filled", warnings));
+        Assert.AreEqual(("Checkmark", false), FluentIconGlyphs.ParseReference("Checkmark, Regular", warnings));
+        Assert.AreEqual(("Checkmark", false), FluentIconGlyphs.ParseReference(" Checkmark ", warnings));
+        Assert.AreEqual(0, warnings.Count);
     }
 }

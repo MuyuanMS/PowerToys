@@ -41,7 +41,7 @@ internal sealed class BadgeModel : IAdaptiveVisualModel
 
     public BadgeAppearance Appearance { get; init; }
 
-    public BadgeShape Shape { get; init; }
+    public BadgeShape Shape { get; init; } = BadgeShape.Circular;
 
     public BadgeSize Size { get; init; }
 
@@ -87,7 +87,7 @@ internal sealed class BadgeModel : IAdaptiveVisualModel
             return null;
         }
 
-        var (name, filled) = FluentIconGlyphs.ParseReference(icon);
+        var (name, filled) = FluentIconGlyphs.ParseReference(icon, warnings);
         if (FluentIconGlyphs.TryGetGlyph(name, filled, out var glyph))
         {
             return glyph;

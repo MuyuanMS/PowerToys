@@ -80,6 +80,19 @@ public class ProgressAndBadgeModelTests
     }
 
     [TestMethod]
+    public void BadgeDefaultsToSchemaValuesWhenJsonCannotBeRead()
+    {
+        var warnings = new List<string>();
+        var model = BadgeModel.Parse("{", warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual(BadgeAppearance.Filled, model.Appearance);
+        Assert.AreEqual(BadgeShape.Circular, model.Shape);
+        Assert.AreEqual(BadgeSize.Medium, model.Size);
+        Assert.AreEqual(BadgeIconPosition.Before, model.IconPosition);
+    }
+
+    [TestMethod]
     public void BadgeParsesItsIcon()
     {
         var warnings = new List<string>();
@@ -110,5 +123,16 @@ public class ProgressAndBadgeModelTests
         Assert.AreEqual(1, warnings.Count);
         Assert.IsNull(model.IconGlyph);
         Assert.AreEqual("New", model.Text);
+    }
+
+    [TestMethod]
+    public void BadgeWarnsWhenIconStyleIsUnknown()
+    {
+        var warnings = new List<string>();
+        var model = BadgeModel.Parse("""{ "type": "Badge", "icon": "Checkmark,foo" }""", warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual("icon 'Checkmark' has unknown style 'foo'; using regular.", warnings[0]);
+        Assert.AreEqual("\uE73E", model.IconGlyph);
     }
 }

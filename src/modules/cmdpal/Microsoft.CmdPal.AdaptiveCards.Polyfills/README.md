@@ -47,6 +47,8 @@ Models read only the properties that the element's page in the [Adaptive Cards e
 
 `Icon` elements and the `Badge` `icon` property name icons from the Fluent System Icons catalog that Adaptive Cards uses, such as `Calendar` or `Wifi1`. They're drawn with Segoe Fluent Icons, the font Command Palette already uses for glyphs, so `FluentIconGlyphs` maps each name to the Segoe Fluent Icons glyph that draws the same symbol, with a filled glyph where one exists. Names without a matching glyph aren't listed. For them, `AdaptiveFallbackRenderer` draws the icon's `fallback`, since the WinUI 3 renderer drops fallback content, and `IconModel.HasGlyph` tells the incremental updater that the icon doesn't draw itself.
 
+Badge icon references accept `name`, `name,regular`, or `name,filled`; an unknown style suffix uses the regular glyph and adds a warning.
+
 To add a name, check that it's in the Adaptive Cards icon catalog (the `IconName` type of `@microsoft/teams.cards`), and compare the two glyphs side by side before adding it. Some glyphs, such as `RAM`, are only in Segoe Fluent Icons; on Windows 10 without that font they don't draw, as with other Command Palette glyphs.
 
 ## Add an element
