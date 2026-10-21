@@ -10,30 +10,36 @@ public enum DataType
     /// CPU related data. The CPU card adds per-processor utilization and the busiest processes
     /// with <see cref="CPUStats.RequestDetails"/>.
     /// </summary>
-    CPU,
+    CPU = 0,
+
+    /// <summary>
+    /// Retained to preserve the numeric values of the following members for existing consumers.
+    /// </summary>
+    [System.Obsolete("Use CPU instead.")]
+    CpuWithTopProcesses = 1,
 
     /// <summary>
     /// Memory related data.
     /// </summary>
-    Memory,
+    Memory = 2,
 
     /// <summary>
     /// GPU related data.
     /// </summary>
-    GPU,
+    GPU = 3,
 
     /// <summary>
     /// Network related data.
     /// </summary>
-    Network,
+    Network = 4,
 
     /// <summary>
     /// Battery related data.
     /// </summary>
-    Battery,
+    Battery = 5,
 
     /// <summary>
     /// Disk related data.
     /// </summary>
-    Disk,
+    Disk = 6,
 }
