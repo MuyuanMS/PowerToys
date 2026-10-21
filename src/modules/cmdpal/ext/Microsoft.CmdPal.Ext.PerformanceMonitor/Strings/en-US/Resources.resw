@@ -213,6 +213,10 @@
     <value>Speed</value>
     <comment>Label for the memory speed, such as 5600 MT/s</comment>
   </data>
+  <data name="Memory_Widget_Template.Speed_Value" xml:space="preserve">
+    <value>{0} MT/s</value>
+    <comment>{0} is the memory transfer rate, such as 5600 MT/s</comment>
+  </data>
   <data name="Memory_Widget_Template.Slots_Used" xml:space="preserve">
     <value>Slots used</value>
     <comment>Label for how many memory slots have a module, such as 2 of 4</comment>

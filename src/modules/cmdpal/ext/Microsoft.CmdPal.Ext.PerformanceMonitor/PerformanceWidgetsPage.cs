@@ -850,7 +850,7 @@ internal sealed partial class SystemMemoryUsageWidgetPage : WidgetPage, IDisposa
             {
                 if (modules.SpeedMegaTransfers > 0)
                 {
-                    ContentData["memSpeed"] = string.Format(CultureInfo.CurrentCulture, "{0} MT/s", modules.SpeedMegaTransfers);
+                    ContentData["memSpeed"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Memory_Widget_Template/Speed_Value"), modules.SpeedMegaTransfers);
                 }
 
                 ContentData["memSlots"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Memory_Widget_Template/Slots_Used_Value"), modules.SlotsUsed, modules.SlotCount);
