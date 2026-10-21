@@ -1,0 +1,266 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System.Globalization;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Microsoft.CmdPal.AdaptiveCards.Polyfills.UnitTests;
+
+[TestClass]
+public class GaugeChartModelTests
+{
+    [TestMethod]
+    public void ParsesValueRangeAndOptions()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse(
+            """
+            {
+              "type": "Chart.Gauge",
+              "title": "CPU",
+              "subLabel": "Utilization",
+              "value": 42,
+              "min": 0,
+              "max": 200,
+              "valueFormat": "fraction",
+              "showLegend": false,
+              "showMinMax": false,
+              "showNeedle": false,
+              "showTitle": true,
+              "colorSet": "diverging"
+            }
+            """,
+            warnings);
+
+        Assert.AreEqual(0, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual("CPU", model.Title);
+        Assert.IsTrue(model.ShowTitle);
+        Assert.AreEqual("Utilization", model.SubLabel);
+        Assert.AreEqual(42d, model.Value);
+        Assert.AreEqual(200d, model.Max);
+        Assert.AreEqual(GaugeValueFormat.Fraction, model.ValueFormat);
+        Assert.IsFalse(model.ShowLegend);
+        Assert.IsFalse(model.ShowMinMax);
+        Assert.IsFalse(model.ShowNeedle);
+        Assert.AreEqual("diverging", model.ColorSet);
+        Assert.AreEqual(0.21, model.Fraction, 1e-9);
+        Assert.AreEqual("42/200", model.FormatValue(CultureInfo.InvariantCulture));
+    }
+
+    [TestMethod]
+    public void DefaultsMatchTheAdaptiveCardsSchema()
+    {
+        var model = GaugeChartModel.Parse("""{ "type": "Chart.Gauge", "title": "CPU" }""", new List<string>());
+
+        Assert.IsFalse(model.ShowTitle);
+        Assert.IsTrue(model.ShowLegend);
+        Assert.IsTrue(model.ShowMinMax);
+        Assert.IsTrue(model.ShowNeedle);
+        Assert.AreEqual(GaugeValueFormat.Percentage, model.ValueFormat);
+        Assert.AreEqual(0d, model.Value);
+    }
+
+    [TestMethod]
+    public void SegmentSizesSetTheDefaultMaximum()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse(
+            """
+            {
+              "type": "Chart.Gauge",
+              "value": 70,
+              "segments": [
+                { "legend": "Low", "size": 50, "color": "good" },
+                { "legend": "Medium", "size": 30, "color": "warning" },
+                { "legend": "High", "size": 20, "color": "attention" }
+              ]
+            }
+            """,
+            warnings);
+
+        Assert.AreEqual(0, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual(3, model.Segments.Count);
+        Assert.AreEqual(30d, model.Segments[1].Value);
+        Assert.AreEqual("warning", model.Segments[1].Color);
+        Assert.AreEqual(100d, model.Max);
+        Assert.AreEqual(1, model.GetActiveSegment());
+        Assert.AreEqual("70%", model.FormatValue(CultureInfo.InvariantCulture));
+    }
+
+    [TestMethod]
+    public void NegativeSegmentSizesDoNotShiftActiveSegmentRanges()
+    {
+        var model = GaugeChartModel.Parse(
+            """
+            {
+              "type": "Chart.Gauge",
+              "value": 15,
+              "segments": [
+                { "legend": "Ignored", "size": -10 },
+                { "legend": "Low", "size": 20 },
+                { "legend": "High", "size": 40 }
+              ]
+            }
+            """,
+            new List<string>());
+
+        Assert.AreEqual(60d, model.Max);
+        Assert.AreEqual(1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void ValueBeyondLastSegmentHasNoActiveSegment()
+    {
+        var model = new GaugeChartModel
+        {
+            Value = 75,
+            Max = 100,
+            Segments = [new("Low", 50, null), new("Medium", 20, null)],
+        };
+
+        Assert.AreEqual(-1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void TrailingZeroSizeSegmentIsNotActive()
+    {
+        var model = new GaugeChartModel
+        {
+            Value = 50,
+            Max = 100,
+            Segments = [new("Low", 50, null), new("Empty", 0, null)],
+        };
+
+        Assert.AreEqual(-1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void ValuesOutsideRangeUseTheNearestSegment()
+    {
+        var belowRange = new GaugeChartModel
+        {
+            Value = -5,
+            Segments = [new("Low", 50, null), new("High", 50, null)],
+        };
+        var aboveRange = new GaugeChartModel
+        {
+            Value = 150,
+            Segments = [new("Low", 50, null), new("High", 50, null)],
+        };
+
+        Assert.AreEqual(0, belowRange.GetActiveSegment());
+        Assert.AreEqual(1, aboveRange.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void TheMaximumIsInTheLastSegment()
+    {
+        var model = new GaugeChartModel
+        {
+            Value = 100,
+            Segments = [new("Low", 50, null), new("High", 50, null)],
+        };
+
+        Assert.AreEqual(1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void ValueBelowMinimumUsesFirstActiveSegment()
+    {
+        var model = new GaugeChartModel
+        {
+            Value = -5,
+            Segments = [new("Low", 50, null), new("High", 50, null)],
+        };
+
+        Assert.AreEqual(0, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void FractionIsClamped()
+    {
+        Assert.AreEqual(1d, new GaugeChartModel { Value = 150 }.Fraction);
+        Assert.AreEqual(0d, new GaugeChartModel { Value = -10 }.Fraction);
+        Assert.AreEqual("100%", new GaugeChartModel { Value = 150 }.FormatValue(CultureInfo.InvariantCulture));
+    }
+
+    [TestMethod]
+    public void PercentageValueUsesCultureSpecificPercentFormatting()
+    {
+        var culture = CultureInfo.GetCultureInfo("fr-FR");
+        var model = new GaugeChartModel { Value = 25 };
+
+        Assert.AreEqual(0.25.ToString("P0", culture), model.FormatValue(culture));
+    }
+
+    [TestMethod]
+    public void InvalidRangeWarnsAndFallsBack()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse("""{ "type": "Chart.Gauge", "value": 5, "min": 10, "max": 10 }""", warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual(10d, model.Min);
+        Assert.AreEqual(110d, model.Max);
+    }
+
+    [TestMethod]
+    public void InvalidInferredMaximumFallsBackWithoutWarning()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse("""{ "type": "Chart.Gauge", "min": 150 }""", warnings);
+
+        Assert.AreEqual(0, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual(150d, model.Min);
+        Assert.AreEqual(250d, model.Max);
+    }
+
+    [TestMethod]
+    public void SegmentSharesAreZeroWhenRangeCannotBeRepresented()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse(
+            """{ "type": "Chart.Gauge", "min": 1e308, "segments": [{ "size": 50 }] }""",
+            warnings);
+
+        Assert.AreEqual(0, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual(model.Min, model.Max);
+        Assert.AreEqual(0d, model.GetSegmentShares()[0]);
+    }
+
+    [TestMethod]
+    public void SegmentSharesAreZeroWhenRangeOverflows()
+    {
+        var model = new GaugeChartModel
+        {
+            Min = -1e308,
+            Max = 1e308,
+            Segments = [new("A", 50, null)],
+        };
+
+        Assert.AreEqual(0d, model.GetSegmentShares()[0]);
+    }
+
+    [TestMethod]
+    public void MalformedJsonWarns()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse("{", warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual(0d, model.Value);
+    }
+
+    [TestMethod]
+    public void IncrementalStateIgnoresPropertyOrder()
+    {
+        var warnings = new List<string>();
+        var first = GaugeChartModel.Parse("""{ "type": "Chart.Gauge", "value": 5, "max": 10 }""", warnings);
+        var second = GaugeChartModel.Parse("""{ "max": 10, "value": 5, "type": "Chart.Gauge" }""", warnings);
+        var changed = GaugeChartModel.Parse("""{ "max": 10, "value": 6, "type": "Chart.Gauge" }""", warnings);
+
+        Assert.AreEqual(first.IncrementalState, second.IncrementalState);
+        Assert.AreNotEqual(first.IncrementalState, changed.IncrementalState);
+    }
+}
