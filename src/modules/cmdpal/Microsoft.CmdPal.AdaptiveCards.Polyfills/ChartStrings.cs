@@ -11,5 +11,8 @@ internal static class ChartStrings
 
     public static string Get(string name) => _getString(name);
 
+    public static string GetCategoryLabel(string? label) =>
+        string.IsNullOrWhiteSpace(label) ? Get("AdaptiveChart_UnnamedCategory") : label;
+
     public static void SetLookup(Func<string, string> getString) => _getString = getString;
 }
