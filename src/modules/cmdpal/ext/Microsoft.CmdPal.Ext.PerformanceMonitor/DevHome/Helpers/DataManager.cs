@@ -121,7 +121,9 @@ internal sealed partial class DataManager : IDisposable
 
     private static bool ShouldSample(object stats) => ShouldSample(stats, Environment.TickCount64);
 
-    private void UpdateTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private void UpdateTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e) => UpdateNow();
+
+    private void UpdateNow()
     {
         var firstUpdateBlockSuffix = GetFirstUpdateBlockSuffix();
         var isTracked = firstUpdateBlockSuffix is not null && PerformanceMonitorCommandsProvider.CrashSentinel.BeginBlock(firstUpdateBlockSuffix);
@@ -262,7 +264,7 @@ internal sealed partial class DataManager : IDisposable
         _updateTimer.Start();
 
         // Show current values as soon as the page opens, instead of after the first interval.
-        ThreadPool.QueueUserWorkItem(static manager => manager.UpdateTimer_Elapsed(null, null!), this, preferLocal: false);
+        ThreadPool.QueueUserWorkItem(static manager => manager.UpdateNow(), this, preferLocal: false);
     }
 
     public void Stop()

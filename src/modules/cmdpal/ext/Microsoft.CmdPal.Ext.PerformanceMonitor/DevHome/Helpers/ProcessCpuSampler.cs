@@ -51,8 +51,8 @@ internal sealed class ProcessCpuSampler
     {
         var timestamp = Stopwatch.GetTimestamp();
         PruneHistory(_history, timestamp);
-        var baseline = _history.Count > 0 ? _history[0] : default;
-        var times = new Dictionary<(ulong ProcessId, long CreateTime), long>(baseline.Times?.Count ?? 0);
+        Snapshot? baseline = _history.Count > 0 ? _history[0] : null;
+        var times = new Dictionary<(ulong ProcessId, long CreateTime), long>(baseline?.Times.Count ?? 0);
         var deltas = new List<(string Name, long Delta)>();
 
         fixed (byte* buffer = ReadSnapshot())
@@ -70,7 +70,7 @@ internal sealed class ProcessCpuSampler
                     var key = (processId, *(long*)(reserved + CreateTimeOffset));
                     var time = *(long*)(reserved + UserTimeOffset) + *(long*)(reserved + KernelTimeOffset);
                     times[key] = time;
-                    if (baseline.Times is not null && baseline.Times.TryGetValue(key, out var previous) && time > previous)
+                    if (baseline is { } snapshot && snapshot.Times.TryGetValue(key, out var previous) && time > previous)
                     {
                         var name = process->ImageName.Length > 0
                             ? new string(process->ImageName.Buffer.Value, 0, process->ImageName.Length / sizeof(char))
@@ -89,7 +89,7 @@ internal sealed class ProcessCpuSampler
         }
 
         // CPU times are in 100-nanosecond units, the same as TimeSpan ticks.
-        var elapsed = baseline.Times is null ? 0 : Stopwatch.GetElapsedTime(baseline.Timestamp, timestamp).Ticks;
+        var elapsed = baseline is { } previousSnapshot ? Stopwatch.GetElapsedTime(previousSnapshot.Timestamp, timestamp).Ticks : 0;
         _history.Add(new(timestamp, times));
         return Rank(deltas, elapsed, Environment.ProcessorCount, count);
     }
