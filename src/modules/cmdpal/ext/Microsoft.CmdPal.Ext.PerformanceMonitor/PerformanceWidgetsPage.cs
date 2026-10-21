@@ -1676,6 +1676,7 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
         try
         {
             ContentData.Clear();
+            ContentJson.Clear();
 
             var stats = _dataManager.GetBatteryStats();
 
@@ -1686,6 +1687,9 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
                 ContentData["batteryCharge"] = "—";
                 ContentData["batteryStatus"] = Resources.GetResource("Battery_Usage_Unknown");
                 ContentData["batteryTimeRemaining"] = string.Empty;
+                ContentData["batteryStatusStyle"] = "default";
+                ContentData["batteryIcon"] = string.Empty;
+                ContentData["batteryColor"] = "accent";
                 return;
             }
 
@@ -1695,15 +1699,79 @@ internal sealed partial class SystemBatteryUsageWidgetPage : WidgetPage, IDispos
 
             ContentData["batteryStatus"] = GetStatusText(stats);
             ContentData["batteryTimeRemaining"] = GetTimeRemainingText(stats);
+            ContentData["batteryStatusStyle"] = stats.IsCharging ? "good" : stats.IsOnAcPower ? "informative" : "accent";
+            ContentData["batteryColor"] = GetChargeColor(stats.IsCharging, stats.ChargePercent);
+            ContentData["batteryIcon"] = GetChargeIconName(stats.IsCharging, stats.ChargePercent);
+            if (GetBatteryPercent(stats.ChargePercent) is double batteryPercent)
+            {
+                ContentJson["batteryPercent"] = batteryPercent;
+            }
+
+            stats.ReadReport();
+            if (GetDisplayedRate(stats.IsCharging, stats.IsOnAcPower, stats.ChargeRateMilliwatts) is int rate)
+            {
+                ContentData["batteryRateLabel"] = Resources.GetResource(rate > 0 ? "Battery_Widget_Template/ChargeRate" : "Battery_Widget_Template/DischargeRate");
+                ContentData["batteryRate"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Battery_Widget_Template/RateFormat"), Math.Abs(rate) / 1000.0);
+            }
+
+            if (stats.FullChargeCapacityMilliwattHours is int full && full > 0)
+            {
+                ContentData["batteryFullCapacity"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("Battery_Widget_Template/CapacityFormat"), full / 1000.0);
+                if (stats.DesignCapacityMilliwattHours is int design && design > 0)
+                {
+                    ContentData["batteryHealth"] = FloatToPercentString(Math.Min(1f, (float)full / design));
+                }
+            }
         }
         catch (Exception e)
         {
             ContentData.Clear();
+            ContentJson.Clear();
             ContentData["errorMessage"] = e.Message;
             CurrentIcon = Icons.BatteryGlyph(-1, false, false);
             return;
         }
     }
+
+    /// <summary>
+    /// Returns the rate to show in milliwatts: positive while charging, negative on battery power, and
+    /// none while plugged in and idle, when small readings come and go.
+    /// </summary>
+    internal static int? GetDisplayedRate(bool isCharging, bool isOnAcPower, int? rateMilliwatts) => rateMilliwatts switch
+    {
+        > 0 when isCharging => rateMilliwatts,
+        < 0 when !isOnAcPower => rateMilliwatts,
+        _ => null,
+    };
+
+    internal static double? GetBatteryPercent(float chargePercent) =>
+        chargePercent >= 0
+            ? Math.Round(Math.Clamp(chargePercent, 0, 1) * 100, MidpointRounding.AwayFromZero)
+            : null;
+
+    /// <summary>
+    /// Green while charging or above half, then warning, then attention when low. An unknown
+    /// charge (-1) uses the accent color.
+    /// </summary>
+    internal static string GetChargeColor(bool isCharging, float chargePercent) => chargePercent switch
+    {
+        < 0 => "accent",
+        _ when isCharging => "good",
+        > 0.5f => "good",
+        > 0.2f => "warning",
+        _ => "attention",
+    };
+
+    /// <summary>
+    /// Returns the Adaptive Cards icon for the charge: <c>BatteryCharge</c> while charging,
+    /// otherwise <c>Battery0</c> to <c>Battery10</c>. An unknown charge has no icon.
+    /// </summary>
+    internal static string GetChargeIconName(bool isCharging, float chargePercent) => chargePercent switch
+    {
+        < 0 => string.Empty,
+        _ when isCharging => "BatteryCharge",
+        _ => "Battery" + ((int)Math.Round(Math.Clamp(chargePercent, 0, 1) * 10, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture),
+    };
 
     protected override string GetTemplatePath(WidgetPageState page)
     {

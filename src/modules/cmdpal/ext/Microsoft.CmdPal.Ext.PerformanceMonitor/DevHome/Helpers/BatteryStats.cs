@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Threading;
 using Windows.Win32;
 using Windows.Win32.System.Power;
 
@@ -18,6 +20,8 @@ internal sealed partial class BatteryStats
     private const byte BatteryFlagNoBattery = 0x80;
     private const byte BatteryFlagUnknown = 0xFF;
 
+    private static int _reportFailureLogged;
+
     public bool HasBattery { get; set; }
 
     public bool IsCharging { get; set; }
@@ -33,6 +37,35 @@ internal sealed partial class BatteryStats
     /// Estimated seconds of battery life remaining, or -1 when unknown / charging / on AC.
     /// </summary>
     public int SecondsRemaining { get; set; } = -1;
+
+    /// <summary>Gets the charge rate: positive while charging, negative while discharging.</summary>
+    public int? ChargeRateMilliwatts { get; private set; }
+
+    public int? DesignCapacityMilliwattHours { get; private set; }
+
+    public int? FullChargeCapacityMilliwattHours { get; private set; }
+
+    /// <summary>Reads rates and capacities from the aggregate battery report.</summary>
+    public void ReadReport()
+    {
+        try
+        {
+            var report = global::Windows.Devices.Power.Battery.AggregateBattery.GetReport();
+            ChargeRateMilliwatts = report.ChargeRateInMilliwatts;
+            DesignCapacityMilliwattHours = report.DesignCapacityInMilliwattHours;
+            FullChargeCapacityMilliwattHours = report.FullChargeCapacityInMilliwattHours;
+        }
+        catch (Exception ex)
+        {
+            ChargeRateMilliwatts = null;
+            DesignCapacityMilliwattHours = null;
+            FullChargeCapacityMilliwattHours = null;
+            if (Interlocked.Exchange(ref _reportFailureLogged, 1) == 0)
+            {
+                Microsoft.CmdPal.Common.CoreLogger.LogError("Failed to read the optional aggregate battery report; report metrics will be unavailable.", ex);
+            }
+        }
+    }
 
     public void GetData()
     {
