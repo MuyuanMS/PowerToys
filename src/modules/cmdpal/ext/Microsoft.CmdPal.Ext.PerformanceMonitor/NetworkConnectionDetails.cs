@@ -27,18 +27,38 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
         {
             foreach (var adapter in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (interfaceId is Guid id
-                    ? Guid.TryParse(adapter.Id, out var adapterId) && adapterId == id
-                    : IsDefaultConnection(adapter))
+                IPInterfaceProperties properties;
+                if (interfaceId is Guid id)
                 {
-                    var addresses = adapter.GetIPProperties().UnicastAddresses;
-                    var (ipv4, ipv6) = PickAddresses(addresses.Select(static address => address.Address));
+                    if (!Guid.TryParse(adapter.Id, out var adapterId) || adapterId != id)
+                    {
+                        continue;
+                    }
 
-                    return new(
-                        adapter.NetworkInterfaceType,
-                        ipv4,
-                        ipv6);
+                    properties = adapter.GetIPProperties();
                 }
+                else
+                {
+                    if (adapter.OperationalStatus != OperationalStatus.Up
+                        || adapter.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+                    {
+                        continue;
+                    }
+
+                    properties = adapter.GetIPProperties();
+                    if (properties.GatewayAddresses.Count == 0)
+                    {
+                        continue;
+                    }
+                }
+
+                var addresses = properties.UnicastAddresses;
+                var (ipv4, ipv6) = PickAddresses(addresses.Select(static address => address.Address));
+
+                return new(
+                    adapter.NetworkInterfaceType,
+                    ipv4,
+                    ipv6);
             }
         }
         catch (NetworkInformationException)
@@ -70,8 +90,8 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
     };
 
     /// <summary>
-    /// Picks the first non-link-local address for a family, or a link-local address if it is the
-    /// only available one. Loopback addresses are excluded.
+    /// Prefers non-link-local addresses over link-local ones. For IPv6, global unicast addresses
+    /// are preferred over other non-link-local addresses. Loopback addresses are excluded.
     /// </summary>
     internal static (string IPv4, string IPv6) PickAddresses(IEnumerable<IPAddress> addresses)
     {
