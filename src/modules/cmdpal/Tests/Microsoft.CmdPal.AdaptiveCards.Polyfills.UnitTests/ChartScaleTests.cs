@@ -29,6 +29,17 @@ public class ChartScaleTests
     }
 
     [TestMethod]
+    public void GetTicksCapsPathologicalRangeAt64Values()
+    {
+        var range = new ChartAxisRange(0, 1000, 1);
+
+        var ticks = range.GetTicks();
+
+        Assert.AreEqual(64, ticks.Count);
+        Assert.IsTrue(ticks.All(tick => tick >= range.Min && tick <= range.Max));
+    }
+
+    [TestMethod]
     [DataRow(0.83, 1.0, 0.2)]
     [DataRow(237.0, 250.0, 50.0)]
     [DataRow(1234.0, 1250.0, 250.0)]

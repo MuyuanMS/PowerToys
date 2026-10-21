@@ -7,11 +7,14 @@ namespace Microsoft.CmdPal.AdaptiveCards.Polyfills;
 /// <summary>The value range of a chart axis and the spacing of its grid lines.</summary>
 internal readonly record struct ChartAxisRange(double Min, double Max, double Step)
 {
+    private const int MaxTickCount = 64;
+
     /// <summary>Maps <paramref name="value"/> to 0 (minimum) through 1 (maximum), clamped.</summary>
     public double Normalize(double value) =>
         Max > Min ? Math.Clamp((value - Min) / (Max - Min), 0, 1) : 0;
 
-    /// <summary>Returns the grid line values, from the minimum to the maximum.</summary>
+    /// <summary>Returns up to 64 grid line values within the axis range.</summary>
+    /// <remarks>The limit keeps pathological ranges from creating excessive visual geometry.</remarks>
     public IReadOnlyList<double> GetTicks()
     {
         var ticks = new List<double>();
@@ -24,7 +27,7 @@ internal readonly record struct ChartAxisRange(double Min, double Max, double St
         var first = Math.Ceiling((Min / Step) - 1e-9);
         var last = Math.Floor((Max / Step) + 1e-9);
         var firstTick = first * Step;
-        for (var offset = 0; offset < 64 && first + offset <= last; offset++)
+        for (var offset = 0; offset < MaxTickCount && first + offset <= last; offset++)
         {
             var tick = Math.Round(firstTick + (offset * Step), 10);
             if (ticks.Count == 0 || tick != ticks[^1])
