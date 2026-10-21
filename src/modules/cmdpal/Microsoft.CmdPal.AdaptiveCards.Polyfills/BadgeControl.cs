@@ -89,7 +89,7 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
         }
         else
         {
-            badge.Background = ChartTheme.ToBrush(ChartTheme.GetTrackColor(isDarkTheme));
+            _badge.Background = ChartTheme.ToBrush(ChartTheme.GetTrackColor(isDarkTheme));
             foreground = ChartTheme.ToBrush(ChartTheme.GetTextColor(isDarkTheme, secondary: false));
         }
 

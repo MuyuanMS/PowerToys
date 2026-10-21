@@ -4,7 +4,6 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Microsoft.CmdPal.AdaptiveCards.Polyfills;
@@ -12,6 +11,7 @@ namespace Microsoft.CmdPal.AdaptiveCards.Polyfills;
 /// <summary>Renders an Adaptive Cards <c>Icon</c> element as a Segoe Fluent Icons glyph.</summary>
 internal sealed partial class IconControl : AdaptiveVisualControl
 {
+    private readonly FontIcon _icon = new();
     private IconModel _model;
 
     public IconControl(IconModel model)
@@ -46,12 +46,10 @@ internal sealed partial class IconControl : AdaptiveVisualControl
         }
 
         Visibility = Visibility.Visible;
-        Content = new FontIcon
-        {
-            Glyph = _model.Glyph,
-            FontSize = _model.PixelSize,
-            Foreground = ChartTheme.ToBrush(GetColor(_model.Color, IsDarkTheme)),
-        };
+        _icon.Glyph = _model.Glyph;
+        _icon.FontSize = _model.PixelSize;
+        _icon.Foreground = ChartTheme.ToBrush(GetColor(_model.Color, IsDarkTheme));
+        Content = _icon;
     }
 
     /// <summary>Resolves an icon color the way text colors resolve in the host config.</summary>
