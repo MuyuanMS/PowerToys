@@ -62,9 +62,13 @@ parameters:
   - name: buildInstallers
     type: boolean
     default: true
-  - name: mwbSandboxExperiment
+  # Internal build-plan input, derived from UI-test module selection.
+  - name: prepareMwbRuntime
     type: boolean
     default: false
+  - name: mwbRuntimeCondition
+    type: string
+    default: succeeded()
   - name: useVSPreview
     type: boolean
     default: false
@@ -177,7 +181,7 @@ jobs:
       targetPath: $(LogOutputDirectory)
       condition: or(failed(), canceled())
   steps:
-  - ${{ if eq(parameters.mwbSandboxExperiment, true) }}:
+  - ${{ if eq(parameters.prepareMwbRuntime, true) }}:
     - pwsh: |
         if ('$(BuildPlatform)' -cne 'x64' -or '$(BuildConfiguration)' -cne 'Release' -or
             '${{ parameters.buildTests }}' -ne 'True' -or
@@ -185,6 +189,7 @@ jobs:
           throw 'MWB CI preparation requires the shared build-x64-Release artifact and buildTests=true. ARM64 builds remain normal; only their MWB Sandbox execution is skipped.'
         }
       displayName: Validate gated MWB build preparation
+      condition: ${{ parameters.mwbRuntimeCondition }}
 
   - checkout: self
     clean: true
@@ -701,6 +706,21 @@ jobs:
       tar -c -v --format=zip -C .\src\gpo\assets -f $GpoArchive *
     displayName: Stage GPO files
 
+  - ${{ if eq(parameters.prepareMwbRuntime, true) }}:
+    - task: VSBuild@1
+      displayName: Build isolated MWB UI-test variant without changing shipping outputs
+      condition: ${{ parameters.mwbRuntimeCondition }}
+      inputs:
+        solution: src/modules/MouseWithoutBorders/App/MouseWithoutBorders.csproj
+        msbuildArgs: >-
+          /t:Build
+          /p:BuildProjectReferences=false
+          /p:MwbUiTestBuild=true
+          /p:MwbUiTestSourceRevision=$(Build.SourceVersion)
+        platform: $(BuildPlatform)
+        configuration: $(BuildConfiguration)
+        msbuildArchitecture: x64
+
   - ${{ if or(eq(parameters.runTests, true), eq(parameters.buildTests, true)) }}:
     # Running the tests may result in future jobs consuming artifacts out of this build
     # Instead of running an expensive file copy step, move everything over since the build is totally done.
@@ -714,7 +734,7 @@ jobs:
         Move-Item $ProjectBuildDirectory $FinalOutputRoot
       displayName: Move entire output directory into artifacts
 
-  - ${{ if eq(parameters.mwbSandboxExperiment, true) }}:
+  - ${{ if eq(parameters.prepareMwbRuntime, true) }}:
     - pwsh: |
         $work = "$(Pipeline.Workspace)\mwb-ci-build-$(System.JobId)"
         try {
@@ -725,6 +745,7 @@ jobs:
             -DotNetPath "$(DOTNET_ROOT)\dotnet.exe" `
             -Platform "$(BuildPlatform)" `
             -Configuration "$(BuildConfiguration)" `
+            -MwbUiTestBinaryPath "$(Build.SourcesDirectory)\artifacts\mwb-ui-test\$(BuildPlatform)\$(BuildConfiguration)\bin\PowerToys.MouseWithoutBorders.dll" `
             -SourceRevision "$(Build.SourceVersion)" -ReadyToRun
         } finally {
           # Preserve preparation diagnostics, never downloaded tools or the package cache.
@@ -737,6 +758,7 @@ jobs:
           }
         }
       displayName: Prepare coherent lean MWB runtime and official winapp CLI release
+      condition: ${{ parameters.mwbRuntimeCondition }}
       timeoutInMinutes: 35
 
   - ${{ if eq(parameters.publishArtifacts, true) }}:

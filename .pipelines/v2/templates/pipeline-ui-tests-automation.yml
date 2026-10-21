@@ -25,8 +25,8 @@ parameters:
     default: false
   - name: buildSource
     type: string
-    default: "buildNowSlim"
-    displayName: "Build Source"
+    default: "buildNow"
+    displayName: "Build Source (latestMainOfficialBuild and specificBuildId do not support MWB)"
     values:
       - latestMainOfficialBuild
       - buildNow
@@ -39,13 +39,11 @@ parameters:
   - name: uiTestModules
     type: object
     default: []
-  - name: mwbSandboxExperiment
-    type: boolean
-    default: true
-    displayName: "Run Mouse Without Borders Sandbox tests with the shared Release build (ARM64 skipped)"
 
 stages:
   - ${{ each platform in parameters.buildPlatforms }}:
+    # Full build path: buildNow runs the complete artifact in place; buildNowSlim
+    # downloads and installs its installer. MWB requires one of these current-source paths.
     - ${{ if or(eq(parameters.buildSource, 'buildNow'), eq(parameters.buildSource, 'buildNowSlim')) }}:
       - template: pipeline-ui-tests-full-build.yml
         parameters:
@@ -55,8 +53,8 @@ stages:
           useVSPreview: ${{ parameters.useVSPreview }}
           useLatestWebView2: ${{ parameters.useLatestWebView2 }}
           uiTestModules: ${{ parameters.uiTestModules }}
-          mwbSandboxExperiment: ${{ parameters.mwbSandboxExperiment }}
 
+    # Official build path: build UI tests only and download the selected official build.
     - ${{ if and(ne(parameters.buildSource, 'buildNow'), ne(parameters.buildSource, 'buildNowSlim')) }}:
       - template: pipeline-ui-tests-official-build.yml
         parameters:
@@ -65,4 +63,3 @@ stages:
           specificBuildId: ${{ parameters.specificBuildId }}
           useLatestWebView2: ${{ parameters.useLatestWebView2 }}
           uiTestModules: ${{ parameters.uiTestModules }}
-          mwbSandboxExperiment: ${{ parameters.mwbSandboxExperiment }}

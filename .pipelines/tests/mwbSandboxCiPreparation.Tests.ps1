@@ -38,8 +38,9 @@ function New-CiBundleFixture {
     $archive = Join-Path $bundle 'runtime.zip'
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $archive)
     $archiveHash = (Get-FileHash -LiteralPath $archive).Hash
+    $uiTestBuild = @{ SourceRevision = 'a' * 40; Path = 'PowerToys.MouseWithoutBorders.dll'; Sha256 = 'c' * 64 }
     @{ Sha256 = $archiveHash; FileCount = $runtimeFiles.Count; Files = $runtimeFiles
-        Configuration = 'Release'; ArchivePath = $archive; ProductRoot = $stage; Length = (Get-Item $archive).Length
+        Configuration = 'Release'; UiTestBuild = $uiTestBuild; ArchivePath = $archive; ProductRoot = $stage; Length = (Get-Item $archive).Length
         RunnerModules = @{ SourceSha256 = 'b' * 64; Modules = @('PowerToys.FancyZonesModuleInterface.dll', 'PowerToys.MouseWithoutBordersModuleInterface.dll') } } |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$archive.manifest.json"
     $pin = Get-WinAppCliRelease
@@ -49,10 +50,10 @@ function New-CiBundleFixture {
         @{ Path = $name; Sha256 = (Get-FileHash -LiteralPath $file).Hash }
     }
     $manifest = @{
-        FormatVersion = 2; SourceRevision = 'a' * 40; Platform = 'x64'; Configuration = 'Release'
+        FormatVersion = 3; SourceRevision = 'a' * 40; Platform = 'x64'; Configuration = 'Release'
         Runtime = @{
             Sha256 = $archiveHash; ManifestSha256 = (Get-FileHash -LiteralPath "$archive.manifest.json").Hash
-            ReadyToRun = $false; Files = @($entries)
+            ReadyToRun = $false; UiTestBuild = $uiTestBuild; Files = @($entries)
         }
         WinAppCli = @{
             Repository = $pin.Repository; Tag = $pin.Tag; Version = $pin.Version
@@ -84,6 +85,22 @@ function Get-CiShortPathFixture {
     }
     finally {
         if ($null -ne $fileSystem) { $null = [Runtime.InteropServices.Marshal]::ReleaseComObject($fileSystem) }
+    }
+}
+
+Describe 'MWB CI test-build configuration guard' {
+    It 'requires the isolated binary for Release while preserving Debug diagnostics' {
+        $guard = $buildAst.Find({
+            param($node)
+            $node -is [Management.Automation.Language.IfStatementAst] -and
+                $node.Extent.Text -like '*Release MWB CI bundles require an explicit isolated MwbUiTestBinaryPath*'
+        }, $true)
+        $guard | Should Not BeNullOrEmpty
+        $validate = [scriptblock]::Create(
+            'param([string]$Configuration, [string]$MwbUiTestBinaryPath)' + [Environment]::NewLine + $guard.Extent.Text)
+        { & $validate Release '' } | Should Throw 'explicit isolated MwbUiTestBinaryPath'
+        { & $validate Debug '' } | Should Not Throw
+        { & $validate Release 'C:\fixture\PowerToys.MouseWithoutBorders.dll' } | Should Not Throw
     }
 }
 
@@ -141,7 +158,8 @@ Describe 'Pinned Windows SDK debug UCRT preparation' {
         $source = Get-Content -LiteralPath $buildPath -Raw
         $source | Should Match 'Cpp.Build.props'
         $source | Should Match '\$options.DebugUcrtPath = Get-MwbCiDebugUcrtPath'
-        $source | Should Match '-Platform \$Platform -Configuration \$Configuration @options'
+        $source | Should Match '-Platform \$Platform -Configuration \$Configuration -MwbUiTestBinaryPath \$MwbUiTestBinaryPath'
+        $source | Should Match '-SourceRevision \$SourceRevision @options'
         $source | Should Match "if \(\`$Configuration -eq 'Debug'\)"
         $source | Should Not Match 'Copy-Item.*\$product.*ucrtbased'
     }
@@ -312,7 +330,7 @@ Describe 'MWB CI manifest and initializer agreement' {
         }, $true)
         $script:backendGuard = [scriptblock]::Create('param($marker,$manifest)' + "`n" + $guard.Extent.Text)
         $initializer = [Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $PSScriptRoot '..\..\src\modules\MouseWithoutBorders\Tests\SandboxExperiment\Initialize-AutonomousHost.ps1'),
+            (Join-Path $PSScriptRoot '..\..\src\modules\MouseWithoutBorders\MouseWithoutBorders.UITests\Scripts\Initialize-AutonomousHost.ps1'),
             [ref]$tokens, [ref]$errors)
         if ($errors.Count) { throw 'Initializer parameter contract contains parse errors.' }
         $script:bindInitializer = [scriptblock]::Create($initializer.ParamBlock.Extent.Text + @'
@@ -608,6 +626,36 @@ Describe 'MWB CI bundle provenance and coherent host staging' {
         { Get-MwbCiBundle $root ('a' * 40) } | Should Throw 'provenance'
     }
 
+    It 'rejects a bundle without the isolated test-build provenance' {
+        $fixture.Runtime.Remove('UiTestBuild')
+        $fixture | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath
+        { Get-MwbCiBundle $root ('a' * 40) } | Should Throw 'provenance'
+    }
+
+    It 'preserves explicit Debug diagnostic bundles without a Release-only test variant' {
+        $runtimePath = Join-Path $bundleRoot 'runtime.zip.manifest.json'
+        $runtime = Get-Content -LiteralPath $runtimePath -Raw | ConvertFrom-Json
+        $runtime.Configuration = 'Debug'
+        $runtime.PSObject.Properties.Remove('UiTestBuild')
+        $runtime | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $runtimePath
+        $fixture.Configuration = 'Debug'
+        $fixture.Runtime.Remove('UiTestBuild')
+        $fixture.Runtime.ManifestSha256 = (Get-FileHash -LiteralPath $runtimePath).Hash
+        $fixture | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath
+        (Get-MwbCiBundle $root ('a' * 40) -Configuration Debug).Manifest.Configuration | Should Be 'Debug'
+    }
+
+    It 'rejects mismatched test-build identity even when archive hashes match' -TestCases @(
+        @{ Field = 'SourceRevision'; Value = 'b' * 40 }
+        @{ Field = 'Path'; Value = 'other.dll' }
+        @{ Field = 'Sha256'; Value = 'd' * 64 }
+    ) {
+        param($Field, $Value)
+        $fixture.Runtime.UiTestBuild[$Field] = $Value
+        $fixture | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath
+        { Get-MwbCiBundle $root ('a' * 40) } | Should Throw 'provenance'
+    }
+
     It 'rejects a Platform mismatch between the request and the actual manifest in either direction' -TestCases @(
         @{ ManifestPlatform = 'arm64'; RequestedPlatform = 'x64' }
         @{ ManifestPlatform = 'x64'; RequestedPlatform = 'arm64' }
@@ -752,8 +800,8 @@ Describe 'MWB gated preparation source contracts' {
     }
 
     It 'defaults to no preparation for existing build callers' {
-        $job | Should Match 'name: mwbSandboxExperiment\r?\n    type: boolean\r?\n    default: false'
-        $job | Should Match '\$\{\{ if eq\(parameters.mwbSandboxExperiment, true\) \}\}:\r?\n    - pwsh:'
+        $job | Should Match 'name: prepareMwbRuntime\r?\n    type: boolean\r?\n    default: false'
+        $job | Should Match '\$\{\{ if eq\(parameters.prepareMwbRuntime, true\) \}\}:\r?\n    - pwsh:'
         $job | Should Match '-SourceRevision "\$\(Build.SourceVersion\)" -ReadyToRun'
         $job | Should Not Match '10\.0\.401|mwb-ci-tools|UseDotNet@2'
         $job | Should Match '-DotNetPath "\$\(DOTNET_ROOT\)\\dotnet.exe"'
@@ -805,7 +853,9 @@ Describe 'MWB gated preparation source contracts' {
     }
 
     It 'retains the existing bounded Limited desktop dispatch and recovery' {
-        $script | Should Match "\`$suiteTimeoutMinutes = if \(\`$manifest.SandboxBackend -eq 'WinApp'\) \{ 80 \} else \{ 45 \}"
+        $script | Should Match "\`$suiteTimeoutMinutes = if \(\`$manifest.SandboxBackend -eq 'WinApp'\) \{ 100 \} else \{ 70 \}"
+        $steps = Get-Content -LiteralPath (Join-Path $templates 'steps-mwb-sandbox-experiment.yml') -Raw
+        $steps | Should Match 'timeoutInMinutes: 103'
         $script | Should Match '-TimeoutMinutes \$suiteTimeoutMinutes'
         $script | Should Match "\`$task.Principal.RunLevel -ne 'Limited'"
         $script | Should Match "\`$task.Principal.LogonType -ne 'Interactive'"

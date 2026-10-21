@@ -9,6 +9,7 @@ param(
     [Parameter(Mandatory)][string] $OutputRoot,
     [Parameter(Mandatory)][string] $WorkRoot,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string] $SourceRevision,
+    [string] $MwbUiTestBinaryPath,
     [string] $DotNetPath,
     [ValidateSet('x64', 'arm64')][string] $Platform = 'x64',
     [ValidateSet('Debug', 'Release')][string] $Configuration = 'Release',
@@ -19,6 +20,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . "$PSScriptRoot\MwbSandboxCi.Common.ps1"
+
+if ($Configuration -ceq 'Release' -and [string]::IsNullOrWhiteSpace($MwbUiTestBinaryPath)) {
+    throw 'Release MWB CI bundles require an explicit isolated MwbUiTestBinaryPath.'
+}
 
 function Invoke-MwbCiBuildCommand {
     param([string] $Executable, [string[]] $Arguments, [string] $Directory,
@@ -200,7 +205,7 @@ $output = $paths.OutputRoot
 $work = $paths.WorkRoot
 $WorkRoot = $work
 $null = New-Item -ItemType Directory -Path $output, $work, (Join-Path $work 'scratch')
-$experiment = Join-Path $sourceRoot 'src\modules\MouseWithoutBorders\Tests\SandboxExperiment'
+$scriptsRoot = Join-Path $sourceRoot 'src\modules\MouseWithoutBorders\MouseWithoutBorders.UITests\Scripts'
 $archive = Join-Path $output 'runtime.zip'
 $options = @{}
 if ($Configuration -eq 'Debug') {
@@ -214,8 +219,9 @@ if ($ReadyToRun) {
     $options.ReadyToRun = $true
     $options.Crossgen2Path = Get-MwbCiCrossgen2 $runtimeVersion (Join-Path $work 'compiler') -TargetArchitecture $Platform
 }
-& (Join-Path $experiment 'New-MwbRuntimeArchive.ps1') -ProductRoot $product -ArchivePath $archive `
-    -Platform $Platform -Configuration $Configuration @options | Out-Null
+& (Join-Path $scriptsRoot 'New-MwbRuntimeArchive.ps1') -ProductRoot $product -ArchivePath $archive `
+    -Platform $Platform -Configuration $Configuration -MwbUiTestBinaryPath $MwbUiTestBinaryPath `
+    -SourceRevision $SourceRevision @options | Out-Null
 $runtime = Get-Content -LiteralPath "$archive.manifest.json" -Raw | ConvertFrom-Json
 $files = foreach ($relative in $runtime.Files) {
     $path = Get-MwbCiRelativePath "$archive.staging" $relative
@@ -226,12 +232,13 @@ Remove-Item -LiteralPath "$archive.staging" -Recurse -Force
 $cli = Save-WinAppCliRelease -WorkRoot (Join-Path $work 'winapp-cli') -Destination (Join-Path $output 'winapp-cli') `
     -Platform $Platform -ArchivePath $WinAppCliArchivePath
 [ordered]@{
-    FormatVersion = 2; SourceRevision = $SourceRevision.ToLowerInvariant()
+    FormatVersion = 3; SourceRevision = $SourceRevision.ToLowerInvariant()
     Platform = $Platform; Configuration = $Configuration
     Runtime = [ordered]@{
         Sha256 = $runtime.Sha256
         ManifestSha256 = (Get-FileHash -LiteralPath "$archive.manifest.json" -Algorithm SHA256).Hash
         ReadyToRun = [bool]$ReadyToRun
+        UiTestBuild = if ($runtime.PSObject.Properties['UiTestBuild']) { $runtime.UiTestBuild } else { $null }
         Files = @($files)
     }
     WinAppCli = $cli

@@ -106,14 +106,14 @@ internal sealed class TwoEndpointFixture : IDisposable
         {
             if (guest?.Ready == true)
             {
-                guest.Request("Evidence");
+                guest.Request("Evidence", timeoutSeconds: SandboxTimeouts.EndpointEvidenceRequestSeconds);
             }
         });
         Attempt("Capture host evidence before teardown", () =>
         {
             if (host?.Ready == true)
             {
-                host.Request("Evidence");
+                host.Request("Evidence", timeoutSeconds: SandboxTimeouts.EndpointEvidenceRequestSeconds);
             }
         });
 
@@ -123,7 +123,7 @@ internal sealed class TwoEndpointFixture : IDisposable
         {
             if (guest?.Ready == true)
             {
-                guest.Request("StopPeers", timeoutSeconds: 180);
+                guest.Request("StopPeers", timeoutSeconds: SandboxTimeouts.GuestStopRequestSeconds);
             }
 
             guestStopped = true;
@@ -526,21 +526,15 @@ internal sealed class TwoEndpointFixture : IDisposable
         {
             ["PeerName"] = guestName, ["PeerAddress"] = guestAddress, ["GlobalSettings"] = global.DeepClone(),
             ["ExpectedLocalAddress"] = provision["HostAddress"]!.DeepClone(),
-        }, timeoutSeconds: 360);
+        }, timeoutSeconds: SandboxTimeouts.EndpointStartRequestSeconds);
         settings = Session.FromProcess(started["SettingsProcessId"]!.GetValue<int>().ToString(CultureInfo.InvariantCulture), timeoutMS: 30_000);
         guestPeersStarted = true;
-        // The guest's WinUI3 Settings window can take longer than the host's to satisfy the
-        // startup check: it is one level deeper, inside a Windows Sandbox with no GPU
-        // passthrough. Give this channel call ample headroom above EndpointSupport.ps1's own
-        // guest startup budget (8 minutes) so that budget - not this outer channel timeout -
-        // is what fails first; run localvm-20260914-050434 observed the mapped-folder
-        // response round trip alone add roughly two extra minutes on top of the internal
-        // budget under this nested VM's I/O load.
+        // Enclose the fifteen-minute readiness budget and the mapped-folder reply.
         guest!.Request("Start", new JsonObject
         {
             ["PeerName"] = hostName, ["PeerAddress"] = provision["HostAddress"]!.DeepClone(), ["GlobalSettings"] = global.DeepClone(),
             ["ExpectedLocalAddress"] = guestAddress,
-        }, timeoutSeconds: 900);
+        }, timeoutSeconds: SandboxTimeouts.EndpointStartRequestSeconds);
     }
 
     internal static JsonObject CreateGlobalSettings(string payloadRoot)
@@ -640,6 +634,7 @@ internal sealed class TwoEndpointFixture : IDisposable
         RequireHostForeground();
         MouseHelper.MoveBy(30, 30, steps: 3);
         int stableClickTarget = 0;
+        int blockedClickProbes = 0;
         RunFiles.Wait(() =>
         {
             var current = Observe(guest);
@@ -648,6 +643,8 @@ internal sealed class TwoEndpointFixture : IDisposable
         RunFiles.Wait(() =>
         {
             var current = Observe(guest);
+            Assert.AreEqual(guestReceiverHwnd, current["ForegroundHwnd"]!.GetValue<long>(),
+                "No remote probe movement sent: the exact guest receiver must retain foreground.");
             int x = current["CursorX"]!.GetValue<int>();
             int y = current["CursorY"]!.GetValue<int>();
             int left = current["ClickLeft"]!.GetValue<int>();
@@ -658,9 +655,18 @@ internal sealed class TwoEndpointFixture : IDisposable
             {
                 // A delayed MWB cursor overlay can still intercept the button
                 // even when the receiver is foreground and the cursor is inside.
-                stableClickTarget = ReceiverObservation.IsPhysicalClickTarget(current, guestReceiverHwnd)
-                    ? stableClickTarget + 1 : 0;
-                return stableClickTarget >= 2;
+                if (ReceiverObservation.IsPhysicalClickTarget(current, guestReceiverHwnd))
+                {
+                    stableClickTarget++;
+                    return stableClickTarget >= 2;
+                }
+
+                stableClickTarget = 0;
+                var probe = ReceiverObservation.ClickProbePosition(left, top, right, bottom, blockedClickProbes++);
+                RequireHostForeground();
+                MouseHelper.MoveBy(Math.Clamp(probe.X - x, -100, 100),
+                    Math.Clamp(probe.Y - y, -100, 100), steps: 4);
+                return false;
             }
 
             stableClickTarget = 0;
@@ -684,8 +690,8 @@ internal sealed class TwoEndpointFixture : IDisposable
         var negative = Stopwatch.StartNew();
         do
         {
-            Assert.AreEqual(baseline, Observe(guest!)["ClipboardDigest"]!.GetValue<string>(), "Clipboard-sharing-off did not preserve the guest's independent baseline.");
-            Assert.AreEqual(source, Observe(host!)["ClipboardDigest"]!.GetValue<string>(), "Clipboard-sharing-off changed the source.");
+            Assert.AreEqual(baseline, RequireClipboardDigest(guest!), "Clipboard-sharing-off did not preserve the guest's independent baseline.");
+            Assert.AreEqual(source, RequireClipboardDigest(host!), "Clipboard-sharing-off changed the source.");
             Thread.Sleep(250);
         }
         while (negative.Elapsed < TimeSpan.FromSeconds(5));
@@ -714,10 +720,35 @@ internal sealed class TwoEndpointFixture : IDisposable
         Thread.Sleep(1500);
         var digest = endpoint.Request("PublishClipboard")["Digest"]!.GetValue<string>();
         Assert.AreEqual(64, digest.Length, "The source must acknowledge its generated synthetic clipboard digest.");
-        RunFiles.Wait(() => Observe(endpoint)["ClipboardDigest"]!.GetValue<string>() == digest,
+        var publication = Stopwatch.StartNew();
+        RunFiles.Wait(() => ClipboardMatches(ReadClipboardDigest(Observe(endpoint)), digest, publication.Elapsed),
             TimeSpan.FromSeconds(15), "The source did not publish its acknowledged synthetic clipboard.");
         return digest;
     }
+
+    private string RequireClipboardDigest(EndpointChannel endpoint)
+    {
+        string? digest = null;
+        RunFiles.Wait(() => (digest = ReadClipboardDigest(Observe(endpoint))) is not null,
+            TimeSpan.FromSeconds(15), "Clipboard remained unavailable for the sharing-off assertion.");
+        return digest!;
+    }
+
+    internal static string? ReadClipboardDigest(JsonObject observation)
+    {
+        if (!observation["ClipboardAvailable"]!.GetValue<bool>())
+        {
+            Assert.AreEqual(unchecked((int)0x800401D0), observation["ClipboardErrorHResult"]!.GetValue<int>());
+            Assert.IsNull(observation["ClipboardDigest"], "An unavailable clipboard must not supply a digest.");
+            return null;
+        }
+
+        Assert.IsNull(observation["ClipboardErrorHResult"], "An available clipboard must not carry a read error.");
+        return observation["ClipboardDigest"]!.GetValue<string>();
+    }
+
+    internal static bool ClipboardMatches(string? digest, string expectedDigest, TimeSpan elapsed) =>
+        digest == expectedDigest && elapsed <= TimeSpan.FromSeconds(15);
 
     private JsonElement InspectSubtree(Element element) => WinappCli.InvokeJson(
         "ui", "inspect", element.Selector, settings!.TargetFlag, settings.TargetValue, "--json", "-d", "6");
@@ -753,6 +784,7 @@ internal sealed class TwoEndpointFixture : IDisposable
         var watch = Stopwatch.StartNew();
         var direction = ReferenceEquals(destination, guest) ? "HostToGuest" : "GuestToHost";
         var observations = 0;
+        var busyObservations = 0;
         var matched = false;
         try
         {
@@ -760,7 +792,13 @@ internal sealed class TwoEndpointFixture : IDisposable
                 () =>
                 {
                     observations++;
-                    matched = Observe(destination)["ClipboardDigest"]!.GetValue<string>() == sourceDigest;
+                    var digest = ReadClipboardDigest(Observe(destination));
+                    if (digest is null)
+                    {
+                        busyObservations++;
+                    }
+
+                    matched = ClipboardMatches(digest, sourceDigest, watch.Elapsed);
                     return matched;
                 },
                 TimeSpan.FromSeconds(15),
@@ -779,6 +817,7 @@ internal sealed class TwoEndpointFixture : IDisposable
                     ElapsedMilliseconds = watch.Elapsed.TotalMilliseconds,
                     TimeoutMilliseconds = 15_000,
                     Observations = observations,
+                    BusyObservations = busyObservations,
                     Matched = matched,
                 });
             }
