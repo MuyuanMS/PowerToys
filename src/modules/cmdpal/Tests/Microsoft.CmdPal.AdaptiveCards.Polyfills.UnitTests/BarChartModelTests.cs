@@ -155,6 +155,26 @@ public class BarChartModelTests
     }
 
     [TestMethod]
+    public void MissingDataWarnsAndReturnsNoPoints()
+    {
+        var warnings = new List<string>();
+        var model = BarChartModel.Parse("""{ "type": "Chart.VerticalBar" }""", BarOrientation.Vertical, warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual("data is required.", warnings[0]);
+        Assert.AreEqual(0, model.Data.Count);
+    }
+
+    [TestMethod]
+    [DataRow(0, 0, 1)]
+    [DataRow(1, 1, 0)]
+    [DataRow(0.25, 0.25, 0.75)]
+    public void HorizontalBarColumnWidthsPreserveZeroAndFullFractions(double fraction, double fill, double remainder)
+    {
+        Assert.AreEqual((fill, remainder), BarChartControl.GetBarColumnWidths(fraction));
+    }
+
+    [TestMethod]
     public void PartToWholeTooltipShowsShareAndValue()
     {
         Assert.AreEqual("25% (3)", BarChartControl.FormatTooltipValue(BarDisplayMode.PartToWhole, 0.25, 3));

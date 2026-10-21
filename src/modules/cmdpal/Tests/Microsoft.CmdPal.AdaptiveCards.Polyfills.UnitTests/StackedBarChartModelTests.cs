@@ -64,6 +64,19 @@ public class StackedBarChartModelTests
     }
 
     [TestMethod]
+    [DataRow("""{ "type": "Chart.HorizontalBar.Stacked", "data": {} }""")]
+    [DataRow("""{ "type": "Chart.HorizontalBar.Stacked", "data": "invalid" }""")]
+    public void NonArrayDataWarnsAndLeavesGroupsEmpty(string json)
+    {
+        var warnings = new List<string>();
+        var model = StackedBarChartModel.Parse(json, warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.AreEqual("data must be an array.", warnings[0]);
+        Assert.AreEqual(0, model.Groups.Count);
+    }
+
+    [TestMethod]
     public void MissingLegendUsesFallbackLabelAndKeepsFirstSeenOrder()
     {
         ChartStrings.SetLookup(static key => key == "AdaptiveChart_UnnamedCategory" ? "Uncategorized" : key);

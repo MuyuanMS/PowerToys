@@ -182,9 +182,10 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
             var fraction = mode == BarDisplayMode.PartToWhole
                 ? (total > 0 ? value / total : 0)
                 : Math.Clamp(range.Normalize(value), 0, 1);
+            var (fillWidth, remainderWidth) = GetBarColumnWidths(fraction);
             var bar = new Grid { Height = HorizontalBarHeight, VerticalAlignment = VerticalAlignment.Center };
-            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(fraction, 0.0001), GridUnitType.Star) });
-            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1 - fraction, 0.0001), GridUnitType.Star) });
+            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(fillWidth, GridUnitType.Star) });
+            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(remainderWidth, GridUnitType.Star) });
             var trackBorder = new Border { Background = track, CornerRadius = new CornerRadius(HorizontalBarHeight / 2) };
             Grid.SetColumnSpan(trackBorder, 2);
             bar.Children.Add(trackBorder);
@@ -255,6 +256,12 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
         mode == BarDisplayMode.PartToWhole
             ? string.Format(CultureInfo.CurrentCulture, "{0:0.#}% ({1})", fraction * 100, FormatValue(value))
             : FormatValue(value);
+
+    internal static (double Fill, double Remainder) GetBarColumnWidths(double fraction)
+    {
+        var clampedFraction = Math.Clamp(fraction, 0, 1);
+        return (clampedFraction, 1 - clampedFraction);
+    }
 
     private static Grid CreateLabelRow(string? left, string right, Brush foreground)
     {
