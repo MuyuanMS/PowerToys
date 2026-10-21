@@ -23,6 +23,9 @@ internal static partial class ChartValueFormatter
         };
     }
 
+    public static string FormatPercent(double value, IFormatProvider culture) =>
+        value.ToString("P0", culture);
+
     private static string Shorten(IFormatProvider culture, CompositeFormat format, double scaled) =>
         string.Format(culture, format, scaled.ToString("0.#", culture));
 }

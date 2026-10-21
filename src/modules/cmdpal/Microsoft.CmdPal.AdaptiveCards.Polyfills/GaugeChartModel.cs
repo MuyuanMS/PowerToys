@@ -47,7 +47,7 @@ internal sealed class GaugeChartModel : IAdaptiveVisualModel
     public string FormatValue(IFormatProvider culture) =>
         ValueFormat == GaugeValueFormat.Fraction
             ? string.Format(culture, "{0:0.##}/{1:0.##}", Value, Max)
-            : string.Format(culture, "{0:0}%", Fraction * 100);
+            : ChartValueFormatter.FormatPercent(Fraction, culture);
 
     /// <summary>Returns the index of the segment that contains the value, or -1.</summary>
     public int GetActiveSegment()

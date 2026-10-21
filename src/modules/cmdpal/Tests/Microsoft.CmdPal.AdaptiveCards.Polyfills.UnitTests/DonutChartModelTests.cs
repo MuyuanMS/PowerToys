@@ -82,6 +82,25 @@ public class DonutChartModelTests
     }
 
     [TestMethod]
+    public void SummaryUsesCultureSpecificPercentFormatting()
+    {
+        var culture = CultureInfo.GetCultureInfo("fr-FR");
+        var model = new DonutChartModel
+        {
+            Data = [new("Free", 1, null), new("Used", 3, null)],
+        };
+
+        var summary = DonutChartControl.CreateSummary(model.Data, model.GetShares(), culture);
+        var expected = string.Concat(
+            "Free ",
+            0.25.ToString("P0", culture),
+            ", Used ",
+            0.75.ToString("P0", culture));
+
+        Assert.AreEqual(expected, summary);
+    }
+
+    [TestMethod]
     public void AllZeroDataHasZeroShares()
     {
         var model = new DonutChartModel { Data = [new("A", 0, null)] };

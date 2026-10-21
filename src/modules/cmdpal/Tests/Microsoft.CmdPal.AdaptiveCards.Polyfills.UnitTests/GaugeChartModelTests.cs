@@ -186,6 +186,15 @@ public class GaugeChartModelTests
     }
 
     [TestMethod]
+    public void PercentageValueUsesCultureSpecificPercentFormatting()
+    {
+        var culture = CultureInfo.GetCultureInfo("fr-FR");
+        var model = new GaugeChartModel { Value = 25 };
+
+        Assert.AreEqual(0.25.ToString("P0", culture), model.FormatValue(culture));
+    }
+
+    [TestMethod]
     public void InvalidRangeWarnsAndFallsBack()
     {
         var warnings = new List<string>();

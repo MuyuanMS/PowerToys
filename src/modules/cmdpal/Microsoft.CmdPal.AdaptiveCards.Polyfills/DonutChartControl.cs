@@ -201,7 +201,7 @@ internal sealed partial class DonutChartControl : AdaptiveVisualControl
             var label = ChartShapes.CreateText(_model.Data[i].Label ?? string.Empty, ChartShapes.BodyStyle, secondary);
             label.TextTrimming = TextTrimming.CharacterEllipsis;
             var share = ChartShapes.CreateText(
-                string.Format(CultureInfo.CurrentCulture, "{0:0}%", shares[i] * 100),
+                ChartValueFormatter.FormatPercent(shares[i], CultureInfo.CurrentCulture),
                 ChartShapes.BodyStrongStyle);
             share.HorizontalAlignment = HorizontalAlignment.Right;
             Grid.SetRow(dot, i);
@@ -236,7 +236,7 @@ internal sealed partial class DonutChartControl : AdaptiveVisualControl
                 summary.Append(label).Append(' ');
             }
 
-            summary.Append(string.Format(culture, "{0:0}%", shares[i] * 100));
+            summary.Append(ChartValueFormatter.FormatPercent(shares[i], culture));
         }
 
         return summary.ToString();
