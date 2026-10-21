@@ -132,7 +132,7 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
                 DiskUsages[name].Usage = activeTimePercent / 100f;
                 if (diskCounterWithName.Value.Count > 3)
                 {
-                    DiskUsages[name].ResponseTime = Math.Max(0f, diskCounterWithName.Value[3].NextValue());
+                    DiskUsages[name].ResponseTime = GetResponseTime(diskCounterWithName.Value[3].NextValue());
                 }
 
                 var history = DiskHistories[name];
@@ -154,6 +154,9 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
     /// </summary>
     internal static float GetActiveTimePercent(float idlePercent, bool hasPreviousSample) =>
         hasPreviousSample && float.IsFinite(idlePercent) ? Math.Clamp(100f - idlePercent, 0f, 100f) : 0f;
+
+    internal static float? GetResponseTime(float seconds) =>
+        float.IsFinite(seconds) ? Math.Max(0f, seconds) : null;
 
     public DiskHistory GetHistory(int diskIndex)
     {

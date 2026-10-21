@@ -22,6 +22,21 @@ public class DiskStatsTests
     }
 
     [TestMethod]
+    public void ResponseTimeIsUnknownWhenTheReadingIsNotFinite()
+    {
+        Assert.IsNull(DiskStats.GetResponseTime(float.NaN));
+        Assert.IsNull(DiskStats.GetResponseTime(float.PositiveInfinity));
+        Assert.IsNull(DiskStats.GetResponseTime(float.NegativeInfinity));
+    }
+
+    [TestMethod]
+    public void ResponseTimeClampsFiniteNegativeReadingsToZero()
+    {
+        Assert.AreEqual(0f, DiskStats.GetResponseTime(-0.001f).Value);
+        Assert.AreEqual(0.001f, DiskStats.GetResponseTime(0.001f).Value);
+    }
+
+    [TestMethod]
     [DataRow(100f, 0f)]
     [DataRow(75f, 25f)]
     [DataRow(2.5f, 97.5f)]
