@@ -65,6 +65,7 @@
         },
         {
           "type": "Chart.Line",
+          "$when": "${$host.widgetSize != \"small\"}",
           "spacing": "medium",
           "yAxisTitle": "${netChartAxis}",
           "xAxisTitle": "%NetworkUsage_Widget_Template/Chart_X_Axis%",

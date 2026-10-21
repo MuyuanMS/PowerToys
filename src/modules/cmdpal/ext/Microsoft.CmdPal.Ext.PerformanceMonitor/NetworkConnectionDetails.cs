@@ -37,19 +37,9 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
 
                     properties = adapter.GetIPProperties();
                 }
-                else
+                else if (!IsDefaultConnection(adapter, out properties))
                 {
-                    if (adapter.OperationalStatus != OperationalStatus.Up
-                        || adapter.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
-                    {
-                        continue;
-                    }
-
-                    properties = adapter.GetIPProperties();
-                    if (properties.GatewayAddresses.Count == 0)
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
                 var addresses = properties.UnicastAddresses;
@@ -140,8 +130,16 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
         return bytes[0] == 169 && bytes[1] == 254 ? 2 : 0;
     }
 
-    private static bool IsDefaultConnection(NetworkInterface adapter) =>
-        adapter.OperationalStatus == OperationalStatus.Up
-        && adapter.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
-        && adapter.GetIPProperties().GatewayAddresses.Count > 0;
+    private static bool IsDefaultConnection(NetworkInterface adapter, out IPInterfaceProperties properties)
+    {
+        if (adapter.OperationalStatus != OperationalStatus.Up
+            || adapter.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+        {
+            properties = null!;
+            return false;
+        }
+
+        properties = adapter.GetIPProperties();
+        return properties.GatewayAddresses.Count > 0;
+    }
 }
