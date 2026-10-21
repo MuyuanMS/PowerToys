@@ -1,0 +1,145 @@
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+
+namespace Microsoft.CmdPal.Ext.PerformanceMonitor;
+
+/// <summary>
+/// A network adapter's connection type and addresses, as Task Manager shows them. The Wi-Fi
+/// network name isn't included: reading it needs location access.
+/// </summary>
+internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, string IPv4, string IPv6)
+{
+    /// <summary>
+    /// Reads the details of the adapter with <paramref name="interfaceId"/>, or else of the adapter
+    /// with a default gateway. It takes milliseconds, so callers cache the result.
+    /// </summary>
+    public static NetworkConnectionDetails? Read(Guid? interfaceId)
+    {
+        try
+        {
+            foreach (var adapter in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                IPInterfaceProperties properties;
+                if (interfaceId is Guid id)
+                {
+                    if (!Guid.TryParse(adapter.Id, out var adapterId) || adapterId != id)
+                    {
+                        continue;
+                    }
+
+                    properties = adapter.GetIPProperties();
+                }
+                else if (!IsDefaultConnection(adapter, out properties))
+                {
+                    continue;
+                }
+
+                var addresses = properties.UnicastAddresses;
+                var (ipv4, ipv6) = PickAddresses(addresses.Select(static address => address.Address));
+
+                return new(
+                    adapter.NetworkInterfaceType,
+                    ipv4,
+                    ipv6);
+            }
+        }
+        catch (NetworkInformationException)
+        {
+            // Treat an adapter that can't be read as unknown.
+        }
+
+        return null;
+    }
+
+    /// <summary>Returns the resource key for an adapter type's name, or null for types the card doesn't name.</summary>
+    public static string? GetTypeResourceKey(NetworkInterfaceType type) => type switch
+    {
+        NetworkInterfaceType.Wireless80211 => "NetworkUsage_Widget_Template/Type_WiFi",
+        NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.FastEthernetT
+            or NetworkInterfaceType.FastEthernetFx or NetworkInterfaceType.Ethernet3Megabit => "NetworkUsage_Widget_Template/Type_Ethernet",
+        NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "NetworkUsage_Widget_Template/Type_Cellular",
+        _ => null,
+    };
+
+    /// <summary>Returns the Adaptive Cards icon name for an adapter type, such as <c>Wifi1</c>.</summary>
+    public static string GetTypeIconName(NetworkInterfaceType? type) => type switch
+    {
+        NetworkInterfaceType.Wireless80211 => "Wifi1",
+        NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.FastEthernetT
+            or NetworkInterfaceType.FastEthernetFx or NetworkInterfaceType.Ethernet3Megabit => "NetworkAdapter",
+        NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "CellularData1",
+        _ => "Globe",
+    };
+
+    /// <summary>
+    /// Prefers non-link-local addresses over link-local ones. For IPv6, global unicast addresses
+    /// are preferred over other non-link-local addresses. Loopback addresses are excluded.
+    /// </summary>
+    internal static (string IPv4, string IPv6) PickAddresses(IEnumerable<IPAddress> addresses)
+    {
+        IPAddress? bestIPv4 = null;
+        var bestIPv4Rank = int.MaxValue;
+        IPAddress? bestIPv6 = null;
+        var bestIPv6Rank = int.MaxValue;
+        foreach (var address in addresses)
+        {
+            if (IPAddress.IsLoopback(address))
+            {
+                continue;
+            }
+
+            if (address.AddressFamily == AddressFamily.InterNetwork)
+            {
+                var rank = GetRank(address);
+                if (rank < bestIPv4Rank)
+                {
+                    bestIPv4 = address;
+                    bestIPv4Rank = rank;
+                }
+            }
+            else if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                var rank = GetRank(address);
+                if (rank < bestIPv6Rank)
+                {
+                    bestIPv6 = address;
+                    bestIPv6Rank = rank;
+                }
+            }
+        }
+
+        return (bestIPv4?.ToString() ?? string.Empty, bestIPv6?.ToString() ?? string.Empty);
+    }
+
+    private static int GetRank(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return address.IsIPv6LinkLocal ? 2 : (bytes[0] & 0xE0) == 0x20 ? 0 : 1;
+        }
+
+        return bytes[0] == 169 && bytes[1] == 254 ? 2 : 0;
+    }
+
+    private static bool IsDefaultConnection(NetworkInterface adapter, out IPInterfaceProperties properties)
+    {
+        if (adapter.OperationalStatus != OperationalStatus.Up
+            || adapter.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+        {
+            properties = null!;
+            return false;
+        }
+
+        properties = adapter.GetIPProperties();
+        return properties.GatewayAddresses.Count > 0;
+    }
+}
