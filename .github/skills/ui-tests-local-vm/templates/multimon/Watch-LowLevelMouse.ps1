@@ -78,6 +78,7 @@ public static class MouseHookProbe
     // The hook is called on this thread, so it must keep pumping messages for the whole recording.
     public static Event[] Record(uint milliseconds)
     {
+        while (events.TryDequeue(out _)) { }
         callback = OnEvent;
         hook = SetWindowsHookEx(WH_MOUSE_LL, callback, GetModuleHandle(null), 0);
         if (hook == IntPtr.Zero) throw new InvalidOperationException("SetWindowsHookEx failed: " + Marshal.GetLastWin32Error());

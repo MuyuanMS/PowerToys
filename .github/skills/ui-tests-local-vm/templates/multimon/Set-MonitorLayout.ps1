@@ -641,7 +641,9 @@ function Export-SolidWallpaperSet {
     )
     New-Item -ItemType Directory -Path $Folder -Force | Out-Null
     # The folder holds only generated images, and a stale one would join the file-name order.
-    Get-ChildItem -LiteralPath $Folder -Filter '*.png' -File | Remove-Item -Force
+    Get-ChildItem -LiteralPath $Folder -File |
+        Where-Object { $_.Extension -in '.png', '.jpg', '.jpeg', '.bmp' } |
+        Remove-Item -Force
     for ($index = 0; $index -lt $bars.Count; $index++) {
         $bar = $bars[$index]
         $path = Join-Path $Folder ('{0:D2}_{1}.png' -f ($index + 1), $bar.Name)
