@@ -47,8 +47,14 @@ internal sealed partial class LineChartControl : UserControl, IIncrementalAdapti
     private static readonly TimeSpan DefaultScrollDuration = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MinimumScrollDuration = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan MaximumScrollDuration = TimeSpan.FromMilliseconds(1500);
-    private static readonly CompositeFormat SeriesNameFormat = CompositeFormat.Parse(ChartStrings.Get("AdaptiveChart_SeriesName"));
-    private static readonly CompositeFormat SeriesSummaryFormat = CompositeFormat.Parse(ChartStrings.Get("AdaptiveChart_SeriesSummary"));
+    private static readonly CompositeFormat SeriesNameFormat = ChartFormat.Load(
+        ChartStrings.Get("AdaptiveChart_SeriesName"),
+        CompositeFormat.Parse("Series {0}"),
+        argumentCount: 1);
+    private static readonly CompositeFormat SeriesSummaryFormat = ChartFormat.Load(
+        ChartStrings.Get("AdaptiveChart_SeriesSummary"),
+        CompositeFormat.Parse("{0}: latest {1}, low {2}, high {3}."),
+        argumentCount: 4);
 
     private readonly RowDefinition _plotRow = new() { Height = new GridLength(120) };
     private readonly TextBlock _titleText = new()
