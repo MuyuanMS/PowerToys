@@ -41,6 +41,30 @@ public class SeparatorTests
     }
 
     [TestMethod]
+    public void SectionCommand_ReflectsPropertyBagMutationsAndCanRestorePreviousValue()
+    {
+        var first = new NoOpCommand { Name = "First" };
+        var second = new NoOpCommand { Name = "Second" };
+        var separator = new Separator("Recent", first);
+        var properties = separator.GetProperties();
+        List<string> notifications = [];
+        separator.PropChanged += (_, args) => notifications.Add(args.PropertyName);
+
+        properties[WellKnownExtensionAttributes.SectionCommand] = second;
+        Assert.AreSame(second, separator.SectionCommand);
+
+        separator.SectionCommand = first;
+        Assert.AreSame(first, properties[WellKnownExtensionAttributes.SectionCommand]);
+
+        properties.Remove(WellKnownExtensionAttributes.SectionCommand);
+        Assert.IsNull(separator.SectionCommand);
+
+        separator.SectionCommand = first;
+        Assert.AreSame(first, properties[WellKnownExtensionAttributes.SectionCommand]);
+        CollectionAssert.AreEqual(new[] { nameof(Separator.SectionCommand), nameof(Separator.SectionCommand) }, notifications);
+    }
+
+    [TestMethod]
     public void SectionCommand_UpdatesPropertiesBeforeNotifyingAndRemovesItWhenCleared()
     {
         var first = new NoOpCommand { Name = "First" };

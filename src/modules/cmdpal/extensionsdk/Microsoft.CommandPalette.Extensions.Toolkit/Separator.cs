@@ -9,7 +9,6 @@ namespace Microsoft.CommandPalette.Extensions.Toolkit;
 public partial class Separator : BaseObservable, IListItem, ISeparatorContextItem, ISeparatorFilterItem, IExtendedAttributesProvider
 {
     private readonly PropertySet _extendedAttributes = new();
-    private ICommand? _sectionCommand;
 
     public IDetails? Details => null;
 
@@ -30,15 +29,14 @@ public partial class Separator : BaseObservable, IListItem, ISeparatorContextIte
     /// </remarks>
     public ICommand? SectionCommand
     {
-        get => _sectionCommand;
+        get => _extendedAttributes.TryGetValue(WellKnownExtensionAttributes.SectionCommand, out var value) ? value as ICommand : null;
         set
         {
-            if (EqualityComparer<ICommand?>.Default.Equals(value, _sectionCommand))
+            if (EqualityComparer<ICommand?>.Default.Equals(value, SectionCommand))
             {
                 return;
             }
 
-            _sectionCommand = value;
             if (value is null)
             {
                 _extendedAttributes.Remove(WellKnownExtensionAttributes.SectionCommand);
