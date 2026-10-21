@@ -110,6 +110,50 @@ public class GaugeChartModelTests
     }
 
     [TestMethod]
+    public void ValueBeyondLastSegmentHasNoActiveSegment()
+    {
+        var model = new GaugeChartModel
+        {
+            Value = 75,
+            Max = 100,
+            Segments = [new("Low", 50, null), new("Medium", 20, null)],
+        };
+
+        Assert.AreEqual(-1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void TrailingZeroSizeSegmentIsNotActive()
+    {
+        var model = new GaugeChartModel
+        {
+            Value = 50,
+            Max = 100,
+            Segments = [new("Low", 50, null), new("Empty", 0, null)],
+        };
+
+        Assert.AreEqual(-1, model.GetActiveSegment());
+    }
+
+    [TestMethod]
+    public void ValuesOutsideRangeUseTheNearestSegment()
+    {
+        var belowRange = new GaugeChartModel
+        {
+            Value = -5,
+            Segments = [new("Low", 50, null), new("High", 50, null)],
+        };
+        var aboveRange = new GaugeChartModel
+        {
+            Value = 150,
+            Segments = [new("Low", 50, null), new("High", 50, null)],
+        };
+
+        Assert.AreEqual(0, belowRange.GetActiveSegment());
+        Assert.AreEqual(1, aboveRange.GetActiveSegment());
+    }
+
+    [TestMethod]
     public void TheMaximumIsInTheLastSegment()
     {
         var model = new GaugeChartModel
@@ -122,7 +166,7 @@ public class GaugeChartModelTests
     }
 
     [TestMethod]
-    public void ValueBelowTheSegmentsHasNoActiveSegment()
+    public void ValueBelowMinimumUsesFirstActiveSegment()
     {
         var model = new GaugeChartModel
         {
@@ -130,7 +174,7 @@ public class GaugeChartModelTests
             Segments = [new("Low", 50, null), new("High", 50, null)],
         };
 
-        Assert.AreEqual(-1, model.GetActiveSegment());
+        Assert.AreEqual(0, model.GetActiveSegment());
     }
 
     [TestMethod]
@@ -153,6 +197,17 @@ public class GaugeChartModelTests
     }
 
     [TestMethod]
+    public void InvalidInferredMaximumFallsBackWithoutWarning()
+    {
+        var warnings = new List<string>();
+        var model = GaugeChartModel.Parse("""{ "type": "Chart.Gauge", "min": 150 }""", warnings);
+
+        Assert.AreEqual(0, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual(150d, model.Min);
+        Assert.AreEqual(250d, model.Max);
+    }
+
+    [TestMethod]
     public void SegmentSharesAreZeroWhenRangeCannotBeRepresented()
     {
         var warnings = new List<string>();
@@ -160,7 +215,7 @@ public class GaugeChartModelTests
             """{ "type": "Chart.Gauge", "min": 1e308, "segments": [{ "size": 50 }] }""",
             warnings);
 
-        Assert.AreEqual(1, warnings.Count, string.Join(", ", warnings));
+        Assert.AreEqual(0, warnings.Count, string.Join(", ", warnings));
         Assert.AreEqual(model.Min, model.Max);
         Assert.AreEqual(0d, model.GetSegmentShares()[0]);
     }

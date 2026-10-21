@@ -52,11 +52,17 @@ internal sealed class GaugeChartModel : IAdaptiveVisualModel
     /// <summary>Returns the index of the segment that contains the value, or -1.</summary>
     public int GetActiveSegment()
     {
+        if (!(Max > Min))
+        {
+            return -1;
+        }
+
+        var value = Math.Clamp(Value, Min, Max);
         var start = Min;
         for (var i = 0; i < Segments.Count; i++)
         {
             var end = start + Math.Max(0, Segments[i].Value);
-            if (Value >= start && (Value < end || i == Segments.Count - 1))
+            if (end > start && value >= start && (value < end || (i == Segments.Count - 1 && value == end)))
             {
                 return i;
             }
@@ -100,10 +106,15 @@ internal sealed class GaugeChartModel : IAdaptiveVisualModel
                 segmentTotal += Math.Max(0, segment.Value);
             }
 
-            var max = ChartJson.GetNumber(element, "max") ?? (segmentTotal > 0 ? min + segmentTotal : 100);
+            var specifiedMax = ChartJson.GetNumber(element, "max");
+            var max = specifiedMax ?? (segmentTotal > 0 ? min + segmentTotal : 100);
             if (max <= min)
             {
-                warnings.Add("max must be greater than min.");
+                if (specifiedMax.HasValue)
+                {
+                    warnings.Add("max must be greater than min.");
+                }
+
                 max = min + 100;
             }
 
