@@ -57,8 +57,8 @@ public class ProcessCpuSamplerTests
         Assert.AreEqual(0, sampler.Sample(5).Length);
 
         // Keep this process busy so the second snapshot has something to report.
-        var deadline = DateTime.UtcNow.AddMilliseconds(200);
-        while (DateTime.UtcNow < deadline)
+        var workload = Stopwatch.StartNew();
+        while (workload.Elapsed < TimeSpan.FromSeconds(1))
         {
             Thread.SpinWait(1000);
         }

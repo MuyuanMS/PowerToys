@@ -77,4 +77,37 @@ public class DataManagerTests
             manager.Stop();
         }
     }
+
+    [TestMethod]
+    public void StopWaitsForATimerUpdateAlreadyInProgress()
+    {
+        using var timerUpdateStarted = new ManualResetEventSlim();
+        using var continueTimerUpdate = new ManualResetEventSlim();
+        var updateCount = 0;
+        using var manager = new DataManager(DataType.Memory, () =>
+        {
+            if (Interlocked.Increment(ref updateCount) == 2)
+            {
+                timerUpdateStarted.Set();
+                continueTimerUpdate.Wait();
+            }
+        });
+
+        try
+        {
+            manager.Start();
+            Assert.IsTrue(timerUpdateStarted.Wait(TimeSpan.FromSeconds(5)));
+
+            var stopTask = Task.Run(manager.Stop);
+            Assert.IsFalse(stopTask.Wait(TimeSpan.FromMilliseconds(100)));
+
+            continueTimerUpdate.Set();
+            Assert.IsTrue(stopTask.Wait(TimeSpan.FromSeconds(5)));
+        }
+        finally
+        {
+            continueTimerUpdate.Set();
+            manager.Stop();
+        }
+    }
 }

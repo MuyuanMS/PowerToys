@@ -123,7 +123,16 @@ internal sealed partial class DataManager : IDisposable
 
     private static bool ShouldSample(object stats) => ShouldSample(stats, Environment.TickCount64);
 
-    private void UpdateTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e) => UpdateNow();
+    private void UpdateTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        lock (_immediateUpdateLock)
+        {
+            if (_updateTimer.Enabled)
+            {
+                UpdateNow();
+            }
+        }
+    }
 
     private void UpdateNow()
     {
