@@ -1061,7 +1061,7 @@ internal sealed partial class SystemDiskUsageWidgetPage : WidgetPage, IDisposabl
 
     /// <summary>Formats an average response time given in seconds, such as <c>0.4 ms</c>.</summary>
     internal static string ResponseTimeToString(float seconds) =>
-        string.Format(CultureInfo.CurrentCulture, "{0:0.#} ms", Math.Max(0, seconds) * 1000);
+        string.Format(CultureInfo.CurrentCulture, Resources.GetResource("DiskUsage_Widget_Template/Response_Time_Value"), Math.Max(0, seconds) * 1000);
 
     public string GetItemTitle(bool isBandPage)
     {

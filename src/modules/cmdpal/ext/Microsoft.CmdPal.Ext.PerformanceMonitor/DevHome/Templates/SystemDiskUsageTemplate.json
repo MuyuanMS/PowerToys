@@ -109,7 +109,7 @@
           "type": "Chart.Line",
           "spacing": "medium",
           "yAxisTitle": "${diskChartAxis}",
-          "xAxisTitle": "%CPUUsage_Widget_Template/Chart_X_Axis%",
+          "xAxisTitle": "%DiskUsage_Widget_Template/Chart_X_Axis%",
           "yMin": 0,
           "data": "${diskSeries}",
           "fallback": "drop"
