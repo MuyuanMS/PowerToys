@@ -86,6 +86,13 @@ public sealed partial class ManualListItemsViewTests
         return Task.CompletedTask;
     });
 
+    [TestMethod]
+    public Task ContentFormControlCanBeConstructedBeforeThemeResolution() => OnUiThread(() =>
+    {
+        _ = new ContentFormControl();
+        return Task.CompletedTask;
+    });
+
     [DataTestMethod]
     [DataRow(false, false)]
     [DataRow(true, false)]

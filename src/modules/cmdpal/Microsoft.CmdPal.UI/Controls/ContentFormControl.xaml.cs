@@ -56,7 +56,7 @@ public sealed partial class ContentFormControl : UserControl
     public ContentFormControl()
     {
         this.InitializeComponent();
-        _hostConfig = AdaptiveCardsConfig.Create(ActualTheme);
+        _hostConfig = AdaptiveCardsConfig.Create(CurrentHostConfigTheme);
         var renderer = new AdaptiveCardRenderer()
         {
             HostConfig = _hostConfig,
@@ -113,11 +113,13 @@ public sealed partial class ContentFormControl : UserControl
     /// <summary>Re-renders the card for the current theme, since host config colors are baked into it.</summary>
     private void RefreshHostConfig()
     {
-        var hostConfig = AdaptiveCardsConfig.Create(ActualTheme);
+        var hostConfig = AdaptiveCardsConfig.Create(CurrentHostConfigTheme);
         if (ReferenceEquals(hostConfig, _hostConfig))
         {
             return;
         }
+
+        private ElementTheme CurrentHostConfigTheme => ActualTheme == ElementTheme.Light ? ElementTheme.Light : ElementTheme.Dark;
 
         _hostConfig = hostConfig;
         _renderer.HostConfig = hostConfig;
