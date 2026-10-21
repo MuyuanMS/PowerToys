@@ -166,14 +166,31 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
         throw
     }
     finally {
-        if ($process -and -not $process.HasExited) {
-            Write-Warning "Stopping only failed test process PID $($process.Id); this is not a successful shutdown."
-            Stop-Process -Id $process.Id -Force -ErrorAction Stop
-            $record.ForcedCleanup = $true
+        if ($process) {
+            try {
+                if (-not $process.HasExited) {
+                    Write-Warning "Stopping only failed test process PID $($process.Id); this is not a successful shutdown."
+                    Stop-Process -Id $process.Id -Force -ErrorAction Stop
+                    $record.ForcedCleanup = $true
+                }
+            }
+            catch {
+                $cleanupFailure = $_.Exception.Message
+                if ($record.Failure) {
+                    $record.Failure = "$($record.Failure) Forced cleanup failed: $cleanupFailure"
+                }
+                else {
+                    $record.Failure = "Forced cleanup failed: $cleanupFailure"
+                }
+            }
         }
-        $results.Add([pscustomobject]$record)
-        $results | ConvertTo-Json -Depth 5 |
-            Set-Content -LiteralPath (Join-Path $ResultsDirectory 'results.json') -Encoding utf8
-        if ($process) { $process.Dispose() }
+        try {
+            $results.Add([pscustomobject]$record)
+            $results | ConvertTo-Json -Depth 5 |
+                Set-Content -LiteralPath (Join-Path $ResultsDirectory 'results.json') -Encoding utf8
+        }
+        finally {
+            if ($process) { $process.Dispose() }
+        }
     }
 }

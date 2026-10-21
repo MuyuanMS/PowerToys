@@ -81,11 +81,12 @@ namespace CentralizedHotkeys
                 // Window-owned hotkeys are already removed after WM_DESTROY.
                 if (it->second.empty() && IsWindow(runnerWindow))
                 {
-                    if (!UnregisterHotKey(runnerWindow, ids[it->first]))
+                    const auto id = ids.find(it->first);
+                    if (id != ids.end() && !UnregisterHotKey(runnerWindow, id->second))
                     {
                         Logger::warn(L"Failed to unregister {} shortcut. {}", ToWstring(it->first), get_last_error_or_default(GetLastError()));
                     }
-                    else
+                    else if (id != ids.end())
                     {
                         Logger::trace(L"{} shortcut unregistered", ToWstring(it->first));
                     }

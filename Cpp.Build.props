@@ -110,8 +110,9 @@
     </Link>
   </ItemDefinitionGroup>
 
-  <!-- Hybrid CRT: the VC++ runtime and STL stay static (/MT); the UCRT comes from the in-box ucrtbase.dll.
-       Every module shares that UCRT, so don't change process-wide CRT state (doc/devdocs/development/guidelines.md). -->
+  <!-- When EnableHybridCRT=true (the repo default), the VC++ runtime and STL stay static (/MT); the shared UCRT
+       is ucrtbase.dll for Release and the Windows SDK's ucrtbased.dll for Debug. Hybrid CRT modules share that UCRT,
+       so don't change process-wide CRT state (doc/devdocs/development/guidelines.md). -->
   <PropertyGroup>
     <EnableHybridCRT Condition="'$(EnableHybridCRT)' == ''">true</EnableHybridCRT>
   </PropertyGroup>
