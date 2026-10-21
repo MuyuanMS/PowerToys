@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -30,16 +31,13 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
                     ? Guid.TryParse(adapter.Id, out var adapterId) && adapterId == id
                     : IsDefaultConnection(adapter))
                 {
-                    var addresses = new List<IPAddress>();
-                    foreach (var address in adapter.GetIPProperties().UnicastAddresses)
-                    {
-                        addresses.Add(address.Address);
-                    }
+                    var addresses = adapter.GetIPProperties().UnicastAddresses;
+                    var (ipv4, ipv6) = PickAddresses(addresses.Select(static address => address.Address));
 
                     return new(
                         adapter.NetworkInterfaceType,
-                        PickAddress(addresses, AddressFamily.InterNetwork),
-                        PickAddress(addresses, AddressFamily.InterNetworkV6));
+                        ipv4,
+                        ipv6);
                 }
             }
         }
@@ -75,26 +73,33 @@ internal sealed record NetworkConnectionDetails(NetworkInterfaceType Type, strin
     /// Picks the first non-link-local address for a family, or a link-local address if it is the
     /// only available one. Loopback addresses are excluded.
     /// </summary>
-    internal static string PickAddress(IEnumerable<IPAddress> addresses, AddressFamily family)
+    internal static (string IPv4, string IPv6) PickAddresses(IEnumerable<IPAddress> addresses)
     {
-        IPAddress? best = null;
-        var bestRank = int.MaxValue;
+        IPAddress? bestIPv4 = null;
+        var bestIPv4Rank = int.MaxValue;
+        IPAddress? bestIPv6 = null;
+        var bestIPv6Rank = int.MaxValue;
         foreach (var address in addresses)
         {
-            if (address.AddressFamily != family || IPAddress.IsLoopback(address))
+            if (IPAddress.IsLoopback(address))
             {
                 continue;
             }
 
             var rank = GetRank(address);
-            if (rank < bestRank)
+            if (address.AddressFamily == AddressFamily.InterNetwork && rank < bestIPv4Rank)
             {
-                best = address;
-                bestRank = rank;
+                bestIPv4 = address;
+                bestIPv4Rank = rank;
+            }
+            else if (address.AddressFamily == AddressFamily.InterNetworkV6 && rank < bestIPv6Rank)
+            {
+                bestIPv6 = address;
+                bestIPv6Rank = rank;
             }
         }
 
-        return best?.ToString() ?? string.Empty;
+        return (bestIPv4?.ToString() ?? string.Empty, bestIPv6?.ToString() ?? string.Empty);
     }
 
     private static int GetRank(IPAddress address)

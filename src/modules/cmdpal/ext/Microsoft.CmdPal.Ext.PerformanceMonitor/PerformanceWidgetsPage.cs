@@ -1185,7 +1185,7 @@ internal sealed partial class SystemNetworkUsageWidgetPage : WidgetPage, IDispos
     public override IconInfo Icon => Icons.NetworkIcon;
 
     // Connection details change rarely and are slow to read, so they're refreshed at most every
-    // few seconds, and when the card switches adapters.
+    // 15 seconds, and when the card switches adapters.
     private const long ConnectionDetailsLifetimeMilliseconds = 15_000;
 
     private readonly DataManager _dataManager;

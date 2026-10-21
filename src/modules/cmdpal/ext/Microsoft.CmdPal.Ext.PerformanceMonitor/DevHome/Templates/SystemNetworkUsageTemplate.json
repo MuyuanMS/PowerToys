@@ -67,7 +67,7 @@
           "type": "Chart.Line",
           "spacing": "medium",
           "yAxisTitle": "${netChartAxis}",
-          "xAxisTitle": "%CPUUsage_Widget_Template/Chart_X_Axis%",
+          "xAxisTitle": "%NetworkUsage_Widget_Template/Chart_X_Axis%",
           "yMin": 0,
           "data": "${netSeries}",
           "fallback": "drop"

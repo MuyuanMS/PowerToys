@@ -5,7 +5,6 @@
 using System;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.CmdPal.Ext.PerformanceMonitor.UnitTests;
@@ -26,16 +25,20 @@ public class NetworkConnectionDetailsTests
     [TestMethod]
     public void NonLinkLocalAddressesComeBeforeLinkLocalOnes()
     {
-        Assert.AreEqual("192.168.1.20", NetworkConnectionDetails.PickAddress(Addresses, AddressFamily.InterNetwork));
-        Assert.AreEqual("2001:db8::42", NetworkConnectionDetails.PickAddress(Addresses, AddressFamily.InterNetworkV6));
-        Assert.AreEqual("fd8a:b83e::1", NetworkConnectionDetails.PickAddress([Addresses[0], Addresses[2]], AddressFamily.InterNetworkV6));
+        var result = NetworkConnectionDetails.PickAddresses(Addresses);
+
+        Assert.AreEqual("192.168.1.20", result.IPv4);
+        Assert.AreEqual("2001:db8::42", result.IPv6);
+        Assert.AreEqual("fd8a:b83e::1", NetworkConnectionDetails.PickAddresses([Addresses[0], Addresses[2]]).IPv6);
     }
 
     [TestMethod]
     public void LinkLocalAddressIsShownWhenItIsTheOnlyOne()
     {
-        Assert.AreEqual("169.254.10.20", NetworkConnectionDetails.PickAddress([Addresses[1]], AddressFamily.InterNetwork));
-        Assert.AreEqual(string.Empty, NetworkConnectionDetails.PickAddress([IPAddress.Loopback], AddressFamily.InterNetwork));
+        var result = NetworkConnectionDetails.PickAddresses([Addresses[1], IPAddress.Loopback]);
+
+        Assert.AreEqual("169.254.10.20", result.IPv4);
+        Assert.AreEqual(string.Empty, result.IPv6);
     }
 
     [TestMethod]
