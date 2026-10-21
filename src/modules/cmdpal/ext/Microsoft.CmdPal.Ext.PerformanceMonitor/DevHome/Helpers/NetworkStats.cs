@@ -19,7 +19,7 @@ internal sealed partial class NetworkStats
     private readonly string _allAdaptersName;
     private readonly Dictionary<ulong, CounterSample> _previousSamples = new();
     private readonly Dictionary<ulong, AdapterHistory> _history = new();
-    private readonly AdapterHistory _allAdaptersHistory = new(new SampleHistory(), new SampleHistory());
+    private readonly AdapterHistory _allAdaptersHistory = new();
     private readonly List<ulong> _missingInterfaceIds = new();
     private NetworkAdapterData[] _networkAdapters = [];
     private long? _lastTimestamp;
@@ -44,7 +44,29 @@ internal sealed partial class NetworkStats
     }
 
     /// <summary>Send and receive rates in bytes per second, one sample per update.</summary>
-    internal sealed record AdapterHistory(SampleHistory Sent, SampleHistory Received);
+    internal sealed class AdapterHistory
+    {
+        private readonly Lock _lock = new();
+        private readonly SampleHistory _sent = new();
+        private readonly SampleHistory _received = new();
+
+        public void Add(float sent, float received)
+        {
+            lock (_lock)
+            {
+                _sent.Add(sent);
+                _received.Add(received);
+            }
+        }
+
+        public (float[] Sent, float[] Received) Snapshot()
+        {
+            lock (_lock)
+            {
+                return (_sent.Snapshot(), _received.Snapshot());
+            }
+        }
+    }
 
     private sealed record NetworkAdapterData(string Id, string Name, Data Usage, AdapterHistory History, double LinkSpeed);
 
@@ -128,7 +150,7 @@ internal sealed partial class NetworkStats
             var (snapshot, usage) = adapterMeasurements[index];
             if (!_history.TryGetValue(snapshot.InterfaceLuid, out var history))
             {
-                history = new AdapterHistory(new SampleHistory(), new SampleHistory());
+                history = new AdapterHistory();
                 _history.Add(snapshot.InterfaceLuid, history);
             }
 
@@ -236,8 +258,7 @@ internal sealed partial class NetworkStats
 
     private static void AddHistory(AdapterHistory history, Data usage)
     {
-        history.Sent.Add(usage.Sent);
-        history.Received.Add(usage.Received);
+        history.Add(usage.Sent, usage.Received);
     }
 
     private void RemoveMissingInterfaces(HashSet<ulong> currentInterfaceIds)

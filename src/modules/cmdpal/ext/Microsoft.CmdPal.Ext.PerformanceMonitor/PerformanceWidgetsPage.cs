@@ -1262,8 +1262,7 @@ internal sealed partial class SystemNetworkUsageWidgetPage : WidgetPage, IDispos
             }
 
             var history = currentData.GetHistory(_networkIndex);
-            var sent = history.Sent.Snapshot();
-            var received = history.Received.Snapshot();
+            var (sent, received) = history.Snapshot();
             var (divisor, unit) = PerformanceChartData.GetRateScale(_settingsManager.NetworkSpeedUnit, PerformanceChartData.Max(sent, received));
             ContentData["netChartAxis"] = string.Format(CultureInfo.CurrentCulture, Resources.GetResource("NetworkUsage_Widget_Template/Chart_Y_Axis"), unit);
             ContentJson["netSeries"] = PerformanceChartData.Create(

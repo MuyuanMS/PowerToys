@@ -45,6 +45,19 @@ public class NetworkStatsTests
     }
 
     [TestMethod]
+    public void GetHistory_ReturnsPairedSentAndReceivedSamples()
+    {
+        var stats = CreateNetworkStats();
+        stats.ApplySnapshots([new(1, EthernetGuid, "Ethernet", 10_000, 2_000, 1_000_000)], 0);
+
+        stats.ApplySnapshots([new(1, EthernetGuid, "Ethernet", 60_000, 27_000, 1_000_000)], 1);
+
+        var (sent, received) = stats.GetHistory(1).Snapshot();
+        CollectionAssert.AreEqual(new float[] { 0, 25_000 }, sent);
+        CollectionAssert.AreEqual(new float[] { 0, 50_000 }, received);
+    }
+
+    [TestMethod]
     public void ApplySnapshots_TreatsCounterResetAsZeroDelta()
     {
         var stats = CreateNetworkStats();
