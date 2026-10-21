@@ -4,6 +4,7 @@
 
 using System;
 using System.Text.Json.Nodes;
+using System.Threading;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Timer = System.Timers.Timer;
 
@@ -19,7 +20,9 @@ internal sealed partial class SampleChartsForm : FormContent, IDisposable
     private readonly Random _random = new(42);
     private readonly double[] _requests = new double[HistoryLength];
     private readonly double[] _errors = new double[HistoryLength];
+    private readonly object _timerLock = new();
     private Timer? _timer;
+    private bool _disposed;
     private double _load = 42;
 
     public SampleChartsForm()
@@ -35,24 +38,62 @@ internal sealed partial class SampleChartsForm : FormContent, IDisposable
 
     public void Start()
     {
-        if (_timer is not null)
+        lock (_timerLock)
         {
-            return;
-        }
+            if (_disposed || _timer is not null)
+            {
+                return;
+            }
 
-        _timer = new Timer(1000) { AutoReset = true };
-        _timer.Elapsed += (_, _) =>
-        {
-            Advance();
-            DataJson = CreateData();
-        };
-        _timer.Start();
+            _timer = new Timer(1000) { AutoReset = false };
+            _timer.Elapsed += OnTimerElapsed;
+            _timer.Start();
+        }
     }
 
     public void Dispose()
     {
-        _timer?.Dispose();
-        _timer = null;
+        lock (_timerLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            if (_timer is not null)
+            {
+                _timer.Stop();
+                _timer.Elapsed -= OnTimerElapsed;
+                _timer.Dispose();
+                _timer = null;
+            }
+        }
+    }
+
+    private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        if (Volatile.Read(ref _disposed))
+        {
+            return;
+        }
+
+        Advance();
+        var data = CreateData();
+        if (Volatile.Read(ref _disposed))
+        {
+            return;
+        }
+
+        DataJson = data;
+
+        lock (_timerLock)
+        {
+            if (!_disposed)
+            {
+                _timer?.Start();
+            }
+        }
     }
 
     private void Advance()

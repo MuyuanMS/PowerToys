@@ -7,7 +7,7 @@ The WinUI 3 Adaptive Cards renderer doesn't support everything in the current Ad
 
 Cards stay standard Adaptive Cards JSON, and extensions give each element a `fallback` for other hosts. Nothing here is specific to Command Palette, so each piece can move to the open-source renderer and be deleted here (see [Upstream](#upstream)).
 
-Extension authors: see `ExtensionTemplate\TemplateCmdPalExtension\.github\skills\add-adaptive-card-form\references\charts-and-visuals.md`, and the Samples extension's "Charts and visuals" page.
+Extension authors: see [charts-and-visuals.md](../ExtensionTemplate/TemplateCmdPalExtension/.github/skills/add-adaptive-card-form/references/charts-and-visuals.md), and the Samples extension's "Charts and visuals" page.
 
 ## Use it
 
