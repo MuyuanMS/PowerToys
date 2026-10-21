@@ -85,7 +85,7 @@ internal sealed record AdaptiveCardThemeTokens
         Separator = text,
     };
 
-    /// <summary>Formats an opaque color as <c>#AARRGGBB</c>.</summary>
+    /// <summary>Formats a color with alpha as <c>#AARRGGBB</c>.</summary>
     public static string ToHex(byte a, byte r, byte g, byte b) => $"#{a:X2}{r:X2}{g:X2}{b:X2}";
 
     /// <summary>Replaces the alpha of a <c>#AARRGGBB</c> or <c>#RRGGBB</c> color.</summary>
