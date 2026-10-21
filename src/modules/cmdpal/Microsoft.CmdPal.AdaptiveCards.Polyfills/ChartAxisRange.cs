@@ -23,9 +23,14 @@ internal readonly record struct ChartAxisRange(double Min, double Max, double St
 
         var first = Math.Ceiling((Min / Step) - 1e-9);
         var last = Math.Floor((Max / Step) + 1e-9);
-        for (var i = first; i <= last && ticks.Count < 64; i++)
+        var firstTick = first * Step;
+        for (var offset = 0; offset < 64 && first + offset <= last; offset++)
         {
-            ticks.Add(Math.Round(i * Step, 10));
+            var tick = Math.Round(firstTick + (offset * Step), 10);
+            if (ticks.Count == 0 || tick != ticks[^1])
+            {
+                ticks.Add(tick);
+            }
         }
 
         return ticks;

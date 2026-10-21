@@ -20,6 +20,15 @@ public class ChartScaleTests
     }
 
     [TestMethod]
+    public void LargeFixedRangeDoesNotRepeatTicksWhenDoubleIndexCannotIncrementByOne()
+    {
+        var min = 9_007_199_254_740_992d;
+        var range = new ChartAxisRange(min, min + 4, 1);
+
+        CollectionAssert.AreEqual(new[] { min, min + 2, min + 4 }, range.GetTicks().ToArray());
+    }
+
+    [TestMethod]
     [DataRow(0.83, 1.0, 0.2)]
     [DataRow(237.0, 250.0, 50.0)]
     [DataRow(1234.0, 1250.0, 250.0)]
