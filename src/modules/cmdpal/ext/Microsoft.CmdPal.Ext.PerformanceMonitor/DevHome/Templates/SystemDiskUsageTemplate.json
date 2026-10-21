@@ -107,6 +107,7 @@
         },
         {
           "type": "Chart.Line",
+          "$when": "${$host.widgetSize != \"small\"}",
           "spacing": "medium",
           "yAxisTitle": "${diskChartAxis}",
           "xAxisTitle": "%DiskUsage_Widget_Template/Chart_X_Axis%",
@@ -151,6 +152,7 @@
         },
         {
           "type": "Container",
+          "$when": "${$host.widgetSize != \"small\"}",
           "$data": "${volumes}",
           "spacing": "small",
           "items": [

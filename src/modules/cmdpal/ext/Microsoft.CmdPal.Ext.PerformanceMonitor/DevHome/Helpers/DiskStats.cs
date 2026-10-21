@@ -20,7 +20,7 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
 
     private Dictionary<string, Data> DiskUsages { get; set; } = new();
 
-    // Keyed by counter instance name, in discovery order; the order defines the disk index.
+    // Keyed by counter instance name; _diskOrder defines the disk index in discovery order.
     private Dictionary<string, DiskHistory> DiskHistories { get; set; } = new();
 
     /// <summary>Active time (percent) and read and write rates (bytes per second), one sample per update.</summary>
@@ -78,8 +78,8 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
                     var bytesRead = CreatePerformanceCounter("PhysicalDisk", "Disk Read Bytes/sec", instanceName, logFailure: false);
                     var bytesWritten = CreatePerformanceCounter("PhysicalDisk", "Disk Write Bytes/sec", instanceName, logFailure: false);
 
-                    // Active time is 100 minus idle time, as in Task Manager. % Disk Time is the average
-                    // queue length, so it overstates a disk that serves requests in parallel.
+                    // Active time is 100 minus idle time, as in Task Manager. Unlike active time, % Disk Time
+                    // can exceed 100% when requests overlap.
                     var idleTime = CreatePerformanceCounter("PhysicalDisk", "% Idle Time", instanceName, logFailure: false);
                     if (bytesRead is null || bytesWritten is null || idleTime is null)
                     {
@@ -190,14 +190,14 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
 
     public int GetPrevDiskIndex(int diskIndex)
     {
-        if (DiskHistories.Count == 0)
+        if (_diskOrder.Count == 0)
         {
             return 0;
         }
 
         if (diskIndex == 0)
         {
-            return DiskHistories.Count - 1;
+            return _diskOrder.Count - 1;
         }
 
         return diskIndex - 1;
@@ -205,12 +205,12 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
 
     public int GetNextDiskIndex(int diskIndex)
     {
-        if (DiskHistories.Count == 0)
+        if (_diskOrder.Count == 0)
         {
             return 0;
         }
 
-        if (diskIndex == DiskHistories.Count - 1)
+        if (diskIndex == _diskOrder.Count - 1)
         {
             return 0;
         }
