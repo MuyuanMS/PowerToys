@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using Microsoft.CmdPal.Common;
 
 namespace CoreWidgetProvider.Helpers;
@@ -13,6 +12,7 @@ namespace CoreWidgetProvider.Helpers;
 internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposable
 {
     private readonly Dictionary<string, List<PerformanceCounter>> _diskCounters = new();
+    private readonly List<string> _diskOrder = new();
 
     // Instances whose % Idle Time counter has a previous sample, so NextValue() returns a real value.
     private readonly HashSet<string> _idleTimeSampled = new();
@@ -100,6 +100,7 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
                     _diskCounters.Add(instanceName, instanceCounters);
                     DiskHistories.Add(instanceName, new DiskHistory(new SampleHistory(), new SampleHistory(), new SampleHistory()));
                     DiskUsages.Add(instanceName, new Data());
+                    _diskOrder.Add(instanceName);
                 }
                 catch (Exception)
                 {
@@ -156,29 +157,29 @@ internal sealed partial class DiskStats : PerformanceCounterSourceBase, IDisposa
 
     public DiskHistory GetHistory(int diskIndex)
     {
-        return DiskHistories.Count > diskIndex && diskIndex >= 0
-            ? DiskHistories.ElementAt(diskIndex).Value
+        return (uint)diskIndex < (uint)_diskOrder.Count
+            ? DiskHistories[_diskOrder[diskIndex]]
             : new DiskHistory(new SampleHistory(), new SampleHistory(), new SampleHistory());
     }
 
     public string GetDiskName(int diskIndex)
     {
-        if (DiskHistories.Count <= diskIndex)
+        if ((uint)diskIndex >= (uint)_diskOrder.Count)
         {
             return string.Empty;
         }
 
-        return DiskHistories.ElementAt(diskIndex).Key;
+        return _diskOrder[diskIndex];
     }
 
     public Data GetDiskUsage(int diskIndex)
     {
-        if (DiskHistories.Count <= diskIndex)
+        if ((uint)diskIndex >= (uint)_diskOrder.Count)
         {
             return new Data();
         }
 
-        var currDiskName = DiskHistories.ElementAt(diskIndex).Key;
+        var currDiskName = _diskOrder[diskIndex];
         if (!DiskUsages.TryGetValue(currDiskName, out var value))
         {
             return new Data();
