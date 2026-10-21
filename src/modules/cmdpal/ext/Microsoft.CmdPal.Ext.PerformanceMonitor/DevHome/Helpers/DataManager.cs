@@ -23,6 +23,7 @@ internal sealed partial class DataManager : IDisposable
     private readonly Timer _updateTimer;
     private readonly Action _updateAction;
     private bool _updateFailureLogged;
+    private CancellationTokenSource? _immediateUpdateCancellation;
 
     private const int OneSecondInMilliseconds = 1000;
 
@@ -261,19 +262,41 @@ internal sealed partial class DataManager : IDisposable
 
     public void Start()
     {
+        var cancellation = new CancellationTokenSource();
+        CancelImmediateUpdate();
+        Interlocked.Exchange(ref _immediateUpdateCancellation, cancellation);
         _updateTimer.Start();
 
         // Show current values as soon as the page opens, instead of after the first interval.
-        ThreadPool.QueueUserWorkItem(static manager => manager.UpdateNow(), this, preferLocal: false);
+        ThreadPool.QueueUserWorkItem(static state =>
+        {
+            var (manager, token) = ((DataManager Manager, CancellationToken Token))state!;
+            if (!token.IsCancellationRequested)
+            {
+                manager.UpdateNow();
+            }
+        }, (this, cancellation.Token), preferLocal: false);
     }
 
     public void Stop()
     {
         _updateTimer.Stop();
+        CancelImmediateUpdate();
     }
 
     public void Dispose()
     {
+        Stop();
         _updateTimer.Dispose();
+    }
+
+    private void CancelImmediateUpdate()
+    {
+        var cancellation = Interlocked.Exchange(ref _immediateUpdateCancellation, null);
+        if (cancellation is not null)
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
     }
 }
