@@ -64,15 +64,23 @@ public class StackedBarChartModelTests
     [TestMethod]
     public void MissingLegendUsesFallbackLabelAndKeepsFirstSeenOrder()
     {
-        var model = StackedBarChartModel.Parse(
-            """{ "type": "Chart.HorizontalBar.Stacked", "data": [{ "data": [{ "value": 3 }, { "legend": "Named", "value": 2 }, { "value": 1 }] }] }""",
-            new List<string>());
+        ChartStrings.SetLookup(static key => key == "AdaptiveChart_UnnamedCategory" ? "Uncategorized" : key);
+        try
+        {
+            var model = StackedBarChartModel.Parse(
+                """{ "type": "Chart.HorizontalBar.Stacked", "data": [{ "data": [{ "value": 3 }, { "legend": "Named", "value": 2 }, { "value": 1 }] }] }""",
+                new List<string>());
 
-        var legend = model.GetLegend();
+            var legend = model.GetLegend();
 
-        Assert.AreEqual(2, legend.Count);
-        Assert.AreEqual("AdaptiveChart_UnnamedCategory", legend[0].Legend);
-        Assert.AreEqual("Named", legend[1].Legend);
+            Assert.AreEqual(2, legend.Count);
+            Assert.AreEqual("Uncategorized", legend[0].Legend);
+            Assert.AreEqual("Named", legend[1].Legend);
+        }
+        finally
+        {
+            ChartStrings.SetLookup(static key => key);
+        }
     }
 
     [TestMethod]

@@ -192,7 +192,8 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
                 Background = ChartTheme.ToBrush(GetBarColor(i, isDarkTheme)),
                 CornerRadius = new CornerRadius(HorizontalBarHeight / 2),
             });
-            ToolTipService.SetToolTip(bar, $"{ChartStrings.GetCategoryLabel(point.Label)}: {FormatValue(value)}");
+            var tooltipValue = FormatTooltipValue(mode, fraction, value);
+            ToolTipService.SetToolTip(bar, $"{ChartStrings.GetCategoryLabel(point.Label)}: {tooltipValue}");
             Grid.SetRow(bar, i);
             Grid.SetColumn(bar, 1);
             grid.Children.Add(bar);
@@ -248,6 +249,11 @@ internal sealed partial class BarChartControl : AdaptiveVisualControl
     }
 
     private static string FormatValue(double value) => ChartValueFormatter.FormatCompact(value);
+
+    internal static string FormatTooltipValue(BarDisplayMode mode, double fraction, double value) =>
+        mode == BarDisplayMode.PartToWhole
+            ? string.Format(CultureInfo.CurrentCulture, "{0:0.#}% ({1})", fraction * 100, FormatValue(value))
+            : FormatValue(value);
 
     private static Grid CreateLabelRow(string? left, string right, Brush foreground)
     {

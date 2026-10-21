@@ -153,4 +153,16 @@ public class BarChartModelTests
         Assert.AreEqual(BarDisplayMode.AbsoluteWithAxis, model.DisplayMode);
         Assert.AreEqual(BarOrientation.Horizontal, model.Orientation);
     }
+
+    [TestMethod]
+    public void PartToWholeTooltipShowsShareAndValue()
+    {
+        Assert.AreEqual("25% (3)", BarChartControl.FormatTooltipValue(BarDisplayMode.PartToWhole, 0.25, 3));
+    }
+
+    [TestMethod]
+    public void AbsoluteTooltipShowsValueOnly()
+    {
+        Assert.AreEqual("3", BarChartControl.FormatTooltipValue(BarDisplayMode.AbsoluteWithAxis, 0.25, 3));
+    }
 }
