@@ -599,18 +599,53 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR l
 
         // Join module workers before CRT exit holds the shared UCRT exit lock.
         // This guard runs before the settings CLI lock and instance mutex are released.
-        auto shutdown_modules = wil::scope_exit([] {
-            cancel_settings_window_startup();
+        auto shutdown_modules = wil::scope_exit([]() noexcept {
+            const auto report_shutdown_failure = []() noexcept {
+                OutputDebugStringW(L"Runner shutdown cleanup step failed; continuing teardown.\n");
+            };
+
+            try
+            {
+                cancel_settings_window_startup();
+            }
+            catch (...)
+            {
+                report_shutdown_failure();
+            }
+
             CentralizedKeyboardHook::Stop();
             for (const auto& module : modules())
             {
                 CentralizedKeyboardHook::ClearModuleHotkeys(module.first);
-                CentralizedHotkeys::UnregisterHotkeysForModule(module.first);
+                try
+                {
+                    CentralizedHotkeys::UnregisterHotkeysForModule(module.first);
+                }
+                catch (...)
+                {
+                    report_shutdown_failure();
+                }
             }
 
-            Logger::info("Unloading {} modules before CRT exit", modules().size());
+            const auto module_count = modules().size();
+            try
+            {
+                Logger::info("Unloading {} modules before CRT exit", module_count);
+            }
+            catch (...)
+            {
+                report_shutdown_failure();
+            }
+
             modules().clear();
-            Logger::info("Runner module shutdown completed");
+            try
+            {
+                Logger::info("Runner module shutdown completed");
+            }
+            catch (...)
+            {
+                report_shutdown_failure();
+            }
         });
 
         std::thread{ [] {
