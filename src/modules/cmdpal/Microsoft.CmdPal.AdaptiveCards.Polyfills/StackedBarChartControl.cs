@@ -102,7 +102,7 @@ internal sealed partial class StackedBarChartControl : AdaptiveVisualControl
             }
 
             bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(point.Value, GridUnitType.Star) });
-            var label = point.Label ?? string.Empty;
+            var label = StackedBarChartModel.GetLegendLabel(point.Label);
             var brush = ChartTheme.ToBrush(colors[label]);
 
             // A transparent background keeps an outlined part's tooltip reachable.
@@ -111,7 +111,7 @@ internal sealed partial class StackedBarChartControl : AdaptiveVisualControl
                 : new Border { Background = brush };
             ToolTipService.SetToolTip(
                 cell,
-                $"{point.Label}: {ChartValueFormatter.FormatCompact(point.Value)}");
+                $"{label}: {ChartValueFormatter.FormatCompact(point.Value)}");
             cells.Add(cell);
         }
 
@@ -157,7 +157,7 @@ internal sealed partial class StackedBarChartControl : AdaptiveVisualControl
                     summary.Append(", ");
                 }
 
-                summary.Append(group.Data[i].Label)
+                summary.Append(StackedBarChartModel.GetLegendLabel(group.Data[i].Label))
                     .Append(' ')
                     .Append(ChartValueFormatter.FormatCompact(group.Data[i].Value));
             }

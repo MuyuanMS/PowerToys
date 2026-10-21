@@ -45,12 +45,13 @@ internal sealed class StackedBarChartModel : IAdaptiveVisualModel
     public IReadOnlyList<(string Legend, string? Color, int ColorIndex)> GetLegend()
     {
         var legend = new List<(string Legend, string? Color, int ColorIndex)>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var group in Groups)
         {
             foreach (var point in group.Data)
             {
-                var name = point.Label ?? string.Empty;
-                if (legend.FindIndex(item => string.Equals(item.Legend, name, StringComparison.Ordinal)) < 0)
+                var name = GetLegendLabel(point.Label);
+                if (seen.Add(name))
                 {
                     legend.Add((name, point.Color, legend.Count));
                 }
@@ -59,6 +60,9 @@ internal sealed class StackedBarChartModel : IAdaptiveVisualModel
 
         return legend;
     }
+
+    internal static string GetLegendLabel(string? label) =>
+        string.IsNullOrWhiteSpace(label) ? ChartStrings.Get("AdaptiveChart_UnnamedCategory") : label;
 
     public static StackedBarChartModel Parse(string elementJson, ICollection<string> warnings)
     {

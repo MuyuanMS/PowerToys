@@ -56,6 +56,32 @@ public class BarChartModelTests
     }
 
     [TestMethod]
+    public void EmptyDataUsesFiniteAxisRange()
+    {
+        var range = new BarChartModel { Orientation = BarOrientation.Vertical }.GetValueAxisRange();
+
+        Assert.IsTrue(double.IsFinite(range.Min));
+        Assert.IsTrue(double.IsFinite(range.Max));
+        Assert.AreEqual(0, range.Min);
+        Assert.AreEqual(1, range.Max);
+    }
+
+    [TestMethod]
+    public void HorizontalAxisStartsAtZeroWhenDataContainsNegativeValues()
+    {
+        var model = BarChartModel.Parse(
+            """{ "type": "Chart.HorizontalBar", "data": [{ "x": "negative", "y": -10 }, { "x": "positive", "y": 10 }] }""",
+            BarOrientation.Horizontal,
+            new List<string>());
+
+        var range = model.GetValueAxisRange();
+
+        Assert.AreEqual(0, range.Min);
+        Assert.AreEqual(10, range.Max);
+        Assert.AreEqual(0.5, range.Normalize(5));
+    }
+
+    [TestMethod]
     [DataRow("AbsoluteWithAxis", "AbsoluteWithAxis")]
     [DataRow("absoluteNoAxis", "AbsoluteNoAxis")]
     [DataRow("PartToWhole", "PartToWhole")]

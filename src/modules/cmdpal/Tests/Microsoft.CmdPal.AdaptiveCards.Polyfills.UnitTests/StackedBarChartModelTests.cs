@@ -62,6 +62,20 @@ public class StackedBarChartModelTests
     }
 
     [TestMethod]
+    public void MissingLegendUsesFallbackLabelAndKeepsFirstSeenOrder()
+    {
+        var model = StackedBarChartModel.Parse(
+            """{ "type": "Chart.HorizontalBar.Stacked", "data": [{ "data": [{ "value": 3 }, { "legend": "Named", "value": 2 }, { "value": 1 }] }] }""",
+            new List<string>());
+
+        var legend = model.GetLegend();
+
+        Assert.AreEqual(2, legend.Count);
+        Assert.AreEqual("AdaptiveChart_UnnamedCategory", legend[0].Legend);
+        Assert.AreEqual("Named", legend[1].Legend);
+    }
+
+    [TestMethod]
     public void TheTitleShowsOnlyWhenAsked()
     {
         var hidden = StackedBarChartModel.Parse("""{ "type": "Chart.HorizontalBar.Stacked", "title": "Memory", "data": [] }""", new List<string>());

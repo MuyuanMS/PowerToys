@@ -9,7 +9,7 @@ using Microsoft.CmdPal.AdaptiveCards.IncrementalRendering;
 namespace Microsoft.CmdPal.AdaptiveCards.Polyfills;
 
 /// <summary>
-/// Adds the schema features that the WinUI 3 renderer doesn't support yet: the chart, <c>ProgressBar</c>,
+/// Adds the schema features that the WinUI 3 renderer doesn't support yet: chart elements, <c>ProgressBar</c>,
 /// <c>Badge</c>, and <c>Icon</c> elements, and <c>roundedCorners</c> and <c>showBorder</c> on containers.
 /// </summary>
 public static class AdaptiveCardPolyfills

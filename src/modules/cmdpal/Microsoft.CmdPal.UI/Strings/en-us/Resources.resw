@@ -1903,6 +1903,10 @@ Home: highest position. End: lowest position.</value>
     <value>Bar chart</value>
     <comment>Accessible name of a bar chart in a form when the chart has no title.</comment>
   </data>
+  <data name="AdaptiveChart_UnnamedCategory" xml:space="preserve">
+    <value>Unnamed category</value>
+    <comment>Fallback label for a chart category when its legend label is missing.</comment>
+  </data>
   <data name="AdaptiveFilePathInput_BrowseFor" xml:space="preserve">
     <value>Browse for {0}</value>
     <comment>Accessible label for the browse button. {0} is the name of the path field.</comment>
