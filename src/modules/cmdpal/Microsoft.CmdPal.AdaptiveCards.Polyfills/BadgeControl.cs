@@ -5,6 +5,7 @@
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
@@ -145,6 +146,10 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
         ToolTipService.SetToolTip(_badge, _model.Tooltip);
 
         // An icon-only badge is described by its tooltip.
+        var isDecorativeIconOnly = _model.Text.Length == 0
+            && _model.IconGlyph is not null
+            && string.IsNullOrWhiteSpace(_model.Tooltip);
+        AutomationProperties.SetAccessibilityView(this, isDecorativeIconOnly ? AccessibilityView.Raw : AccessibilityView.Control);
         AutomationProperties.SetName(this, _model.Text.Length > 0 ? _model.Text : _model.Tooltip ?? string.Empty);
     }
 }

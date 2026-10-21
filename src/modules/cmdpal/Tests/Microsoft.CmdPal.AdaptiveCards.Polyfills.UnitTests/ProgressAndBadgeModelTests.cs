@@ -33,6 +33,18 @@ public class ProgressAndBadgeModelTests
     }
 
     [TestMethod]
+    public void ProgressBarDefaultsToSchemaValuesWhenJsonCannotBeRead()
+    {
+        var warnings = new List<string>();
+        var model = ProgressBarModel.Parse("{", warnings);
+
+        Assert.AreEqual(1, warnings.Count);
+        Assert.IsTrue(warnings[0].StartsWith("The element JSON could not be read:", StringComparison.Ordinal));
+        Assert.IsTrue(model.IsIndeterminate);
+        Assert.AreEqual(100d, model.Max);
+    }
+
+    [TestMethod]
     public void ProgressBarValueIsClamped()
     {
         Assert.AreEqual(100d, new ProgressBarModel { Value = 140 }.ClampedValue);
