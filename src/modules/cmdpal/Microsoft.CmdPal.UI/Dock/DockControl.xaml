@@ -389,31 +389,19 @@
                 </VisualState>
             </VisualStateGroup>
             <VisualStateGroup x:Name="PinDropStates">
-                <VisualState x:Name="PinDropNone">
-                    <VisualState.Setters>
-                        <Setter Target="StartDropZone.IsActive" Value="False" />
-                        <Setter Target="CenterDropZone.IsActive" Value="False" />
-                        <Setter Target="EndDropZone.IsActive" Value="False" />
-                    </VisualState.Setters>
-                </VisualState>
+                <VisualState x:Name="PinDropNone" />
                 <VisualState x:Name="PinDropStart">
                     <VisualState.Setters>
                         <Setter Target="StartDropZone.IsActive" Value="True" />
-                        <Setter Target="CenterDropZone.IsActive" Value="False" />
-                        <Setter Target="EndDropZone.IsActive" Value="False" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="PinDropCenter">
                     <VisualState.Setters>
-                        <Setter Target="StartDropZone.IsActive" Value="False" />
                         <Setter Target="CenterDropZone.IsActive" Value="True" />
-                        <Setter Target="EndDropZone.IsActive" Value="False" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="PinDropEnd">
                     <VisualState.Setters>
-                        <Setter Target="StartDropZone.IsActive" Value="False" />
-                        <Setter Target="CenterDropZone.IsActive" Value="False" />
                         <Setter Target="EndDropZone.IsActive" Value="True" />
                     </VisualState.Setters>
                 </VisualState>
