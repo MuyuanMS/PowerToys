@@ -17,7 +17,7 @@ internal sealed partial class SampleChartsPage : ContentPage, IDisposable
 
     public SampleChartsPage()
     {
-        Name = "Open";
+        Name = "Charts and visuals";
         Title = "Charts and visuals";
         Icon = new IconInfo("\uE9D2"); // AreaChart
     }
