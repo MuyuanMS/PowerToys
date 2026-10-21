@@ -24,8 +24,8 @@ public sealed class AdaptiveCardsConfig
     public static AdaptiveHostConfig Dark => Create(ElementTheme.Dark);
 
     /// <summary>
-    /// Returns the host config for content shown in <paramref name="theme"/>. Calls that resolve to the
-    /// same colors return the same instance, so callers can compare by reference.
+    /// Returns the host config for content shown in <paramref name="theme"/>. Configs are cached by
+    /// resolved colors, but older entries may be evicted when the cache reaches its limit.
     /// </summary>
     public static AdaptiveHostConfig Create(ElementTheme theme)
     {
