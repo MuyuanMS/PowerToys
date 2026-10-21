@@ -461,7 +461,7 @@ public sealed partial class DockWindow : WindowEx,
         CleanupBackdropControllers();
         if (_configurationSource is null || !MicaController.IsSupported())
         {
-            SetupTransparentBackdrop();
+            SetupDesktopAcrylic(_themeService.CurrentDockTheme.BackdropParameters);
             return;
         }
 
