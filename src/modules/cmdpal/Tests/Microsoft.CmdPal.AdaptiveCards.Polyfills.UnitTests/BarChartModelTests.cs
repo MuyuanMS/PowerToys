@@ -99,6 +99,33 @@ public class BarChartModelTests
     }
 
     [TestMethod]
+    public void VerticalAxisIncludesZeroWhenAllDataIsNegative()
+    {
+        var model = BarChartModel.Parse(
+            """{ "type": "Chart.VerticalBar", "data": [{ "x": "one", "y": -10 }, { "x": "two", "y": -5 }] }""",
+            BarOrientation.Vertical,
+            new List<string>());
+
+        var range = model.GetValueAxisRange();
+
+        Assert.AreEqual(-10d, range.Min);
+        Assert.AreEqual(0d, range.Max);
+    }
+
+    [TestMethod]
+    public void VerticalAxisPreservesExplicitNegativeMaximum()
+    {
+        var model = BarChartModel.Parse(
+            """{ "type": "Chart.VerticalBar", "yMax": -4, "data": [{ "x": "one", "y": -10 }, { "x": "two", "y": -5 }] }""",
+            BarOrientation.Vertical,
+            new List<string>());
+
+        var range = model.GetValueAxisRange();
+
+        Assert.AreEqual(-4d, range.Max);
+    }
+
+    [TestMethod]
     public void HorizontalDisplayValueMatchesTheRenderedBar()
     {
         var horizontal = new BarChartModel { Orientation = BarOrientation.Horizontal };

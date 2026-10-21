@@ -79,7 +79,7 @@ internal sealed class BarChartModel : IAdaptiveVisualModel
     {
         var (dataMin, dataMax) = GetValueExtent();
         var axisMin = Orientation == BarOrientation.Horizontal ? 0 : Math.Min(0, dataMin);
-        var axisMax = Orientation == BarOrientation.Horizontal ? Math.Max(0, dataMax) : dataMax;
+        var axisMax = Math.Max(0, dataMax);
         return ChartScale.Compute(YMin, YMax, axisMin, axisMax);
     }
 
