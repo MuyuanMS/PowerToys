@@ -86,7 +86,7 @@ internal sealed partial class DonutChartControl : AdaptiveVisualControl
             ? _model.Title
             : ChartStrings.Get(_model.IsPie ? "AdaptiveChart_PieChart" : "AdaptiveChart_DonutChart");
         AutomationProperties.SetName(this, name);
-        AutomationProperties.SetHelpText(this, CreateSummary(shares));
+        AutomationProperties.SetHelpText(this, CreateSummary(_model.Data, shares, CultureInfo.CurrentCulture));
     }
 
     private Canvas CreateChart(double diameter, IReadOnlyList<double> shares, IReadOnlyList<ChartColor> colors, IReadOnlyList<bool> outlines, bool isDarkTheme)
@@ -217,19 +217,26 @@ internal sealed partial class DonutChartControl : AdaptiveVisualControl
         return legend;
     }
 
-    private string CreateSummary(IReadOnlyList<double> shares)
+    internal static string CreateSummary(
+        IReadOnlyList<ChartDataPoint> data,
+        IReadOnlyList<double> shares,
+        IFormatProvider culture)
     {
         var summary = new StringBuilder();
-        for (var i = 0; i < _model.Data.Count; i++)
+        for (var i = 0; i < data.Count; i++)
         {
             if (summary.Length > 0)
             {
                 summary.Append(", ");
             }
 
-            summary.Append(_model.Data[i].Label)
-                .Append(' ')
-                .Append(string.Format(CultureInfo.CurrentCulture, "{0:0}%", shares[i] * 100));
+            var label = data[i].Label;
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                summary.Append(label).Append(' ');
+            }
+
+            summary.Append(string.Format(culture, "{0:0}%", shares[i] * 100));
         }
 
         return summary.ToString();

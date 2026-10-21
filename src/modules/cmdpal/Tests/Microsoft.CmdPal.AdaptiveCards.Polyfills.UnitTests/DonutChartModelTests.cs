@@ -2,6 +2,7 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Globalization;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.CmdPal.AdaptiveCards.Polyfills.UnitTests;
@@ -65,6 +66,19 @@ public class DonutChartModelTests
         var shares = model.GetShares();
         Assert.AreEqual(0d, shares[0]);
         Assert.AreEqual(1d, shares[1]);
+    }
+
+    [TestMethod]
+    public void SummaryOmitsSeparatorsForMissingOrWhitespaceLabels()
+    {
+        var model = new DonutChartModel
+        {
+            Data = [new(null, 1, null), new("   ", 1, null), new("Free", 2, null)],
+        };
+
+        var summary = DonutChartControl.CreateSummary(model.Data, model.GetShares(), CultureInfo.InvariantCulture);
+
+        Assert.AreEqual("25%, 25%, Free 50%", summary);
     }
 
     [TestMethod]
