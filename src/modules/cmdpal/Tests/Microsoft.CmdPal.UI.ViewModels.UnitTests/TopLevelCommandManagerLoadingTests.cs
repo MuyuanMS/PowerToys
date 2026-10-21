@@ -329,6 +329,8 @@ public partial class TopLevelCommandManagerTests
         var started = LoadingSignal();
         var release = LoadingSignal();
         var stops = 0;
+        var eventDetachmentThreadId = 0;
+        var providerRemovalDetachmentThreadId = 0;
         var service = new Mock<IExtensionService>();
         service.Setup(s => s.LoadProvidersAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<CommandProviderWrapper>());
         service.Setup(s => s.SignalStopAsync()).Returns(() =>
@@ -337,6 +339,10 @@ public partial class TopLevelCommandManagerTests
             started.TrySetResult();
             return release.Task;
         });
+        service.SetupRemove(s => s.OnProviderAdded -= It.IsAny<TypedEventHandler<IExtensionService, IEnumerable<CommandProviderWrapper>>>())
+            .Callback(() => Interlocked.Exchange(ref eventDetachmentThreadId, Environment.CurrentManagedThreadId));
+        service.SetupRemove(s => s.OnProviderRemoved -= It.IsAny<TypedEventHandler<IExtensionService, IEnumerable<CommandProviderWrapper>>>())
+            .Callback(() => Interlocked.Exchange(ref providerRemovalDetachmentThreadId, Environment.CurrentManagedThreadId));
         using var manager = new TopLevelCommandManager(services, [service.Object]);
         await manager.LoadExternalProvidersAsync();
         var first = manager.ReloadAllCommandsAsync();
@@ -344,7 +350,10 @@ public partial class TopLevelCommandManagerTests
         {
             await started.Task.WaitAsync(LoadingTimeout);
             var second = manager.ReloadAllCommandsAsync();
+            var disposeThreadId = Environment.CurrentManagedThreadId;
             manager.Dispose();
+            Assert.AreEqual(disposeThreadId, eventDetachmentThreadId);
+            Assert.AreEqual(disposeThreadId, providerRemovalDetachmentThreadId);
             var disposal = manager.DisposeAsync().AsTask();
             var secondDisposal = manager.DisposeAsync().AsTask();
             Assert.AreSame(disposal, secondDisposal);

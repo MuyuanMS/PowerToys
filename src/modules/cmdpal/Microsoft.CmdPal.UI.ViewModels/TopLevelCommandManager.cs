@@ -1340,7 +1340,23 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
 
         GC.SuppressFinalize(this);
-        _ = Task.Run(() => DisposeCoreAsync(completion));
+        Exception? detachmentFailure = null;
+        try
+        {
+            _reloadCommandsRunner.BusyChanged -= ReloadBusyChanged;
+            WeakReferenceMessenger.Default.UnregisterAll(this);
+            foreach (var service in _extensionServices)
+            {
+                service.OnProviderAdded -= ExtensionService_OnProviderAdded;
+                service.OnProviderRemoved -= ExtensionService_OnProviderRemoved;
+            }
+        }
+        catch (Exception ex)
+        {
+            detachmentFailure = ex;
+        }
+
+        _ = Task.Run(() => DisposeCoreAsync(completion, detachmentFailure));
         return new ValueTask(completion.Task);
     }
 
@@ -1356,7 +1372,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
-    private async Task DisposeCoreAsync(TaskCompletionSource completion)
+    private async Task DisposeCoreAsync(TaskCompletionSource completion, Exception? detachmentFailure)
     {
         try
         {
@@ -1373,28 +1389,22 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
 
             try
             {
-                _reloadCommandsRunner.BusyChanged -= ReloadBusyChanged;
-                WeakReferenceMessenger.Default.UnregisterAll(this);
-                foreach (var service in _extensionServices)
-                {
-                    service.OnProviderAdded -= ExtensionService_OnProviderAdded;
-                    service.OnProviderRemoved -= ExtensionService_OnProviderRemoved;
-                }
+                await Task.WhenAll(_reloadCommandsRunner.DisposeAsync().AsTask(), providerActivities, cancellation).ConfigureAwait(false);
             }
             finally
             {
-                try
-                {
-                    await Task.WhenAll(_reloadCommandsRunner.DisposeAsync().AsTask(), providerActivities, cancellation).ConfigureAwait(false);
-                }
-                finally
-                {
-                    _extensionLoadCts.Dispose();
-                    CompleteStartup();
-                }
+                _extensionLoadCts.Dispose();
+                CompleteStartup();
             }
 
-            completion.TrySetResult();
+            if (detachmentFailure is null)
+            {
+                completion.TrySetResult();
+            }
+            else
+            {
+                completion.TrySetException(detachmentFailure);
+            }
         }
         catch (Exception ex)
         {
