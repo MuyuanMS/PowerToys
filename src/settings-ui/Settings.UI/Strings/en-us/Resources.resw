@@ -6939,6 +6939,6 @@ Text uses the current drawing color.</value>
     <value>Pairing could not be loaded or updated. Try again.</value>
   </data>
   <data name="Oobe_AdvancedPasteRichText_HowToUse.Text" xml:space="preserve">
-    <value>to paste Markdown or plain text from the clipboard as formatted rich text.</value>
+    <value>to paste Markdown clipboard text as formatted rich text.</value>
   </data>
 </root>

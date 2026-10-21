@@ -36,10 +36,9 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             ViewModel.LogOpeningModuleEvent();
-            var settings = SettingsRepository<AdvancedPasteSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties;
-            AdvancedPasteUIHotkeyControl.Keys = settings.AdvancedPasteUIShortcut.GetKeysList();
-            PasteAsPlainTextHotkeyControl.Keys = settings.PasteAsPlainTextShortcut.GetKeysList();
-            PasteAsMarkdownHotkeyControl.Keys = settings.PasteAsMarkdownShortcut.GetKeysList();
+            AdvancedPasteUIHotkeyControl.Keys = SettingsRepository<AdvancedPasteSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.AdvancedPasteUIShortcut.GetKeysList();
+            PasteAsPlainTextHotkeyControl.Keys = SettingsRepository<AdvancedPasteSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.PasteAsPlainTextShortcut.GetKeysList();
+            PasteAsMarkdownHotkeyControl.Keys = SettingsRepository<AdvancedPasteSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.PasteAsMarkdownShortcut.GetKeysList();
 
             // TODO(stefan): Check how to remove additional space if item is set to Collapsed.
             if (PasteAsMarkdownHotkeyControl.Keys.Count > 0)
@@ -47,13 +46,13 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
                 PasteAsMarkdownHotkeyControl.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
             }
 
-            PasteAsRichTextHotkeyControl.Keys = settings.PasteAsRichTextShortcut.GetKeysList();
+            PasteAsRichTextHotkeyControl.Keys = SettingsRepository<AdvancedPasteSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.PasteAsRichTextShortcut.GetKeysList();
             if (PasteAsRichTextHotkeyControl.Keys.Count > 0)
             {
                 PasteAsRichTextHotkeyControl.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
             }
 
-            PasteAsJsonHotkeyControl.Keys = settings.PasteAsJsonShortcut.GetKeysList();
+            PasteAsJsonHotkeyControl.Keys = SettingsRepository<AdvancedPasteSettings>.GetInstance(SettingsUtils.Default).SettingsConfig.Properties.PasteAsJsonShortcut.GetKeysList();
             if (PasteAsJsonHotkeyControl.Keys.Count > 0)
             {
                 PasteAsJsonHotkeyControl.Visibility = Microsoft.UI.Xaml.Visibility.Visible;

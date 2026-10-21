@@ -48,11 +48,7 @@ internal static class DataPackageHelpers
     internal static DataPackage CreateFromHtml(string html, string plainTextFallback = null)
     {
         DataPackage dataPackage = new();
-        if (!string.IsNullOrEmpty(html))
-        {
-            dataPackage.SetHtmlFormat(HtmlFormatHelper.CreateHtmlFormat(html));
-        }
-
+        dataPackage.SetHtmlFormat(HtmlFormatHelper.CreateHtmlFormat(html));
         if (!string.IsNullOrEmpty(plainTextFallback))
         {
             dataPackage.SetText(plainTextFallback);

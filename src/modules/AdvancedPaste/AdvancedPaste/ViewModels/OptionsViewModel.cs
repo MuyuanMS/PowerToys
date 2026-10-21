@@ -36,25 +36,6 @@ namespace AdvancedPaste.ViewModels
 {
     public sealed partial class OptionsViewModel : ObservableObject, IProgress<double>, IDisposable
     {
-        private static readonly PasteFormats[] DisplayOrder =
-        [
-            PasteFormats.PlainText,
-            PasteFormats.Markdown,
-            PasteFormats.RichText,
-            PasteFormats.Json,
-            PasteFormats.FixSpellingAndGrammar,
-            PasteFormats.ImageToText,
-            PasteFormats.PasteAsTxtFile,
-            PasteFormats.PasteAsPngFile,
-            PasteFormats.PasteAsHtmlFile,
-            PasteFormats.TranscodeToMp3,
-            PasteFormats.TranscodeToMp4,
-            PasteFormats.KernelQuery,
-            PasteFormats.CustomTextTransformation,
-        ];
-
-        private static readonly PasteFormats[] RemainingFormats = Enum.GetValues<PasteFormats>().Except(DisplayOrder).ToArray();
-
         private readonly DispatcherQueue _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         private readonly DispatcherTimer _clipboardTimer;
         private readonly IUserSettings _userSettings;
@@ -448,8 +429,24 @@ namespace AdvancedPaste.ViewModels
                 }
             }
 
-            UpdateFormats(StandardPasteFormats, DisplayOrder
-                                                    .Concat(RemainingFormats)
+            var displayOrder = new[]
+            {
+                PasteFormats.PlainText,
+                PasteFormats.Markdown,
+                PasteFormats.RichText,
+                PasteFormats.Json,
+                PasteFormats.FixSpellingAndGrammar,
+                PasteFormats.ImageToText,
+                PasteFormats.PasteAsTxtFile,
+                PasteFormats.PasteAsPngFile,
+                PasteFormats.PasteAsHtmlFile,
+                PasteFormats.TranscodeToMp3,
+                PasteFormats.TranscodeToMp4,
+                PasteFormats.KernelQuery,
+                PasteFormats.CustomTextTransformation,
+            };
+
+            UpdateFormats(StandardPasteFormats, displayOrder
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
                                                     .Select(CreateStandardPasteFormat));
 
