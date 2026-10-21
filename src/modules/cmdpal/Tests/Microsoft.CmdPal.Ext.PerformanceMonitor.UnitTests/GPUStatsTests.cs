@@ -181,8 +181,38 @@ public class GPUStatsTests
 
         Assert.AreEqual(8UL, memory.DedicatedTotal);
         Assert.AreEqual(16UL, memory.SharedTotal);
+        Assert.IsFalse(memory.DedicatedAvailable);
+        Assert.IsFalse(memory.SharedAvailable);
         Assert.AreEqual(default, stats.GetGPUMemory(1));
         Assert.AreEqual(0, stats.GetGPUEngines(0).Length);
+    }
+
+    [TestMethod]
+    public void UpdateMemorySample_ValidThenMissingAndPartialSamplesClearAvailability()
+    {
+        var data = new GPUStats.Data();
+
+        data.UpdateMemorySample(new GPUStats.AdapterMemorySample(10, 20));
+
+        Assert.IsTrue(data.DedicatedMemoryAvailable);
+        Assert.IsTrue(data.SharedMemoryAvailable);
+        Assert.AreEqual(10UL, data.DedicatedMemoryUsed);
+        Assert.AreEqual(20UL, data.SharedMemoryUsed);
+
+        data.UpdateMemorySample(new GPUStats.AdapterMemorySample(30, null));
+
+        Assert.IsTrue(data.DedicatedMemoryAvailable);
+        Assert.IsFalse(data.SharedMemoryAvailable);
+        Assert.AreEqual(30UL, data.DedicatedMemoryUsed);
+        Assert.AreEqual(0UL, data.SharedMemoryUsed);
+
+        // A failed counter read returns no sample for this adapter.
+        data.UpdateMemorySample(null);
+
+        Assert.IsFalse(data.DedicatedMemoryAvailable);
+        Assert.IsFalse(data.SharedMemoryAvailable);
+        Assert.AreEqual(0UL, data.DedicatedMemoryUsed);
+        Assert.AreEqual(0UL, data.SharedMemoryUsed);
     }
 
     [TestMethod]

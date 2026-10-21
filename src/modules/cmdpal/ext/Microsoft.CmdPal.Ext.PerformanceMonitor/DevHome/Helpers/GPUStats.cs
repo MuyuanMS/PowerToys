@@ -74,10 +74,18 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
     internal sealed record DisplayInfo(string Name, string ShortName, int AdapterCount);
 
     /// <summary>An adapter's memory use and size, in bytes. Sizes are zero when unknown.</summary>
-    internal readonly record struct MemoryInfo(ulong DedicatedUsed, ulong DedicatedTotal, ulong SharedUsed, ulong SharedTotal);
+    internal readonly record struct MemoryInfo(
+        ulong DedicatedUsed,
+        ulong DedicatedTotal,
+        bool DedicatedAvailable,
+        ulong SharedUsed,
+        ulong SharedTotal,
+        bool SharedAvailable);
 
     /// <summary>The utilization of one engine type, as an index into <see cref="EngineTypes"/>.</summary>
     internal readonly record struct EngineUsage(int Type, float Percent);
+
+    internal readonly record struct AdapterMemorySample(ulong? Dedicated, ulong? Shared);
 
     public sealed class Data
     {
@@ -100,6 +108,20 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
         public ulong DedicatedMemoryUsed { get; set; }
 
         public ulong SharedMemoryUsed { get; set; }
+
+        public bool DedicatedMemoryAvailable { get; private set; }
+
+        public bool SharedMemoryAvailable { get; private set; }
+
+        internal void UpdateMemorySample(AdapterMemorySample? sample)
+        {
+            var dedicated = sample?.Dedicated;
+            var shared = sample?.Shared;
+            DedicatedMemoryUsed = dedicated.GetValueOrDefault();
+            SharedMemoryUsed = shared.GetValueOrDefault();
+            DedicatedMemoryAvailable = dedicated.HasValue;
+            SharedMemoryAvailable = shared.HasValue;
+        }
 
         /// <summary>Gets or sets the utilization of each engine type the adapter has, in percent.</summary>
         public EngineUsage[] Engines { get; set; } = [];
@@ -278,16 +300,7 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
                     var usage = adapterUsage.GetValueOrDefault(gpu.LuidKey);
                     gpu.Usage = usage / 100f;
                     gpu.Engines = engines;
-                    if (adapterMemory.TryGetValue(gpu.LuidKey, out var memory))
-                    {
-                        gpu.DedicatedMemoryUsed = memory.Dedicated;
-                        gpu.SharedMemoryUsed = memory.Shared;
-                    }
-                    else
-                    {
-                        gpu.DedicatedMemoryUsed = 0;
-                        gpu.SharedMemoryUsed = 0;
-                    }
+                    gpu.UpdateMemorySample(adapterMemory.TryGetValue(gpu.LuidKey, out var memory) ? memory : null);
 
                     lock (gpu.GpuChartValues)
                     {
@@ -385,9 +398,9 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
     }
 
     /// <summary>Reads each adapter's dedicated and shared memory use, in bytes, keyed by LUID.</summary>
-    private Dictionary<long, (ulong Dedicated, ulong Shared)> ReadAdapterMemory()
+    private Dictionary<long, AdapterMemorySample> ReadAdapterMemory()
     {
-        var memory = new Dictionary<long, (ulong Dedicated, ulong Shared)>();
+        var memory = new Dictionary<long, AdapterMemorySample>();
         if (_gpuAdapterMemoryCategory is null)
         {
             return memory;
@@ -402,7 +415,8 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
                 {
                     if (TryGetAdapterLuid(instance.InstanceName, out var luidKey))
                     {
-                        memory[luidKey] = (ToBytes(instance.RawValue), memory.GetValueOrDefault(luidKey).Shared);
+                        var sample = memory.GetValueOrDefault(luidKey);
+                        memory[luidKey] = sample with { Dedicated = ToBytes(instance.RawValue) };
                     }
                 }
             }
@@ -413,7 +427,8 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
                 {
                     if (TryGetAdapterLuid(instance.InstanceName, out var luidKey))
                     {
-                        memory[luidKey] = (memory.GetValueOrDefault(luidKey).Dedicated, ToBytes(instance.RawValue));
+                        var sample = memory.GetValueOrDefault(luidKey);
+                        memory[luidKey] = sample with { Shared = ToBytes(instance.RawValue) };
                     }
                 }
             }
@@ -579,7 +594,13 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
             }
 
             var gpu = _stats[gpuActiveIndex];
-            return new(gpu.DedicatedMemoryUsed, gpu.DedicatedMemoryTotal, gpu.SharedMemoryUsed, gpu.SharedMemoryTotal);
+            return new(
+                gpu.DedicatedMemoryUsed,
+                gpu.DedicatedMemoryTotal,
+                gpu.DedicatedMemoryAvailable,
+                gpu.SharedMemoryUsed,
+                gpu.SharedMemoryTotal,
+                gpu.SharedMemoryAvailable);
         }
     }
 

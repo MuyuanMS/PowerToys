@@ -178,6 +178,7 @@
                     },
                     {
                       "type": "ProgressBar",
+                      "$when": "${hasDedicatedMemorySample}",
                       "spacing": "small",
                       "value": "${gpuDedicatedPercent}",
                       "color": "good",
@@ -212,6 +213,7 @@
                     },
                     {
                       "type": "ProgressBar",
+                      "$when": "${hasSharedMemorySample}",
                       "spacing": "small",
                       "value": "${gpuSharedPercent}",
                       "color": "good",

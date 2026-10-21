@@ -1360,6 +1360,8 @@ internal sealed partial class SystemNetworkUsageWidgetPage : WidgetPage, IDispos
 
 internal sealed partial class SystemGPUUsageWidgetPage : WidgetPage, IDisposable
 {
+    private const string MemoryUnavailable = "--";
+
     public override string Id => "com.microsoft.cmdpal.gpu_widget";
 
     public override string Title => Resources.GetResource("GPU_Usage_Title");
@@ -1409,14 +1411,16 @@ internal sealed partial class SystemGPUUsageWidgetPage : WidgetPage, IDisposable
             ContentJson["gpuEngines"] = CreateEngines(stats, _gpuActiveIndex);
 
             var memory = stats.GetGPUMemory(_gpuActiveIndex);
-            var dedicated = FormatUsedOfTotal(memory.DedicatedUsed, memory.DedicatedTotal);
-            var shared = FormatUsedOfTotal(memory.SharedUsed, memory.SharedTotal);
+            var dedicated = memory.DedicatedAvailable ? FormatUsedOfTotal(memory.DedicatedUsed, memory.DedicatedTotal) : MemoryUnavailable;
+            var shared = memory.SharedAvailable ? FormatUsedOfTotal(memory.SharedUsed, memory.SharedTotal) : MemoryUnavailable;
             ContentJson["hasDedicatedMemory"] = memory.DedicatedTotal > 0;
             ContentJson["hasSharedMemory"] = memory.SharedTotal > 0;
+            ContentJson["hasDedicatedMemorySample"] = memory.DedicatedAvailable;
+            ContentJson["hasSharedMemorySample"] = memory.SharedAvailable;
             ContentData["gpuDedicatedMemory"] = dedicated;
-            ContentJson["gpuDedicatedPercent"] = GetPercent(memory.DedicatedUsed, memory.DedicatedTotal);
+            ContentJson["gpuDedicatedPercent"] = memory.DedicatedAvailable ? GetPercent(memory.DedicatedUsed, memory.DedicatedTotal) : 0d;
             ContentData["gpuSharedMemory"] = shared;
-            ContentJson["gpuSharedPercent"] = GetPercent(memory.SharedUsed, memory.SharedTotal);
+            ContentJson["gpuSharedPercent"] = memory.SharedAvailable ? GetPercent(memory.SharedUsed, memory.SharedTotal) : 0d;
             if (memory.DedicatedTotal > 0 || memory.SharedTotal > 0)
             {
                 ContentData["gpuMemoryLabel"] = Resources.GetResource(memory.DedicatedTotal > 0
