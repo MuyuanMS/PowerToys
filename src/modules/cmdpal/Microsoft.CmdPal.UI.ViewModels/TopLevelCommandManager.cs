@@ -1327,6 +1327,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
     public ValueTask DisposeAsync()
     {
         TaskCompletionSource completion;
+        Task cancellation;
+        Task providerActivities;
         lock (_stateLock)
         {
             if (_disposeCompletion is not null)
@@ -1337,6 +1339,8 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             _disposing = true;
             _disposeCompletion = completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _reloadCommandsRunner.Dispose();
+            cancellation = _extensionLoadCts.CancelAsync();
+            providerActivities = _providerActivitiesDrained?.Task ?? Task.CompletedTask;
         }
 
         GC.SuppressFinalize(this);
@@ -1356,7 +1360,7 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
             detachmentFailure = ex;
         }
 
-        _ = Task.Run(() => DisposeCoreAsync(completion, detachmentFailure));
+        _ = Task.Run(() => DisposeCoreAsync(completion, cancellation, providerActivities, detachmentFailure));
         return new ValueTask(completion.Task);
     }
 
@@ -1372,21 +1376,14 @@ public sealed partial class TopLevelCommandManager : ObservableObject,
         }
     }
 
-    private async Task DisposeCoreAsync(TaskCompletionSource completion, Exception? detachmentFailure)
+    private async Task DisposeCoreAsync(
+        TaskCompletionSource completion,
+        Task cancellation,
+        Task providerActivities,
+        Exception? detachmentFailure)
     {
         try
         {
-            Task cancellation;
-            Task providerActivities;
-            lock (_providerPublicationLock)
-            {
-                lock (_stateLock)
-                {
-                    cancellation = _extensionLoadCts.CancelAsync();
-                    providerActivities = _providerActivitiesDrained?.Task ?? Task.CompletedTask;
-                }
-            }
-
             try
             {
                 await Task.WhenAll(_reloadCommandsRunner.DisposeAsync().AsTask(), providerActivities, cancellation).ConfigureAwait(false);

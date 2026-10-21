@@ -516,15 +516,18 @@ public partial class TopLevelCommandManagerTests
     {
         using var services = CreateServices();
         var failure = new InvalidOperationException("Cancellation failed.");
+        var loadToken = default(CancellationToken);
         var service = new Mock<IExtensionService>();
         service.Setup(s => s.LoadProvidersAsync(It.IsAny<CancellationToken>())).Returns((CancellationToken token) =>
         {
+            loadToken = token;
             token.Register(() => throw failure);
             return Task.FromResult<IEnumerable<CommandProviderWrapper>>([]);
         });
         var manager = new TopLevelCommandManager(services, [service.Object]);
         await manager.LoadExternalProvidersAsync();
         manager.Dispose();
+        Assert.IsTrue(loadToken.IsCancellationRequested);
         var exception = await Assert.ThrowsExactlyAsync<AggregateException>(() => manager.DisposeAsync().AsTask().WaitAsync(LoadingTimeout));
         Assert.AreSame(failure, exception.InnerException);
         Assert.IsFalse(WeakReferenceMessenger.Default.IsRegistered<ReloadCommandsMessage>(manager));
