@@ -64,7 +64,7 @@ public static class MouseHookProbe
     [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
     [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
-    [DllImport("user32.dll")] static extern UIntPtr SetTimer(IntPtr hwnd, UIntPtr id, uint elapse, IntPtr proc);
+    [DllImport("user32.dll", SetLastError = true)] static extern UIntPtr SetTimer(IntPtr hwnd, UIntPtr id, uint elapse, IntPtr proc);
     [DllImport("user32.dll")] static extern bool KillTimer(IntPtr hwnd, UIntPtr id);
     [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string name);
 
@@ -81,9 +81,16 @@ public static class MouseHookProbe
         callback = OnEvent;
         hook = SetWindowsHookEx(WH_MOUSE_LL, callback, GetModuleHandle(null), 0);
         if (hook == IntPtr.Zero) throw new InvalidOperationException("SetWindowsHookEx failed: " + Marshal.GetLastWin32Error());
-        UIntPtr timer = SetTimer(IntPtr.Zero, UIntPtr.Zero, milliseconds, IntPtr.Zero);
+        UIntPtr timer = UIntPtr.Zero;
         try
         {
+            timer = SetTimer(IntPtr.Zero, UIntPtr.Zero, milliseconds, IntPtr.Zero);
+            if (timer == UIntPtr.Zero)
+            {
+                int error = Marshal.GetLastWin32Error();
+                throw new InvalidOperationException("SetTimer failed: " + error);
+            }
+
             MSG msg;
             while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
             {
@@ -92,8 +99,9 @@ public static class MouseHookProbe
         }
         finally
         {
-            KillTimer(IntPtr.Zero, timer);
+            if (timer != UIntPtr.Zero) KillTimer(IntPtr.Zero, timer);
             UnhookWindowsHookEx(hook);
+            hook = IntPtr.Zero;
         }
         return events.ToArray();
     }

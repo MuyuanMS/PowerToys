@@ -868,6 +868,9 @@ foreach ($monitor in [PowerToysUiTestVm.DesktopWallpaper]::GetMonitors()) {
     }
 }
 $ordered = @($painted | Sort-Object -Property Left, Top)
+if ($ordered.Count -eq 0) {
+    throw 'Windows reported no active monitor rectangles for wallpaper assignment.'
+}
 
 # Generated bars follow the per-count lookup; a folder of the caller's own images keeps file-name order.
 $assignment = @(if ($generated -and $ordered.Count -le $barsByMonitorCount.Count) {
