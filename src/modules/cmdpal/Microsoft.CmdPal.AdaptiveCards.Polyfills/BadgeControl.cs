@@ -22,7 +22,6 @@ internal sealed partial class BadgeControl : AdaptiveVisualControl
 
     private readonly FontIcon _icon = new()
     {
-        FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
         VerticalAlignment = VerticalAlignment.Center,
     };
 
