@@ -447,6 +447,7 @@ namespace AdvancedPaste.ViewModels
             };
 
             UpdateFormats(StandardPasteFormats, displayOrder
+                                                    .Concat(Enum.GetValues<PasteFormats>().Except(displayOrder))
                                                     .Where(format => PasteFormat.MetadataDict[format].IsCoreAction || _userSettings.AdditionalActions.Contains(format))
                                                     .Select(CreateStandardPasteFormat));
 

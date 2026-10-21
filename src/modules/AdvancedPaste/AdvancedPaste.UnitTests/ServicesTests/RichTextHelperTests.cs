@@ -42,6 +42,35 @@ public class RichTextHelperTests
     }
 
     [TestMethod]
+    public void ToRichText_RemovesUnsafeLinksAndImages()
+    {
+        const string markdown =
+            "[script](javascript:alert(1)) " +
+            "[file](file:///C:/secret) [data](data:text/html,hello) " +
+            "<javascript:alert(1)> ![tracking pixel](https://example.com/pixel.png)";
+
+        var html = RichTextHelper.ToRichText(markdown);
+
+        Assert.IsFalse(html.Contains("href=", StringComparison.Ordinal), "Unsafe link targets should be removed");
+        Assert.IsFalse(html.Contains("<img", StringComparison.Ordinal), "Images should not cause remote content to load");
+        Assert.IsTrue(html.Contains("script", StringComparison.Ordinal), "Link text should be preserved");
+        Assert.IsTrue(html.Contains("file", StringComparison.Ordinal), "Link text should be preserved");
+        Assert.IsTrue(html.Contains("data", StringComparison.Ordinal), "Link text should be preserved");
+        Assert.IsTrue(html.Contains("tracking pixel", StringComparison.Ordinal), "Image alt text should be preserved");
+    }
+
+    [TestMethod]
+    public void ToRichText_PreservesAllowlistedLinks()
+    {
+        const string markdown = "[site](https://example.com) [email](mailto:user@example.com)";
+
+        var html = RichTextHelper.ToRichText(markdown);
+
+        Assert.IsTrue(html.Contains("href=\"https://example.com\"", StringComparison.Ordinal), "HTTPS links should be preserved");
+        Assert.IsTrue(html.Contains("href=\"mailto:user@example.com\"", StringComparison.Ordinal), "Mail links should be preserved");
+    }
+
+    [TestMethod]
     public void ToRichText_ProducesValidHtmlFragment()
     {
         var markdown = "# Heading\n\n**Bold** text";
