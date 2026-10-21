@@ -48,7 +48,14 @@ $offset = (Test-Path -LiteralPath $logPath -PathType Leaf) ? (Get-Item -LiteralP
 
 $process = Start-Process -FilePath $ToolPath -PassThru
 if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-    $process.Kill()
+    try {
+        $process.Kill()
+    }
+    catch [System.InvalidOperationException] {
+        if (-not $process.HasExited) {
+            throw
+        }
+    }
     $process.WaitForExit()
     throw "MonitorReportTool did not exit within $TimeoutSeconds s and was stopped."
 }
