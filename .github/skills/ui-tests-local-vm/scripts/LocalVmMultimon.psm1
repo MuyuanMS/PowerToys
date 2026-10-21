@@ -38,12 +38,8 @@ function Get-MultimonSetting {
         return $Override
     }
     $multimon = $Configuration.ContainsKey('Multimon') ? $Configuration.Multimon : @{}
-    if ($multimon.ContainsKey($Name)) {
-        $value = $multimon[$Name]
-        $valueText = [string]$value
-        if ($null -ne $value -and ($valueText.Length -eq 0 -or -not [string]::IsNullOrWhiteSpace($valueText))) {
-            return $valueText
-        }
+    if ($multimon.ContainsKey($Name) -and -not [string]::IsNullOrWhiteSpace([string]$multimon[$Name])) {
+        return [string]$multimon[$Name]
     }
     return $Default
 }
