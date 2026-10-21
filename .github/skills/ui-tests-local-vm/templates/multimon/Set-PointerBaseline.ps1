@@ -51,14 +51,16 @@ public static class PointerSettings
     public static int[] ReadAcceleration()
     {
         var values = new int[3];
-        SystemParametersInfo(SPI_GETMOUSE, 0, values, 0);
+        if (!SystemParametersInfo(SPI_GETMOUSE, 0, values, 0))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         return values;
     }
 
     public static int ReadSpeed()
     {
         int speed = 0;
-        SystemParametersInfo(SPI_GETMOUSESPEED, 0, ref speed, 0);
+        if (!SystemParametersInfo(SPI_GETMOUSESPEED, 0, ref speed, 0))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         return speed;
     }
 }
