@@ -283,6 +283,11 @@ internal sealed partial class GPUStats : PerformanceCounterSourceBase, IDisposab
                         gpu.DedicatedMemoryUsed = memory.Dedicated;
                         gpu.SharedMemoryUsed = memory.Shared;
                     }
+                    else
+                    {
+                        gpu.DedicatedMemoryUsed = 0;
+                        gpu.SharedMemoryUsed = 0;
+                    }
 
                     lock (gpu.GpuChartValues)
                     {
