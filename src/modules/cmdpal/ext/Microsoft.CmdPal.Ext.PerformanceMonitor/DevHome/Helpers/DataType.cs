@@ -7,39 +7,39 @@ namespace CoreWidgetProvider.Helpers;
 public enum DataType
 {
     /// <summary>
-    /// CPU related data.
+    /// CPU related data. The CPU card adds per-processor utilization and the busiest processes
+    /// with <see cref="CPUStats.RequestDetails"/>.
     /// </summary>
-    CPU,
+    CPU = 0,
 
     /// <summary>
-    /// CPU related data, including the top processes.
-    /// Calculating the top processes takes a lot longer,
-    /// so by default we don't.
+    /// Retained to preserve the numeric values of the following members for existing consumers.
     /// </summary>
-    CpuWithTopProcesses,
+    [System.Obsolete("Use CPU instead.")]
+    CpuWithTopProcesses = 1,
 
     /// <summary>
     /// Memory related data.
     /// </summary>
-    Memory,
+    Memory = 2,
 
     /// <summary>
     /// GPU related data.
     /// </summary>
-    GPU,
+    GPU = 3,
 
     /// <summary>
     /// Network related data.
     /// </summary>
-    Network,
+    Network = 4,
 
     /// <summary>
     /// Battery related data.
     /// </summary>
-    Battery,
+    Battery = 5,
 
     /// <summary>
     /// Disk related data.
     /// </summary>
-    Disk,
+    Disk = 6,
 }
