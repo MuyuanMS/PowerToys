@@ -98,7 +98,7 @@ internal sealed partial class AdaptiveVisualElementRenderer : IAdaptiveElementRe
         // An element that can't draw itself shows its fallback, or nothing when it has none.
         return model.RendersItself
             ? _type.Create(model)
-            : AdaptiveFallbackRenderer.Render(element, context, renderArgs)!;
+            : AdaptiveFallbackRenderer.Render(element, context, renderArgs) ?? new Grid { Visibility = Visibility.Collapsed };
     }
 }
 
