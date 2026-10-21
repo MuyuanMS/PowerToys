@@ -60,7 +60,7 @@ internal sealed partial class SampleChartsForm : FormContent, IDisposable
                 return;
             }
 
-            _disposed = true;
+            Volatile.Write(ref _disposed, true);
             if (_timer is not null)
             {
                 _timer.Stop();
