@@ -24,11 +24,17 @@ public sealed class AdaptiveCardsConfig
     public static AdaptiveHostConfig Dark => Create(ElementTheme.Dark);
 
     /// <summary>
-    /// Returns the host config for content shown in <paramref name="theme"/>. Configs are cached by
-    /// resolved colors, but older entries may be evicted when the cache reaches its limit.
+    /// Returns the host config for content shown in <paramref name="theme"/>, which must be
+    /// <see cref="ElementTheme.Light"/> or <see cref="ElementTheme.Dark"/>.
+    /// Configs are cached by resolved colors, but older entries may be evicted when the cache reaches its limit.
     /// </summary>
     public static AdaptiveHostConfig Create(ElementTheme theme)
     {
+        if (theme is not ElementTheme.Light and not ElementTheme.Dark)
+        {
+            throw new ArgumentOutOfRangeException(nameof(theme));
+        }
+
         var json = AdaptiveHostConfigJson.Create(GetTokens(theme));
         lock (CacheLock)
         {

@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Reflection;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.CmdPal.Common.Helpers;
+using Microsoft.CmdPal.UI.Controls;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CommandPalette.Extensions;
@@ -75,6 +76,13 @@ public sealed partial class ManualListItemsViewTests
     {
         _window.Content = null;
         _window.AppWindow.Hide();
+        return Task.CompletedTask;
+    });
+
+    [TestMethod]
+    public Task DefaultThemeIsRejectedForAdaptiveCardHostConfig() => OnUiThread(() =>
+    {
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => AdaptiveCardsConfig.Create(ElementTheme.Default));
         return Task.CompletedTask;
     });
 
