@@ -991,14 +991,14 @@ public sealed partial class DockControl : UserControl, IRecipient<EnterDockEditM
 
     private void UpdatePinDropTarget(DockDropTarget? target)
     {
-        if (_pinDropTarget == target)
-        {
-            return;
-        }
-
         if (target is not null)
         {
             UpdatePinDropAnimations();
+        }
+
+        if (_pinDropTarget == target)
+        {
+            return;
         }
 
         _pinDropTarget = target;
