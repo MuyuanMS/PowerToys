@@ -34,27 +34,25 @@ game mode is active.
 
 ### BackgroundColor
 
-Sets the background color of the spotlight effect.
+Sets the background color (including transparency) of the spotlight overlay.
 
 **Type:** string (hex color)  
-**Format:** `"#RRGGBB"`  
-**Default:** `"#000000"` (black)
+**Format:** `"#AARRGGBB"` (alpha, red, green, blue)  
+**Default:** `"#80000000"` (50% opaque black)
+
+> **Note:** The alpha channel (`AA`) controls opacity, where `FF` (255) is fully opaque and
+> `00` (0) is fully transparent. For example, `#80000000` means 50% opaque black.
 
 ### SpotlightColor
 
-Sets the color of the spotlight circle around the cursor.
+Sets the color (including transparency) of the spotlight circle around the cursor.
 
 **Type:** string (hex color)  
-**Format:** `"#RRGGBB"`  
-**Default:** `"#FFFFFF"` (white)
+**Format:** `"#AARRGGBB"` (alpha, red, green, blue)  
+**Default:** `"#80FFFFFF"` (50% opaque white)
 
-### OverlayOpacity
-
-Sets the opacity of the background overlay (0-100).
-
-**Type:** integer  
-**Range:** `0` to `100`  
-**Default:** `50`
+> **Note:** The alpha channel (`AA`) controls opacity, where `FF` (255) is fully opaque and
+> `00` (0) is fully transparent. For example, `#80FFFFFF` means 50% opaque white.
 
 ### SpotlightRadius
 
@@ -96,13 +94,12 @@ This example customizes the spotlight colors and radius.
 $config = @{
     settings = @{
         properties = @{
-            BackgroundColor = "#000000"
-            SpotlightColor = "#00FF00"
+            BackgroundColor = "#80000000"
+            SpotlightColor = "#8000FF00"
             SpotlightRadius = 150
-            OverlayOpacity = 60
         }
         name = "FindMyMouse"
-        version = "1.0"
+        version = "1.2"
     }
 } | ConvertTo-Json -Depth 10 -Compress
 
@@ -130,7 +127,7 @@ resources:
           SpotlightInitialZoom: 300
           SpotlightRadius: 120
         name: FindMyMouse
-        version: 1.0
+        version: 1.2
 ```
 
 ### Example 3 - Install and configure with WinGet
@@ -160,13 +157,12 @@ resources:
     properties:
       settings:
         properties:
-          BackgroundColor: "#000000"
-          SpotlightColor: "#0078D7"
-          OverlayOpacity: 70
+          BackgroundColor: "#B3000000"
+          SpotlightColor: "#B30078D7"
           SpotlightRadius: 140
           DoNotActivateOnGameMode: true
         name: FindMyMouse
-        version: 1.0
+        version: 1.2
 ```
 
 ### Example 4 - Subtle configuration
@@ -186,11 +182,11 @@ resources:
     properties:
       settings:
         properties:
-          OverlayOpacity: 30
+          BackgroundColor: "#4D000000"
           SpotlightRadius: 100
           AnimationDurationMs: 300
         name: FindMyMouse
-        version: 1.0
+        version: 1.2
 ```
 
 ### Example 5 - High visibility configuration
@@ -201,14 +197,13 @@ This example creates a high-visibility spotlight for accessibility.
 $config = @{
     settings = @{
         properties = @{
-            BackgroundColor = "#000000"
-            SpotlightColor = "#FFFF00"
-            OverlayOpacity = 80
+            BackgroundColor = "#CC000000"
+            SpotlightColor = "#CCFFFF00"
             SpotlightRadius = 200
             SpotlightInitialZoom = 400
         }
         name = "FindMyMouse"
-        version = "1.0"
+        version = "1.2"
     }
 } | ConvertTo-Json -Depth 10 -Compress
 
@@ -234,7 +229,7 @@ resources:
         properties:
           DoNotActivateOnGameMode: true
         name: FindMyMouse
-        version: 1.0
+        version: 1.2
 ```
 
 ## Use cases
@@ -251,10 +246,9 @@ resources:
       settings:
         properties:
           SpotlightRadius: 180
-          OverlayOpacity: 70
-          SpotlightColor: "#FFFFFF"
+          SpotlightColor: "#B3FFFFFF"
         name: FindMyMouse
-        version: 1.0
+        version: 1.2
 ```
 
 ### Accessibility
@@ -268,12 +262,11 @@ resources:
     properties:
       settings:
         properties:
-          SpotlightColor: "#FFFF00"
-          OverlayOpacity: 80
+          SpotlightColor: "#CCFFFF00"
           SpotlightRadius: 200
           AnimationDurationMs: 1000
         name: FindMyMouse
-        version: 1.0
+        version: 1.2
 ```
 
 ## See also
