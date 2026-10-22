@@ -247,8 +247,12 @@ function Get-HistoryPrIdentitySet {
         if (-not $sha) {
             continue
         }
-        & git -C $RepoPath cat-file -e "$sha^{commit}" 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Ancestor -Ancestor $sha -Descendant $Commit)) {
+        $objectExists = & {
+            $ErrorActionPreference = "Continue"
+            & git -C $RepoPath cat-file -e "$sha^{commit}" 2>$null
+            $LASTEXITCODE -eq 0
+        }
+        if (-not $objectExists -or -not (Test-Ancestor -Ancestor $sha -Descendant $Commit)) {
             continue
         }
         $subject = ([string](Invoke-Git show -s --format=%s $sha)).Trim()
