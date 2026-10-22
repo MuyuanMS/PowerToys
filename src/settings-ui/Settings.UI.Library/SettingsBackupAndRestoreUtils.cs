@@ -299,7 +299,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
                 // get data needed for process
                 var backupRestoreSettings = JsonNode.Parse(GetBackupRestoreSettingsJson());
+                var additionalPaths = GetAdditionalSettingsPaths(backupRestoreSettings);
                 var currentSettingsFiles = GetSettingsFiles(backupRestoreSettings, appBasePath).ToList().ToDictionary(x => x.Substring(appBasePath.Length));
+                AddAdditionalPathFiles(backupRestoreSettings, currentSettingsFiles, additionalPaths);
                 var backupSettingsFiles = GetSettingsFiles(backupRestoreSettings, latestSettingsFolder).ToList().ToDictionary(x => x.Substring(latestSettingsFolder.Length));
 
                 if (backupSettingsFiles.Count == 0)
@@ -351,7 +353,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                         // we don't have anything to merge this into, we need to use it as is
                         Logger.LogInfo($"Settings file {currentFile.Key} is in the backup but does not exist for restore");
 
-                        var thisPathToRestore = Path.Combine(appBasePath, currentFile.Key.Substring(1));
+                        var thisPathToRestore = ResolveRestorePath(currentFile.Key, appBasePath, additionalPaths);
                         TryCreateDirectory(Path.GetDirectoryName(thisPathToRestore));
                         File.WriteAllText(thisPathToRestore, settingsToRestoreJson);
                         anyFilesUpdated = true;
@@ -568,6 +570,81 @@ namespace Microsoft.PowerToys.Settings.UI.Library
         }
 
         /// <summary>
+        /// Method <c>GetAdditionalSettingsPaths</c> reads the <c>AdditionalSettingsPaths</c> section
+        /// from the backup/restore config and returns a mapping of path-key to resolved absolute path.
+        /// </summary>
+        private static Dictionary<string, string> GetAdditionalSettingsPaths(JsonNode settings)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var additionalPaths = settings["AdditionalSettingsPaths"] as JsonArray;
+            if (additionalPaths == null)
+            {
+                return result;
+            }
+
+            foreach (var entry in additionalPaths)
+            {
+                var pathKey = entry["PathKey"]?.ToString();
+                var fullPath = entry["FullPath"]?.ToString();
+                if (!string.IsNullOrEmpty(pathKey) && !string.IsNullOrEmpty(fullPath))
+                {
+                    result[pathKey] = Environment.ExpandEnvironmentVariables(fullPath);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Method <c>AddAdditionalPathFiles</c> scans each additional settings directory and
+        /// merges the matching settings files into <paramref name="settingsFiles"/> using keys
+        /// prefixed with the path-key (e.g. <c>\Microsoft.CmdPal\settings.json</c>).
+        /// </summary>
+        private static void AddAdditionalPathFiles(JsonNode settings, Dictionary<string, string> settingsFiles, Dictionary<string, string> additionalPaths)
+        {
+            foreach (var kvp in additionalPaths)
+            {
+                var pathKey = kvp.Key;
+                var basePath = kvp.Value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                foreach (var file in GetSettingsFiles(settings, basePath))
+                {
+                    // Build a key that is unique across all base paths:
+                    // "\Microsoft.CmdPal\settings.json", "\Microsoft.CmdPal\foo.settings.json", …
+                    var relativeWithinBase = file.Substring(basePath.Length); // always starts with separator
+                    var combinedKey = Path.DirectorySeparatorChar + pathKey + relativeWithinBase;
+                    if (settingsFiles.ContainsKey(combinedKey))
+                    {
+                        Logger.LogWarning($"AddAdditionalPathFiles: key collision for '{combinedKey}', overwriting with '{file}'.");
+                    }
+
+                    settingsFiles[combinedKey] = file;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Method <c>ResolveRestorePath</c> maps a backup relative key back to the absolute path
+        /// where the settings file should be written on restore.  For files that belong to an
+        /// additional settings path (e.g. Command Palette), the key prefix is resolved to that
+        /// path's base directory; everything else falls back to <paramref name="appBasePath"/>.
+        /// </summary>
+        private static string ResolveRestorePath(string relativeKey, string appBasePath, Dictionary<string, string> additionalPaths)
+        {
+            var keyWithoutLeadingSep = relativeKey.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (var kvp in additionalPaths)
+            {
+                var prefix = kvp.Key + Path.DirectorySeparatorChar;
+                if (keyWithoutLeadingSep.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var relativeWithinAdditional = keyWithoutLeadingSep.Substring(kvp.Key.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    return Path.Combine(kvp.Value, relativeWithinAdditional);
+                }
+            }
+
+            return Path.Combine(appBasePath, keyWithoutLeadingSep);
+        }
+
+        /// <summary>
         /// Method <c>BackupSettings</c> does the backup process.
         /// </summary>
         /// <returns>
@@ -666,7 +743,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
                     // get data needed for process
                     var backupRestoreSettings = JsonNode.Parse(GetBackupRestoreSettingsJson());
+                    var additionalPaths = GetAdditionalSettingsPaths(backupRestoreSettings);
                     var currentSettingsFiles = GetSettingsFiles(backupRestoreSettings, appBasePath).ToList().ToDictionary(x => x.Substring(appBasePath.Length));
+                    AddAdditionalPathFiles(backupRestoreSettings, currentSettingsFiles, additionalPaths);
                     var fullBackupDir = Path.Combine(Path.GetTempPath(), $"settings_{DateTime.UtcNow.ToFileTimeUtc().ToString(CultureInfo.InvariantCulture)}");
                     var latestSettingsFolder = GetLatestSettingsFolder();
                     var lastBackupSettingsFiles = GetSettingsFiles(backupRestoreSettings, latestSettingsFolder).ToList().ToDictionary(x => x.Substring(latestSettingsFolder.Length));
@@ -718,7 +797,10 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                             anyFileBackedUp = true;
 
                             // write the export version of the settings file to backup location.
-                            var relativePath = currentFile.Value.Substring(appBasePath.Length + 1);
+                            // Using the key (which equals "\relative\path.json") is equivalent to
+                            // currentFile.Value.Substring(appBasePath.Length + 1) for main-settings
+                            // files, and also correct for additional-path files (e.g. CmdPal).
+                            var relativePath = currentFile.Key.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                             var backupFullPath = Path.Combine(fullBackupDir, relativePath);
 
                             Logger.LogInfo($"BackupSettings writing, {backupFullPath}, dryRun:{dryRun}.");
@@ -747,7 +829,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                     {
                         // if we did do a backup, we need to copy in all the settings files we skipped so the backup is complete.
                         // this is needed since we might use the backup on another machine/
-                        var relativePath = currentFile.Value.Path.Substring(appBasePath.Length + 1);
+                        // Key-based relativePath is equivalent to value.Substring(appBasePath.Length+1) for main
+                        // settings and also correct for additional-path files (e.g. CmdPal).
+                        var relativePath = currentFile.Key.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                         var backupFullPath = Path.Combine(fullBackupDir, relativePath);
 
                         Logger.LogInfo($"BackupSettings writing, {backupFullPath}, dryRun:{dryRun}");
@@ -910,8 +994,6 @@ namespace Microsoft.PowerToys.Settings.UI.Library
                 if (backupRestoreSettings["IgnoredSettings"][settingFileKey] != null)
                 {
                     var settingsArray = (JsonArray)backupRestoreSettings["IgnoredSettings"][settingFileKey];
-
-                    Console.WriteLine("settingsArray " + settingsArray.GetType().FullName);
 
                     var settingsList = new List<string>();
 
