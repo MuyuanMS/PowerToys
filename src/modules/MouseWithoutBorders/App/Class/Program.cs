@@ -178,16 +178,6 @@ namespace MouseWithoutBorders.Class
                     }
                 }
 
-                SessionPolicy.Initialize(
-                    serviceMode,
-                    runningAsSystem,
-                    WinAPI.GetMyDesktop(),
-                    Setting.Values.AllowNonConsoleSessions);
-                if (SessionPolicy.Current.AllowNonConsole)
-                {
-                    Logger.Log("Non-console session support enabled. An active user Default desktop is still required; service, System, and secure-desktop scenarios are not supported.");
-                }
-
                 PowerToysTelemetry.Log.WriteEvent(new MouseWithoutBorders.Telemetry.MouseWithoutBordersStartedEvent());
 
                 try
@@ -286,7 +276,7 @@ namespace MouseWithoutBorders.Class
 
             void Shutdown();
 
-            Task Reconnect();
+            void Reconnect();
 
             Task<string> GenerateNewKey();
 
@@ -375,7 +365,7 @@ namespace MouseWithoutBorders.Class
                 return Task.CompletedTask;
             }
 
-            public async Task<string> GenerateNewKey()
+            public Task<string> GenerateNewKey()
             {
                 EnsurePairingOperationAuthorized(Settings.IsProtectedMode, _canManageServicePairing);
                 Setting.Values.PauseInstantSaving = true;
@@ -396,11 +386,12 @@ namespace MouseWithoutBorders.Class
 
                 Setting.Values.SaveSettings();
 
-                await Reconnect();
-                return key;
+                Reconnect();
+
+                return Task.FromResult(key);
             }
 
-            public Task Reconnect()
+            public void Reconnect()
             {
                 SocketStuff.InvalidKeyFound = false;
                 InitAndCleanup.ReopenSocketDueToReadError = true;
@@ -418,7 +409,6 @@ namespace MouseWithoutBorders.Class
                 }
 
                 MachineStuff.SendMachineMatrix();
-                return Task.CompletedTask;
             }
 
             public void Shutdown()
