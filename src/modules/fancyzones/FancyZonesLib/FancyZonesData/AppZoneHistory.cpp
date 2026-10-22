@@ -344,6 +344,18 @@ bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::Wor
         {
             if (data.workAreaId == workAreaId)
             {
+                // If the window already has this zone stamped on it, it is merely being
+                // re-confirmed at its current position (e.g. via UpdateWindowPositions).
+                // In that case, preserve the "last-closed slot" zone stored in history so
+                // that the next new window opens in the vacated position rather than being
+                // pushed into a zone that is already occupied.
+                const auto currentWindowZones = FancyZonesWindowProperties::RetrieveZoneIndexProperty(window);
+                if (!currentWindowZones.empty() && currentWindowZones == zoneIndexSet && data.layoutId == layoutId)
+                {
+                    data.processIdToHandleMap[processId] = window;
+                    return true;
+                }
+
                 // application already has history on this work area, update it with new window position
                 data.processIdToHandleMap[processId] = window;
                 data.layoutId = layoutId;
@@ -376,7 +388,7 @@ bool AppZoneHistory::SetAppLastZones(HWND window, const FancyZonesDataTypes::Wor
     return true;
 }
 
-bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId)
+bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::WorkAreaId& workAreaId, const GUID& layoutId, bool preserveHistory)
 {
     auto processPath = get_process_path_waiting_uwp(window);
     if (processPath.empty())
@@ -423,11 +435,22 @@ bool AppZoneHistory::RemoveAppLastZone(HWND window, const FancyZonesDataTypes::W
                 }
             }
 
-            data = perDesktopData.erase(data);
-            if (perDesktopData.empty())
+            if (preserveHistory)
             {
-                m_history.erase(processPath);
+                // Preserve the zone position so the next window can open in the vacated slot
+                // ("last closed slot" feature). Only clear the process-to-handle tracking;
+                // keep zoneIndexSet intact so GetAppLastZoneIndexSet can return it for new windows.
+                data->processIdToHandleMap.clear();
             }
+            else
+            {
+                data = perDesktopData.erase(data);
+                if (perDesktopData.empty())
+                {
+                    m_history.erase(history);
+                }
+            }
+
             SaveData();
             return true;
         }
