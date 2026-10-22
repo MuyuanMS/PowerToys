@@ -31,6 +31,49 @@ namespace PowerRenameManagerTests
             int depth;
         };
 
+        class CTestPowerRenameManager : public CPowerRenameManager
+        {
+        public:
+            HRESULT InitForTest()
+            {
+                return _Init();
+            }
+
+            void CleanupForTest()
+            {
+                _Cleanup();
+            }
+
+            HRESULT CreateFileOpWorkerThreadForTest()
+            {
+                return _CreateFileOpWorkerThread();
+            }
+
+            DWORD WaitForFileOpWorkerThread(DWORD timeout)
+            {
+                return WaitForSingleObject(m_fileOpWorkerThreadHandle, timeout);
+            }
+
+            void CloseFileOpWorkerThread()
+            {
+                if (m_fileOpWorkerThreadHandle)
+                {
+                    CloseHandle(m_fileOpWorkerThreadHandle);
+                    m_fileOpWorkerThreadHandle = nullptr;
+                }
+            }
+
+            void StartFileOpWorker()
+            {
+                SetEvent(m_startFileOpWorkerEvent);
+            }
+
+            void StartRegExWorker()
+            {
+                SetEvent(m_startRegExWorkerEvent);
+            }
+        };
+
         void RenameHelper(_In_ rename_pairs * renamePairs, _In_ int numPairs, _In_ std::wstring searchTerm, _In_ std::wstring replaceTerm, SYSTEMTIME fileTime, _In_ DWORD flags)
         {
             // Create a single item (in a temp directory) and verify rename works as expected
@@ -147,6 +190,41 @@ namespace PowerRenameManagerTests
             Assert::IsTrue(mgr->Shutdown() == S_OK);
 
             mockMgrEvents->Release();
+        }
+
+        TEST_METHOD (VerifyFileOpWorkerStartsWithoutRegExWorkerSignal)
+        {
+            CTestFileHelper testFileHelper;
+            Assert::IsTrue(testFileHelper.AddFile(L"foo.txt"));
+
+            CTestPowerRenameManager mgr;
+            Assert::IsTrue(mgr.InitForTest() == S_OK);
+
+            CComPtr<IPowerRenameItem> item;
+            CMockPowerRenameItem::CreateInstance(testFileHelper.GetFullPath(L"foo.txt").c_str(),
+                                                 L"foo.txt",
+                                                 0,
+                                                 false,
+                                                 SYSTEMTIME{ 0 },
+                                                 &item);
+            Assert::IsTrue(item->PutNewName(L"bar.txt") == S_OK);
+            Assert::IsTrue(item->PutStatus(PowerRenameItemRenameStatus::ShouldRename) == S_OK);
+            Assert::IsTrue(mgr.AddItem(item) == S_OK);
+            Assert::IsTrue(mgr.CreateFileOpWorkerThreadForTest() == S_OK);
+
+            Assert::AreEqual(static_cast<DWORD>(WAIT_TIMEOUT), mgr.WaitForFileOpWorkerThread(100));
+
+            mgr.StartFileOpWorker();
+            DWORD waitResult = mgr.WaitForFileOpWorkerThread(5000);
+            if (waitResult != WAIT_OBJECT_0)
+            {
+                mgr.StartRegExWorker();
+                Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), mgr.WaitForFileOpWorkerThread(5000));
+            }
+
+            mgr.CloseFileOpWorkerThread();
+            mgr.CleanupForTest();
+            Assert::AreEqual(static_cast<DWORD>(WAIT_OBJECT_0), waitResult);
         }
 
         TEST_METHOD (VerifySingleRename)
