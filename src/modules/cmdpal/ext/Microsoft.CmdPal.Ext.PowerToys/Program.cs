@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using ManagedCommon;
 using Microsoft.CommandPalette.Extensions;
+using PowerToysExtension.Helpers;
 using Shmuelie.WinRTServer;
 using Shmuelie.WinRTServer.CsWinRT;
 
@@ -43,8 +44,17 @@ public class Program
                     server.Start();
                     Logger.LogInfo("Extension instance registered; waiting for disposal signal.");
 
-                    extensionDisposedEvent.WaitOne();
-                    Logger.LogInfo("Extension disposed signal received; exiting server loop.");
+                    // Start the lifecycle monitor so the process responds to OS-initiated
+                    // shutdown requests (WM_QUERYENDSESSION / WM_ENDSESSION) promptly.
+                    // Without this, the COM server blocks on WaitOne indefinitely and is
+                    // force-terminated by the OS, producing MOAPPLICATION_HANG reports.
+                    using AppLifeMonitor appLifeMonitor = new();
+                    appLifeMonitor.Start();
+
+                    // Wait until the extension is disposed by the host OR the OS requests
+                    // a shutdown / session end, whichever comes first.
+                    WaitHandle.WaitAny([extensionDisposedEvent, appLifeMonitor.ExitRequestedWaitHandle]);
+                    Logger.LogInfo("Extension disposed or OS shutdown signal received; exiting server loop.");
                 }
                 finally
                 {

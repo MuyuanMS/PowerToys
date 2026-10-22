@@ -7,7 +7,7 @@ using Shmuelie.WinRTServer;
 using Shmuelie.WinRTServer.CsWinRT;
 using System;
 using System.Threading;
-using System.Threading.Tasks;
+using TemplateCmdPalExtension.Helpers;
 
 namespace TemplateCmdPalExtension;
 
@@ -29,9 +29,16 @@ public class Program
             server.RegisterClass<TemplateCmdPalExtension, IExtension>(() => extensionInstance);
             server.Start();
             
-            // This will make the main thread wait until the event is signalled by the extension class.
-            // Since we have single instance of the extension object, we exit as soon as it is disposed.
-            extensionDisposedEvent.WaitOne();
+            // Start the lifecycle monitor so the process responds to OS-initiated
+            // shutdown requests (WM_QUERYENDSESSION / WM_ENDSESSION) promptly.
+            // Without this, the COM server blocks on WaitOne indefinitely and is
+            // force-terminated by the OS, producing MOAPPLICATION_HANG reports.
+            using AppLifeMonitor appLifeMonitor = new();
+            appLifeMonitor.Start();
+
+            // Wait until the extension is disposed by the host OR the OS requests
+            // a shutdown / session end, whichever comes first.
+            WaitHandle.WaitAny([extensionDisposedEvent, appLifeMonitor.ExitRequestedWaitHandle]);
             server.Stop();
             server.UnsafeDispose();
         }
