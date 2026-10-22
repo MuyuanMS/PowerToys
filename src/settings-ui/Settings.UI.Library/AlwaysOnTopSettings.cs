@@ -13,12 +13,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
     public class AlwaysOnTopSettings : BasePTModuleSettings, ISettingsConfig, IHotkeyConfig
     {
         public const string ModuleName = "AlwaysOnTop";
-        public const string ModuleVersion = "0.0.1";
+        public const string InitialModuleVersion = "0.0.1";
+        public const string CurrentModuleVersion = "0.0.2";
 
         public AlwaysOnTopSettings()
         {
             Name = ModuleName;
-            Version = ModuleVersion;
+            Version = CurrentModuleVersion;
             Properties = new AlwaysOnTopProperties();
         }
 
@@ -55,6 +56,13 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         public bool UpgradeSettingsConfiguration()
         {
+            if (string.IsNullOrWhiteSpace(Version) || string.Equals(Version, InitialModuleVersion, System.StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.OpacitySoundEnabled = new BoolProperty(Properties.SoundEnabled.Value);
+                Version = CurrentModuleVersion;
+                return true;
+            }
+
             return false;
         }
     }

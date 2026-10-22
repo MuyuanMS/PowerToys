@@ -902,7 +902,7 @@ void AlwaysOnTop::StepWindowTransparency(HWND window, int delta)
     {
         ApplyWindowAlpha(targetWindow, newTransparency);
 
-        if (AlwaysOnTopSettings::settings()->enableSound)
+        if (AlwaysOnTopSettings::settings()->enableOpacitySound)
         {
             m_sound.Play(delta > 0 ? Sound::Type::IncreaseOpacity : Sound::Type::DecreaseOpacity);
         }
