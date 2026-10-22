@@ -1,3 +1,4 @@
+import http.client
 import importlib.util
 import json
 import tempfile
@@ -668,6 +669,17 @@ class IssueContextTests(unittest.TestCase):
 
     def test_permission_lookup_failure_responds_normally(self):
         api = FakeApi(permissions={"alice": RuntimeError("GitHub API failed")})
+        _, _, should_process, evidence = CONTEXT.prepare_with_evidence(
+            {"action": "opened", "issue": self.open_issue()},
+            api,
+        )
+        self.assertTrue(should_process)
+        self.assertFalse(evidence["team_authored"])
+
+    def test_http_protocol_failure_responds_normally(self):
+        api = FakeApi(
+            permissions={"alice": http.client.IncompleteRead(b"truncated")}
+        )
         _, _, should_process, evidence = CONTEXT.prepare_with_evidence(
             {"action": "opened", "issue": self.open_issue()},
             api,

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -605,7 +606,7 @@ def is_team_member(api, login):
         return False
     try:
         permission = api.get_repository_permission(login) or {}
-    except (RuntimeError, OSError, ValueError):
+    except (http.client.HTTPException, RuntimeError, OSError, ValueError):
         # Fail open so a lookup outage never silently drops community issues.
         return False
     role = str(permission.get("role_name") or "").lower()

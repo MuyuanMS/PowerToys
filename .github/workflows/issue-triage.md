@@ -630,6 +630,17 @@ safe-outputs:
                     labels: [desiredProductLabel]
                   });
                 }
+                if (teamIssueLabels.has('Needs-Author-Feedback')) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      ...context.repo,
+                      issue_number: issueNumber,
+                      name: 'Needs-Author-Feedback'
+                    });
+                  } catch (error) {
+                    if (error.status !== 404) throw error;
+                  }
+                }
                 core.info('Team-authored issue: applied labels without responding');
                 return;
               }
