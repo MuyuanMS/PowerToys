@@ -365,6 +365,35 @@ namespace ImageResizer.Tests.Models
         }
 
         [DataTestMethod]
+        [DataRow("--size", "abc")]
+        [DataRow("--quality", "abc")]
+        [DataRow("-q", "abc")]
+        [DataRow("--quality", "99999999999")]
+        public void Parse_WithUnparsableIntegerValue_ReturnsParseError(string option, string value)
+        {
+            var options = CliOptions.ParseForCli([option, value, "test.jpg"]);
+
+            Assert.AreEqual(1, options.ParseErrors.Count);
+            StringAssert.Contains(options.ParseErrors[0], value);
+            Assert.IsNull(options.SizeIndex);
+            Assert.IsNull(options.JpegQualityLevel);
+        }
+
+        [DataTestMethod]
+        [DataRow("--size", "-1", "Size index must be a non-negative integer.")]
+        [DataRow("--quality", "0", "JPEG quality must be between 1 and 100.")]
+        [DataRow("--quality", "101", "JPEG quality must be between 1 and 100.")]
+        public void Parse_WithOutOfRangeIntegerValue_ReturnsValidationError(string option, string value, string expectedError)
+        {
+            var options = CliOptions.ParseForCli([option, value, "test.jpg"]);
+
+            Assert.AreEqual(1, options.ParseErrors.Count);
+            StringAssert.Contains(options.ParseErrors[0], expectedError);
+            Assert.IsNull(options.SizeIndex);
+            Assert.IsNull(options.JpegQualityLevel);
+        }
+
+        [DataTestMethod]
         [DataRow("[suggest]", "abc")]
         [DataRow("[suggest:30]", "abc")]
         [DataRow("[suggest]", "-1")]
