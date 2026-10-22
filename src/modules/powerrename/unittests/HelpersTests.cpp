@@ -830,4 +830,20 @@ namespace HelpersTests
             Assert::AreEqual(L"file_15EER", result);
         }
     };
+
+    TEST_CLASS(GetTransformedFileNameTests)
+    {
+    public:
+        TEST_METHOD(VerifyLocaleAwareNonAsciiCasing)
+        {
+            // Use \u escapes to avoid MSVC code-page mis-compilation of raw non-ASCII literals
+            // (é = U+00E9, É = U+00C9)
+            wchar_t result[MAX_PATH] = {};
+            Assert::IsTrue(SUCCEEDED(GetTransformedFileName(result, ARRAYSIZE(result), L"\u00E9cole.txt", Uppercase, false)));
+            Assert::AreEqual(L"\u00C9COLE.TXT", result);
+
+            Assert::IsTrue(SUCCEEDED(GetTransformedFileName(result, ARRAYSIZE(result), L"\u00C9COLE.TXT", Lowercase, false)));
+            Assert::AreEqual(L"\u00E9cole.txt", result);
+        }
+    };
 }

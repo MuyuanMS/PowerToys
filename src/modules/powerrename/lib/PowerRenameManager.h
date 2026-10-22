@@ -103,6 +103,14 @@ protected:
     HANDLE m_fileOpWorkerThreadHandle = nullptr;
     HANDLE m_startFileOpWorkerEvent = nullptr;
 
+    // Reentrancy guards for the UI-thread entry points.
+    // These are bool flags (not CRITICAL_SECTION) because CRITICAL_SECTION is
+    // recursive on the same thread, so TryEnterCriticalSection cannot prevent
+    // same-thread reentry through the message pump that _PerformRegExRename and
+    // _PerformFileOperation now run (MsgWaitForMultipleObjects dispatches messages).
+    bool m_isPerformingRegEx = false;
+    bool m_isPerformingFileOp = false;
+
     CSRWLock m_lockEvents;
     CSRWLock m_lockItems;
 
@@ -131,8 +139,6 @@ protected:
     bool m_closeUIWindowAfterRenaming = true;
 
     HWND m_hwndMessage = nullptr;
-
-    CRITICAL_SECTION m_critsecReentrancy;
 
     long m_refCount;
 };
