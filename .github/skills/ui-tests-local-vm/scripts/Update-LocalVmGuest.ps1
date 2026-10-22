@@ -11,8 +11,6 @@ Retail Windows 10 22H2 media starts at an unserviced build that .NET 10 rejects 
 "Your Windows doesn't fully support CET. Please install all available Windows updates."
 This script drives the in-box Windows Update COM API over PowerShell Direct, reboots as needed, and
 repeats until no software updates remain or MaxPasses is reached.
-Also prevents password expiry for the existing guest administrator. AdminUserName defaults to the
-credential's local user name; pass StandardUser when the guest does not use the PTUser default.
 
 .EXAMPLE
 pwsh ./Update-LocalVmGuest.ps1 -VmName PowerToysUiTest-Win10
@@ -26,9 +24,7 @@ param(
     [ValidateRange(1, 10)]
     [int]$MaxPasses = 4,
     [ValidateRange(1, 120)]
-    [int]$ReconnectTimeoutMinutes = 30,
-    [string]$AdminUserName,
-    [string]$StandardUser = 'PTUser'
+    [int]$ReconnectTimeoutMinutes = 30
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,12 +38,6 @@ if (-not (Test-Path $CredentialPath -PathType Leaf)) {
 
 Import-Module Hyper-V -ErrorAction Stop
 $credential = Import-Clixml $CredentialPath
-if ($credential -isnot [pscredential]) {
-    throw "Credential file does not contain a PSCredential: $CredentialPath"
-}
-if ([string]::IsNullOrWhiteSpace($AdminUserName)) {
-    $AdminUserName = $credential.UserName -replace '^.*\\', ''
-}
 
 function New-GuestSession {
     $deadline = [DateTime]::UtcNow.AddMinutes($ReconnectTimeoutMinutes)
@@ -67,16 +57,6 @@ function New-GuestSession {
 $vm = Get-VM -Name $VmName -ErrorAction Stop
 if ($vm.State -ne 'Running') {
     Start-VM -Name $VmName
-}
-
-$session = New-GuestSession
-try {
-    $adminPolicyScript = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\templates\oem\Set-UiTestAdminPasswordPolicy.ps1'))
-    Invoke-Command -Session $session -FilePath $adminPolicyScript `
-        -ArgumentList $AdminUserName, $StandardUser -ErrorAction Stop | Out-Null
-}
-finally {
-    Remove-PSSession $session -ErrorAction SilentlyContinue
 }
 
 $passes = @()

@@ -202,9 +202,7 @@ function Start-InteractiveTask {
         $principal = New-ScheduledTaskPrincipal `
             -UserId "$env:COMPUTERNAME\$InteractiveUser" `
             -LogonType Interactive -RunLevel Limited
-        # Priority 7 defaults to background CPU/I/O scheduling and propagates to
-        # product children. Interactive UI tests need normal scheduling under VM load.
-        $settings = New-ScheduledTaskSettingsSet -Priority 4 `
+        $settings = New-ScheduledTaskSettingsSet `
             -ExecutionTimeLimit (New-TimeSpan -Minutes $LimitMinutes) `
             -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
         $task = New-ScheduledTask -Action $action -Principal $principal -Settings $settings
@@ -745,13 +743,7 @@ finally {
                 Invoke-Command -Session $session -ScriptBlock {
                     param($ProbeTaskName, $TestTaskName)
                     foreach ($name in @($ProbeTaskName, $TestTaskName)) {
-                        $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
-                        if ($null -ne $task) {
-                            if ($task.State -in @('Running', 'Queued')) {
-                                Stop-ScheduledTask -InputObject $task -ErrorAction Stop
-                            }
-                            Unregister-ScheduledTask -InputObject $task -Confirm:$false -ErrorAction Stop
-                        }
+                        Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
                     }
                 } -ArgumentList $probeTaskName, $testTaskName -ErrorAction Stop
             }

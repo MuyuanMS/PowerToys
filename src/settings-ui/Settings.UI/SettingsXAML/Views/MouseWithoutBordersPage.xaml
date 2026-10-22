@@ -35,12 +35,6 @@
                         </tkcontrols:SettingsCard>
                     </controls:GPOInfoControl>
                 </controls:SettingsGroup>
-                <InfoBar
-                    x:Name="SettingsSyncErrorInfoBar"
-                    x:Uid="MouseWithoutBorders_SettingsSyncErrorInfoBar"
-                    AutomationProperties.LiveSetting="Assertive"
-                    IsOpen="False"
-                    Severity="Error" />
                 <controls:SettingsGroup
                     x:Name="KeySettingsGroup"
                     x:Uid="MouseWithoutBorders_KeySettings"
@@ -64,7 +58,6 @@
                                         Width="248" />
                                     <Button
                                         x:Uid="MouseWithoutBorders_Connect"
-                                        AutomationProperties.AutomationId="MouseWithoutBordersConnectButton"
                                         Command="{x:Bind ConnectCommand, Mode=OneTime}"
                                         Style="{StaticResource AccentButtonStyle}" />
                                 </StackPanel>
@@ -78,16 +71,14 @@
                                 Style="{StaticResource AccentButtonStyle}" />
                             <Button
                                 x:Uid="MouseWithoutBorders_Connect"
-                                AutomationProperties.AutomationId="MouseWithoutBordersShowConnectFieldsButton"
                                 Command="{x:Bind ShowConnectFieldsCommand, Mode=OneTime}"
                                 IsEnabled="{x:Bind ViewModel.CanConnectPairing, Mode=OneWay}"
                                 Style="{StaticResource AccentButtonStyle}"
-                                Visibility="{x:Bind Path=ViewModel.ConnectFieldsVisible, Mode=OneWay, Converter={StaticResource ReverseBoolToVisibilityConverter}}" />
+                                Visibility="{x:Bind Path=ViewModel.ConnectFieldsVisible, Mode=OneWay, Converter={StaticResource ReverseBoolToVisibilityConverter}, ConverterParameter=True}" />
                         </StackPanel>
                     </tkcontrols:SettingsExpander>
                     <InfoBar
                         x:Uid="MouseWithoutBorders_PairingUpdateFailed"
-                        AutomationProperties.LiveSetting="Assertive"
                         IsClosable="False"
                         IsOpen="{x:Bind ViewModel.HasPairingError, Mode=OneWay}"
                         IsTabStop="{x:Bind ViewModel.HasPairingError, Mode=OneWay}"
@@ -299,10 +290,7 @@
                         HeaderIcon="{ui:FontIcon Glyph=&#xF0E3;}"
                         IsEnabled="{x:Bind ViewModel.CardForShareClipboardSettingIsEnabled, Mode=OneWay}"
                         IsExpanded="True">
-                        <ToggleSwitch
-                            x:Uid="MouseWithoutBorders_ShareClipboard_ToggleSwitch"
-                            AutomationProperties.AutomationId="MouseWithoutBordersShareClipboardToggle"
-                            IsOn="{x:Bind ViewModel.ShareClipboard, Mode=TwoWay}" />
+                        <ToggleSwitch x:Uid="MouseWithoutBorders_ShareClipboard_ToggleSwitch" IsOn="{x:Bind ViewModel.ShareClipboard, Mode=TwoWay}" />
                         <tkcontrols:SettingsExpander.Items>
                             <tkcontrols:SettingsCard
                                 Name="MouseWithoutBordersTransferFile"
