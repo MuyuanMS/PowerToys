@@ -91,20 +91,28 @@ namespace Settings.UI.UnitTests
             Assert.AreEqual(ScoobeWindow.MaxReleaseFetchAttempts, calls);
         }
 
-        [TestMethod]
-        public async Task RetryWithBackoffDoesNotRetryRateLimit()
+        [DataTestMethod]
+        [DataRow(HttpStatusCode.Forbidden)]
+        [DataRow(HttpStatusCode.TooManyRequests)]
+        public async Task RetryWithBackoffDoesNotRetryRateLimit(HttpStatusCode statusCode)
         {
             int calls = 0;
+            int delayCalls = 0;
 
             await Assert.ThrowsExceptionAsync<HttpRequestException>(() => ScoobeWindow.RetryWithBackoffAsync<string>(
                 () =>
                 {
                     calls++;
-                    throw new HttpRequestException("rate limited", null, HttpStatusCode.Forbidden);
+                    return Task.FromException<string>(new HttpRequestException("rate limited", null, statusCode));
                 },
-                _ => Task.CompletedTask));
+                _ =>
+                {
+                    delayCalls++;
+                    return Task.CompletedTask;
+                }));
 
             Assert.AreEqual(1, calls);
+            Assert.AreEqual(0, delayCalls);
         }
 
         [TestMethod]
@@ -113,7 +121,7 @@ namespace Settings.UI.UnitTests
             Assert.IsTrue(ScoobeWindow.IsTransientFetchFailure(new HttpRequestException("dns")));
             Assert.IsTrue(ScoobeWindow.IsTransientFetchFailure(new TaskCanceledException()));
             Assert.IsTrue(ScoobeWindow.IsTransientFetchFailure(new HttpRequestException(null, null, HttpStatusCode.BadGateway)));
-            Assert.IsTrue(ScoobeWindow.IsTransientFetchFailure(new HttpRequestException(null, null, HttpStatusCode.TooManyRequests)));
+            Assert.IsFalse(ScoobeWindow.IsTransientFetchFailure(new HttpRequestException(null, null, HttpStatusCode.TooManyRequests)));
             Assert.IsFalse(ScoobeWindow.IsTransientFetchFailure(new HttpRequestException(null, null, HttpStatusCode.Forbidden)));
             Assert.IsFalse(ScoobeWindow.IsTransientFetchFailure(new HttpRequestException(null, null, HttpStatusCode.NotFound)));
             Assert.IsFalse(ScoobeWindow.IsTransientFetchFailure(new JsonException()));

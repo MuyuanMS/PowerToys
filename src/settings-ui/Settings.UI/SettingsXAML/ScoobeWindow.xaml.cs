@@ -193,7 +193,7 @@ namespace Microsoft.PowerToys.Settings.UI
         {
             HttpRequestException { StatusCode: null } => true,
             HttpRequestException { StatusCode: HttpStatusCode code } =>
-                code is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)code >= 500,
+                code is HttpStatusCode.RequestTimeout || (int)code >= 500,
             TaskCanceledException => true,
             _ => false,
         };
