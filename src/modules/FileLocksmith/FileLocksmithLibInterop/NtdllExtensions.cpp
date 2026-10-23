@@ -180,13 +180,13 @@ namespace
                 WaitForSingleObject(m_block->done_event, INFINITE);
             }
 
+            CloseHandle(file_handle);
+
             std::wstring result;
             if (m_block->is_disk && NT_SUCCESS(m_block->status))
             {
                 result = unicode_to_str(*reinterpret_cast<UNICODE_STRING*>(m_block->buffer));
             }
-
-            CloseHandle(file_handle);
             return result;
         }
 
