@@ -57,7 +57,7 @@ To use it, add a project reference to `ManagedCommon` and add the following line
 using ManagedCommon;
 ```
 
-In the `Main` function (or a function with a similar meaning (like `App` in a `App.xaml.cs` file)) you have to call `InitializeLogger` and specify the location where the logs will be saved (always use a path scheme similar to this example):
+In the `Main` function (or a function with a similar meaning (like `App` in an `App.xaml.cs` file)) you have to call `InitializeLogger` and specify the location where the logs will be saved (always use a path scheme similar to this example):
 
 ```Csharp
 Logger.InitializeLogger("\\FancyZones\\Editor\\Logs");
@@ -75,7 +75,7 @@ The `Logger` class contains the following logging functions:
 // Logs an error that the utility encountered
 Logger.LogError(string message);
 Logger.LogError(string message, Exception ex);
-// Logs an error that isn't that grave
+// Logs a less severe error that the utility encountered
 Logger.LogWarning(string message);
 // Logs what the app is doing at the moment
 Logger.LogInfo(string message);
