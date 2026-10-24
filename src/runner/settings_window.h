@@ -39,6 +39,7 @@ enum class ESettingsWindowNames
     ZoomIt,
     PowerDisplay,
     GrabAndMove,
+    CopyAsUNC,
 };
 
 std::string ESettingsWindowNames_to_string(ESettingsWindowNames value);
