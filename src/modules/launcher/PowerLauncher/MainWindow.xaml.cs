@@ -4,6 +4,7 @@
 
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Runtime.InteropServices;
@@ -44,8 +45,17 @@ namespace PowerLauncher
         private bool _deletePressed;
         private HwndSource _hwndSource;
         private Timer _firstDeleteTimer = new Timer();
+        private bool _loadedAtLeastOnce;
         private bool _coldStateHotkeyPressed;
         private bool _disposedValue;
+
+        private static readonly string OpenSoundPath = Path.Combine(AppContext.BaseDirectory, "Sounds", "open.wav");
+        private static readonly string CloseSoundPath = Path.Combine(AppContext.BaseDirectory, "Sounds", "close.wav");
+        private static readonly Lazy<byte[]> OpenSoundBytes = new Lazy<byte[]>(() => LoadSoundBytes(OpenSoundPath));
+        private static readonly Lazy<byte[]> CloseSoundBytes = new Lazy<byte[]>(() => LoadSoundBytes(CloseSoundPath));
+        private static readonly Lazy<GCHandle> OpenSoundHandle = new Lazy<GCHandle>(() => PinSound(OpenSoundBytes.Value));
+        private static readonly Lazy<GCHandle> CloseSoundHandle = new Lazy<GCHandle>(() => PinSound(CloseSoundBytes.Value));
+
         private IDisposable _reactiveSubscription;
         private Point _mouseDownPosition;
         private ResultViewModel _mouseDownResultViewModel;
@@ -251,6 +261,7 @@ namespace PowerLauncher
             _viewModel.SetFontSize();
 
             BringProcessToForeground();
+            _loadedAtLeastOnce = true;
         }
 
         private void SetupSearchTextBoxReactiveness(bool showResultsWithDelay)
@@ -785,6 +796,7 @@ namespace PowerLauncher
         {
             if (Visibility == Visibility.Visible)
             {
+                PlayAudibleFeedback(true);
                 _deletePressed = false;
                 if (_firstDeleteTimer != null)
                 {
@@ -815,10 +827,62 @@ namespace PowerLauncher
             }
             else
             {
+                PlayAudibleFeedback(false);
                 if (_firstDeleteTimer != null)
                 {
                     _firstDeleteTimer.Stop();
                 }
+            }
+        }
+
+        private void PlayAudibleFeedback(bool isOpening)
+        {
+            if (!_loadedAtLeastOnce || !_settings.EnableAudibleFeedback)
+            {
+                return;
+            }
+
+            bool shouldPlay = isOpening ? _settings.EnableOpeningSound : _settings.EnableClosingSound;
+            if (!shouldPlay)
+            {
+                return;
+            }
+
+            string soundPath = isOpening ? OpenSoundPath : CloseSoundPath;
+            byte[] soundBytes = isOpening ? OpenSoundBytes.Value : CloseSoundBytes.Value;
+
+            if (soundBytes == null)
+            {
+                Log.Info($"Sound file not found: {soundPath}", GetType());
+                return;
+            }
+
+            try
+            {
+                GCHandle soundHandle = isOpening ? OpenSoundHandle.Value : CloseSoundHandle.Value;
+                NativeMethods.PlaySound(soundHandle.AddrOfPinnedObject(), IntPtr.Zero, NativeMethods.SndMemory | NativeMethods.SndAsync | NativeMethods.SndNoDefault);
+            }
+            catch (Exception ex)
+            {
+                Log.Exception("Failed to play audible feedback", ex, GetType());
+            }
+        }
+
+        private static GCHandle PinSound(byte[] soundBytes)
+        {
+            return soundBytes == null ? default : GCHandle.Alloc(soundBytes, GCHandleType.Pinned);
+        }
+
+        private static byte[] LoadSoundBytes(string path)
+        {
+            try
+            {
+                return File.Exists(path) ? File.ReadAllBytes(path) : null;
+            }
+            catch (Exception ex)
+            {
+                Log.Exception($"Failed to load sound file: {path}", ex, typeof(MainWindow));
+                return null;
             }
         }
 
