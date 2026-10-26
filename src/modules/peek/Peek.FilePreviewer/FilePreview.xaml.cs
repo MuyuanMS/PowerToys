@@ -102,6 +102,7 @@ namespace Peek.FilePreviewer
 
                     if (Previewer is not IUnsupportedFilePreviewer)
                     {
+                        (Previewer as IDisposable)?.Dispose();
                         Previewer = previewerFactory.CreateDefaultPreviewer(Item);
                         await UpdatePreviewAsync(_cancellationTokenSource.Token);
                     }
