@@ -4,12 +4,12 @@
 
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Microsoft.CmdPal.Ext.Apps.Catalog;
 
-namespace Microsoft.CmdPal.Ext.Apps;
+namespace Microsoft.CmdPal.Ext.Apps.Catalog.Cache;
 
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(List<string>), TypeInfoPropertyName = "StringList")]
+[JsonSerializable(typeof(AppCatalogCacheFile))]
 [JsonSourceGenerationOptions(UseStringEnumConverter = true, WriteIndented = true, IncludeFields = true, PropertyNameCaseInsensitive = true, AllowTrailingCommas = true)]
-internal sealed partial class JsonSerializationContext : JsonSerializerContext
-{
-}
+internal sealed partial class AppCatalogCacheJsonSerializationContext : JsonSerializerContext;
