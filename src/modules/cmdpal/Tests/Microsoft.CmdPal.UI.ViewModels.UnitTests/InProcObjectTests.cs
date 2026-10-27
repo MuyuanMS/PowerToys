@@ -2,6 +2,8 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Collections.Generic;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -42,9 +44,51 @@ public sealed class InProcObjectTests
     public void NullableValue_MatchesExtensionObjectSemantics()
     {
         var wrapped = new InProcObject<IListItem?>(null);
+        var other = new InProcObject<IListItem?>(null);
 
         Assert.IsNull(wrapped.Safe);
-        Assert.IsFalse(wrapped.Equals(new InProcObject<IListItem?>(null)));
-        Assert.AreEqual(wrapped.GetHashCode(), wrapped.GetHashCode());
+        Assert.IsFalse(wrapped.HasValue);
+        Assert.IsTrue(wrapped.Equals(wrapped));
+        Assert.IsTrue(wrapped.Equals(other));
+        Assert.AreEqual(wrapped.GetHashCode(), other.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCode_DoesNotCallWrappedObject()
+    {
+        var target = new ThrowingHashCode();
+        var wrapped = new InProcObject<object>(target);
+        var same = new InProcObject<object>(target);
+
+        Assert.IsTrue(wrapped.Equals(same));
+        Assert.AreEqual(wrapped.GetHashCode(), same.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCode_RemainsStableWhenWrappedObjectChanges()
+    {
+        var target = new MutableHashCode { Value = 1 };
+        var wrapped = new InProcObject<object>(target);
+        var same = new InProcObject<object>(target);
+        var set = new HashSet<InProcObject<object>> { wrapped };
+        var originalHash = wrapped.GetHashCode();
+
+        target.Value = 2;
+
+        Assert.AreEqual(originalHash, wrapped.GetHashCode());
+        Assert.IsTrue(set.Contains(wrapped));
+        Assert.IsTrue(set.Contains(same));
+    }
+
+    private sealed class ThrowingHashCode
+    {
+        public override int GetHashCode() => throw new InvalidOperationException("Wrapped object hashing must not be called.");
+    }
+
+    private sealed class MutableHashCode
+    {
+        public int Value { get; set; }
+
+        public override int GetHashCode() => Value;
     }
 }

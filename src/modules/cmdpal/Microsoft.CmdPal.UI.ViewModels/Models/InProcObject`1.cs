@@ -35,5 +35,5 @@ public class InProcObject<T>(T value) : IEquatable<InProcObject<T>>
     public override bool Equals(object? obj) => Equals(obj as InProcObject<T>);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => Safe?.GetHashCode() ?? base.GetHashCode();
+    public override int GetHashCode() => RuntimeHelpers.GetHashCode(Safe);
 }
