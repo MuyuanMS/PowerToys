@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using ManagedCommon;
+using Microsoft.CmdPal.Ext.Apps.Catalog;
 using Microsoft.CmdPal.Ext.Apps.Properties;
 using Microsoft.CmdPal.Ext.Apps.Utils;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -14,17 +15,26 @@ using Windows.Win32.System.Com;
 using Windows.Win32.UI.Shell;
 using WyHash;
 
-namespace Microsoft.CmdPal.Ext.Apps;
+namespace Microsoft.CmdPal.Ext.Apps.Commands;
 
 internal sealed partial class AppCommand : InvokableCommand
 {
     private readonly AppItem _app;
+    private readonly string? _shortcutPath;
 
-    public AppCommand(AppItem app)
+    /// <summary>Creates an application command, optionally launching a matched shortcut under the same command ID.</summary>
+    /// <param name="app">The canonical application that owns the command identity.</param>
+    /// <param name="shortcutPath">A retained shortcut to launch instead of the preferred representation.</param>
+    public AppCommand(AppItem app, string? shortcutPath = null)
     {
+        ArgumentNullException.ThrowIfNull(app);
+
         _app = app;
+        _shortcutPath = shortcutPath;
         Name = Resources.run_command_action!;
-        Id = GenerateId();
+        Id = string.IsNullOrEmpty(app.CatalogId)
+            ? GenerateId(app.Name, app.Subtitle, app.LaunchTarget)
+            : AppIdentity.ForCommand(app.CatalogId);
         Icon = Icons.GenericAppIcon;
     }
 
@@ -70,13 +80,17 @@ internal sealed partial class AppCommand : InvokableCommand
 
     private async Task Launch()
     {
-        if (_app.IsPackaged)
+        if (_shortcutPath is not null)
         {
-            await StartApp(_app.UserModelId);
+            await StartExe(_shortcutPath);
+        }
+        else if (_app.IsPackaged)
+        {
+            await StartApp(_app.AppUserModelId);
         }
         else
         {
-            await StartExe(_app.ExePath);
+            await StartExe(_app.LaunchTarget);
         }
     }
 
@@ -86,11 +100,12 @@ internal sealed partial class AppCommand : InvokableCommand
         return CommandResult.Dismiss();
     }
 
-    private string GenerateId()
+    /// <summary>Creates the legacy ID used by existing saved app commands.</summary>
+    internal static string GenerateId(string name, string subtitle, string exePath)
     {
         // Use WyHash64 to generate stable ID hashes.
         // manually seeding with 0, so that the hash is stable across launches
-        var result = WyHash64.ComputeHash64(_app.Name + _app.Subtitle + _app.ExePath, seed: 0);
-        return $"{_app.Name}_{result}";
+        var result = WyHash64.ComputeHash64(name + subtitle + exePath, seed: 0);
+        return $"{name}_{result}";
     }
 }
