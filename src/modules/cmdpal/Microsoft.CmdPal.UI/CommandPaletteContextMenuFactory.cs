@@ -363,7 +363,7 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
     private void AddPinToTrayCommand(string itemId, string providerId, List<IContextItem> items, CommandItemViewModel commandItem)
     {
         // Don't show the pin to tray icon if the tray menu isn't available.
-        if (_settingsService.Settings.TrayIconClickAction == TrayIconClickAction.OpenPalette)
+        if (_settingsService.Settings.TrayIconClickAction == TrayIconClickAction.OpenCommandPalette)
         {
             return;
         }
