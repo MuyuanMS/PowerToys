@@ -61,6 +61,34 @@ public partial class ProviderFallbackSettingsTests
         Assert.IsFalse(settingsService.Settings.ProviderSettings[ProviderId].FallbackCommands[FallbackId].IncludeInGlobalResults);
     }
 
+    [DataTestMethod]
+    [DataRow(true, true, true)]
+    [DataRow(false, true, false)]
+    [DataRow(true, false, false)]
+    [DataRow(false, false, false)]
+    public async Task LoadTopLevelCommands_GlobalInclusion_RequiresEnabledFallback(bool isEnabled, bool includeInGlobalResults, bool expected)
+    {
+        var settingsService = new FakeSettingsService();
+        settingsService.Settings = settingsService.Settings with
+        {
+            ProviderSettings = settingsService.Settings.ProviderSettings.SetItem(
+                ProviderId,
+                new ProviderSettings
+                {
+                    FallbackCommands = ImmutableDictionary<string, FallbackSettings>.Empty.Add(
+                        FallbackId,
+                        new FallbackSettings(isEnabled: isEnabled, includeInGlobalResults: includeInGlobalResults)),
+                }),
+        };
+        await using var services = CreateServices(settingsService);
+        var wrapper = new CommandProviderWrapper(new TestCommandProvider(), TaskScheduler.Default);
+
+        await wrapper.LoadTopLevelCommands(services);
+
+        Assert.AreEqual(expected, wrapper.FallbackItems[0].IncludeInGlobalResults);
+        Assert.AreEqual(expected, Array.IndexOf(settingsService.Settings.GetGlobalFallbacks(), FallbackId) >= 0);
+    }
+
     [TestMethod]
     public async Task DuplicateFallbackIds_KeepProviderIdentityAndGlobalSettings()
     {
