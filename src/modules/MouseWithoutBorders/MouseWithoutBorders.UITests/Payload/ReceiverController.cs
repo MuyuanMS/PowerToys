@@ -55,7 +55,7 @@ namespace Microsoft.MouseWithoutBorders.UITests
             }
             catch (AggregateException error)
             {
-                throw new InvalidOperationException("Receiver initialization failed.", error.InnerException);
+                throw new InvalidOperationException("Receiver initialization failed during " + startupStage + ".", error);
             }
 
             receiver = started.Task.Result;
