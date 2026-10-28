@@ -547,14 +547,24 @@ jobs:
     # Exclude the test assemblies recorded in the MSBuild TRX files from the VSTest run below,
     # so tests already executed by Microsoft.Testing.Platform during the build don't run twice.
     - pwsh: |-
-        $assemblies = @(Get-ChildItem -Path '$(Build.SourcesDirectory)' -Filter '*.trx' -File -Recurse |
-          ForEach-Object { ([xml](Get-Content -LiteralPath $_.FullName -Raw)).TestRun.TestDefinitions.UnitTest.storage } |
+        $sourceRoot = [IO.Path]::GetFullPath('$(Build.SourcesDirectory)')
+        $assemblies = @(Get-ChildItem -Path $sourceRoot -Filter '*.trx' -File -Recurse |
+          ForEach-Object {
+            $trx = [xml](Get-Content -LiteralPath $_.FullName -Raw)
+            foreach ($storage in @($trx.TestRun.TestDefinitions.UnitTest.storage)) {
+              if ([string]::IsNullOrWhiteSpace($storage)) { continue }
+              $storagePath = if ([IO.Path]::IsPathRooted($storage)) { $storage } else { Join-Path $sourceRoot $storage }
+              $relativePath = [IO.Path]::GetRelativePath($sourceRoot, [IO.Path]::GetFullPath($storagePath))
+              if ([IO.Path]::IsPathRooted($relativePath) -or $relativePath -eq '..' -or
+                  $relativePath.StartsWith("..$([IO.Path]::DirectorySeparatorChar)", [StringComparison]::OrdinalIgnoreCase)) { continue }
+              $relativePath.Replace('/', '\')
+            }
+          } |
           Where-Object { $_ } |
-          ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) } |
           Sort-Object -Unique)
         Write-Host "Excluding $($assemblies.Count) test assemblies already run by MSBuild:"
         $assemblies | ForEach-Object { Write-Host "  $_" }
-        $exclusions = ($assemblies | ForEach-Object { "!**\$_.dll" }) -join '%0A'
+        $exclusions = ($assemblies | ForEach-Object { "!$_" }) -join '%0A'
         Write-Host "##vso[task.setvariable variable=MSBuildTestedAssemblyExclusions]$exclusions"
       displayName: Exclude tests already run by MSBuild
       condition: and(succeeded(), ne(variables['BuildPlatform'], 'arm64'))
@@ -564,6 +574,7 @@ jobs:
       condition: and(succeeded(), ne(variables['BuildPlatform'], 'arm64')) # No arm64 agents to run the tests.
       displayName: 'Native Tests'
       inputs:
+        searchFolder: '$(Build.SourcesDirectory)'
         platform: '$(BuildPlatform)'
         configuration: '$(BuildConfiguration)'
         testSelector: 'testAssemblies'
