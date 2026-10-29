@@ -28,6 +28,9 @@ parameters:
   - name: runCppCodeAnalysis
     type: boolean
     default: false
+  - name: skipCppCodeAnalysisInBuild
+    type: boolean
+    default: false
   - name: useLatestWebView2
     type: boolean
     default: false
@@ -86,9 +89,8 @@ stages:
             runTests: ${{ parameters.runTests }}
             buildTests: true
             variables:
-              # MSVC /analyze roughly doubles C++ compile time, so the build jobs skip it.
-              # When runCppCodeAnalysis is set, the CppCodeAnalysis stage runs it in parallel instead.
-              SkipCppCodeAnalysis: 1
+              ${{ if or(parameters.runCppCodeAnalysis, parameters.skipCppCodeAnalysisInBuild) }}:
+                SkipCppCodeAnalysis: 1
               ${{ if and(parameters.runAffectedUiTests, eq(platform, 'x64')) }}:
                 MwbSandboxSelected: $[ dependencies.Resolve.outputs['resolve.hasMwbUiTests'] ]
             prepareMwbRuntime: ${{ and(parameters.runAffectedUiTests, eq(platform, 'x64')) }}
