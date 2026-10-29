@@ -219,6 +219,7 @@ bool create_auto_start_task_for_this_user(bool runElevated)
             {
                 Logger::info(L"The autorun task doesn't match the current settings, recreating it.");
                 hr = pTaskFolder->DeleteTask(_bstr_t(wstrTaskName.c_str()), 0);
+                ExitOnFailure(hr, "Cannot delete mismatched autorun task: {:x}", hr);
             }
         }
     }
