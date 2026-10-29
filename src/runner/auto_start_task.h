@@ -46,11 +46,6 @@ namespace auto_start_task
             }
 
             const auto ace = static_cast<ACCESS_ALLOWED_ACE*>(aceData);
-            if (ace->Header.AceFlags & INHERITED_ACE)
-            {
-                continue;
-            }
-
             wil::unique_hlocal_string sid;
             if (ace->Header.AceType != ACCESS_ALLOWED_ACE_TYPE || !ConvertSidToStringSidW(&ace->SidStart, sid.put()))
             {

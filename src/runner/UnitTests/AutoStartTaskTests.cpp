@@ -97,9 +97,9 @@ namespace RunnerUnitTests
             Assert::IsFalse(auto_start_task::grants_access_only_to(RegisteredDescriptor, otherAccountExpected));
         }
 
-        TEST_METHOD (InheritedAcesAreIgnored)
+        TEST_METHOD (InheritedAcesGrantingAnotherPrincipalAreNotTrusted)
         {
-            Assert::IsTrue(auto_start_task::grants_access_only_to(RegisteredDescriptor + L"(A;ID;FA;;;" + OtherUserSid + L")", ExpectedDescriptor));
+            Assert::IsFalse(auto_start_task::grants_access_only_to(RegisteredDescriptor + L"(A;ID;FA;;;" + OtherUserSid + L")", ExpectedDescriptor));
         }
 
         TEST_METHOD (UnexpectedAceTypeIsNotTrusted)
