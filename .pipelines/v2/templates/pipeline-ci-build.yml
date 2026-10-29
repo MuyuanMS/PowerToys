@@ -25,6 +25,12 @@ parameters:
   - name: useVSPreview
     type: boolean
     default: false
+  - name: runCppCodeAnalysis
+    type: boolean
+    default: false
+  - name: skipCppCodeAnalysisInBuild
+    type: boolean
+    default: false
   - name: useLatestWebView2
     type: boolean
     default: false
@@ -82,14 +88,17 @@ stages:
             msBuildCacheIsReadOnly: ${{ parameters.msBuildCacheIsReadOnly }}
             runTests: ${{ parameters.runTests }}
             buildTests: true
+            variables:
+              ${{ if or(parameters.runCppCodeAnalysis, parameters.skipCppCodeAnalysisInBuild) }}:
+                SkipCppCodeAnalysis: 1
+              ${{ if and(parameters.runAffectedUiTests, eq(platform, 'x64')) }}:
+                MwbSandboxSelected: $[ dependencies.Resolve.outputs['resolve.hasMwbUiTests'] ]
             prepareMwbRuntime: ${{ and(parameters.runAffectedUiTests, eq(platform, 'x64')) }}
             ${{ if and(parameters.runAffectedUiTests, eq(platform, 'x64')) }}:
               dependsOn:
                 - Resolve
               # Resolve is skipped outside PR builds; the ordinary build must still run.
               condition: and(not(failed()), not(canceled()))
-              variables:
-                MwbSandboxSelected: $[ dependencies.Resolve.outputs['resolve.hasMwbUiTests'] ]
               mwbRuntimeCondition: and(succeeded(), eq(variables['MwbSandboxSelected'], 'true'))
             useVSPreview: ${{ parameters.useVSPreview }}
             useLatestWinAppSDK: ${{ parameters.useLatestWinAppSDK }}
@@ -163,3 +172,21 @@ stages:
           buildConfigurations: [Release]
           official: false
           codeSign: false
+
+  - ${{ if eq(parameters.runCppCodeAnalysis, true) }}:
+    - stage: CppCodeAnalysis
+      displayName: C++ code analysis
+      dependsOn: []
+      jobs:
+        - template: job-analyze-cpp.yml
+          parameters:
+            pool:
+              ${{ if eq(variables['System.CollectionId'], 'cb55739e-4afe-46a3-970f-1b49d8ee7564') }}:
+                name: SHINE-INT-L
+              ${{ else }}:
+                name: SHINE-OSS-L
+              ${{ if eq(parameters.useVSPreview, true) }}:
+                demands: ImageOverride -equals SHINE-VS18-Preview
+              ${{ else }}:
+                demands: ImageOverride -equals SHINE-VS18-Latest
+            useVSPreview: ${{ parameters.useVSPreview }}

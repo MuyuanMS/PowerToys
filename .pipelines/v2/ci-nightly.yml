@@ -36,3 +36,4 @@ extends:
     buildPlatforms: ${{ parameters.buildPlatforms }}
     enableMsBuildCaching: ${{ parameters.enableMsBuildCaching }}
     msBuildCacheIsReadOnly: ${{ parameters.msBuildCacheIsReadOnly }}
+    skipCppCodeAnalysisInBuild: true
