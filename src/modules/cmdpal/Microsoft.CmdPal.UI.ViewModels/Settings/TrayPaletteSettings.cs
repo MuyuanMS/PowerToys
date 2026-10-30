@@ -17,7 +17,7 @@ public sealed record TrayPaletteSettings
     public ImmutableList<PinnedCommandSettings> Commands
     {
         get => _commands;
-        init => _commands = value ?? [];
+        init => _commands = value?.Distinct().ToImmutableList() ?? [];
     }
 
     public TrayPaletteSettings Pin(PinnedCommandSettings pin) =>
