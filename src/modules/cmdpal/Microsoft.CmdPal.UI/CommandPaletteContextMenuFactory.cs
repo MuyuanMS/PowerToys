@@ -423,7 +423,7 @@ internal sealed partial class CommandPaletteContextMenuFactory : IContextMenuFac
             var appSnapshot = _allAppsPage?.GetSnapshot();
             Func<string, string>? canonicalId = appSnapshot is null
                 ? null
-                : savedId => appSnapshot.GetVisibleApp(savedId)?.Command?.Id ?? savedId;
+                : savedId => appSnapshot.GetApp(savedId)?.Command?.Id ?? savedId;
             var current = _appStateService.State.RecentCommands;
             var withoutItem = canonicalId is null
                 ? current.WithoutHistoryItem(_commandId)
