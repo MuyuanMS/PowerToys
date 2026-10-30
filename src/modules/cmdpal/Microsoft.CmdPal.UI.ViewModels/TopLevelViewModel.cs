@@ -95,7 +95,7 @@ public partial class TopLevelViewModel : ObservableObject, IListItem, IExtendedA
 
     internal string FallbackKey => $"{CommandProviderId}\0{Id}";
 
-    internal bool IncludeInGlobalResults => GetFallbackSettings()?.IncludeInGlobalResults == true;
+    internal bool IncludeInGlobalResults => GetFallbackSettings() is { IsEnabled: true, IncludeInGlobalResults: true };
 
     public HotkeySettings? Hotkey
     {

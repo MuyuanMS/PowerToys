@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CmdPal.Common.Services;
 using Microsoft.CmdPal.UI.ViewModels.MainPage;
+using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -61,6 +62,32 @@ public partial class ProviderFallbackSettingsTests
         Assert.IsFalse(settingsService.Settings.ProviderSettings[ProviderId].FallbackCommands[FallbackId].IncludeInGlobalResults);
     }
 
+    [DataTestMethod]
+    [DataRow(false, false)]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    [DataRow(true, true)]
+    public async Task IncludeInGlobalResults_RequiresEnabledFallback(bool enabled, bool global)
+    {
+        var settingsService = new FakeSettingsService();
+        settingsService.Settings = settingsService.Settings with
+        {
+            ProviderSettings = settingsService.Settings.ProviderSettings.SetItem(
+                ProviderId,
+                new ProviderSettings
+                {
+                    FallbackCommands = ImmutableDictionary<string, FallbackSettings>.Empty.Add(
+                        FallbackId,
+                        new FallbackSettings(isEnabled: enabled, includeInGlobalResults: global)),
+                }),
+        };
+        await using var services = CreateServices(settingsService);
+        var wrapper = new CommandProviderWrapper(new TestCommandProvider(), TaskScheduler.Default);
+        await wrapper.LoadTopLevelCommands(services);
+
+        Assert.AreEqual(enabled && global, wrapper.FallbackItems[0].IncludeInGlobalResults);
+    }
+
     [TestMethod]
     public async Task DuplicateFallbackIds_KeepProviderIdentityAndGlobalSettings()
     {
@@ -101,9 +128,9 @@ public partial class ProviderFallbackSettingsTests
         var score = typeof(MainListPage).GetMethod("ScoreFallbackItem", BindingFlags.NonPublic | BindingFlags.Static)!;
         string[] ranks = [second.FallbackItems[0].FallbackKey, first.FallbackItems[0].FallbackKey];
 
-        Assert.AreEqual(3, score.Invoke(null, [second.FallbackItems[0], ranks]));
-        Assert.AreEqual(2, score.Invoke(null, [first.FallbackItems[0], ranks]));
-        Assert.AreEqual(2, score.Invoke(null, [first.FallbackItems[0], new[] { FallbackId }]));
+        Assert.AreEqual(3, score.Invoke(null, [new InProcObject<IListItem>(second.FallbackItems[0]), ranks]));
+        Assert.AreEqual(2, score.Invoke(null, [new InProcObject<IListItem>(first.FallbackItems[0]), ranks]));
+        Assert.AreEqual(2, score.Invoke(null, [new InProcObject<IListItem>(first.FallbackItems[0]), new[] { FallbackId }]));
 
         using var provider = new ProviderSettingsViewModel(first, new ProviderSettings(), settingsService);
         var fallback = new FallbackSettingsViewModel(first.FallbackItems[0], new FallbackSettings(), provider, settingsService);
