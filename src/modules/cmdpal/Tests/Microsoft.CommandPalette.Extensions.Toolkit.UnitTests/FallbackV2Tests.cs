@@ -127,7 +127,11 @@ public class FallbackV2Tests
 
         var result = await item.QueryHandler.QueryAsync(args);
 
-        Assert.AreSame(args, fallback.LastQuery);
+        Assert.IsNotNull(fallback.LastQuery);
+        Assert.AreEqual(args.Query, fallback.LastQuery.Query);
+        Assert.AreEqual(args.QueryId, fallback.LastQuery.QueryId);
+        Assert.AreEqual(args.RequestedItemCount, fallback.LastQuery.RequestedItemCount);
+        CollectionAssert.AreEqual(args.LanguageTags, fallback.LastQuery.LanguageTags);
         Assert.AreEqual(args.Query, result.Query);
         Assert.AreEqual(args.QueryId, result.QueryId);
         Assert.HasCount(1, result.Items);

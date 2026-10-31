@@ -2649,7 +2649,7 @@ There are three "modes" of a fallback:
 | ---- |---|---|---|
 | [Active](#active-fallbacks) | No `IFallbackCommandItem3` | Call the legacy `FallbackHandler.UpdateQuery`. | Existing v1 fallbacks |
 | [Passive](#passive-fallbacks) | `IFallbackCommandItem3` with a null `QueryHandler` | Format and match locally. Call `CreateCommand` only on activation. | Web search, ask an assistant, open a URL |
-| [Results](#results-fallbacks) | `IFallbackCommandItem3` with a non-null `QueryHandler` | Call `QueryHandler.QueryAsync` and display its returned items. | Files, settings, open windows, remote search |
+| [Results](#result-sources) | `IFallbackCommandItem3` with a non-null `QueryHandler` | Call `QueryHandler.QueryAsync` and display its returned items. | Files, settings, open windows, remote search |
 
 A provider can return legacy fallbacks, passive commands, and result sources together.
 For example, one provider can expose a passive web search command and a result source for browser history.
