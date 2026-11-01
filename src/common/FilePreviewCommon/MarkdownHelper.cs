@@ -53,7 +53,9 @@ namespace Microsoft.PowerToys.FilePreviewCommon
             var softlineBreak = new Markdig.Extensions.Hardlines.SoftlineBreakAsHardlineExtension();
 
             MarkdownPipelineBuilder pipelineBuilder;
-            pipelineBuilder = new MarkdownPipelineBuilder().UseAdvancedExtensions().UseEmojiAndSmiley().UseYamlFrontMatter().UseMathematics();
+            // Disable ASCII smileys so colon-adjacent bold delimiters remain intact.
+            // Keep named emoji shortcodes such as :smile: supported.
+            pipelineBuilder = new MarkdownPipelineBuilder().UseAdvancedExtensions().UseEmojiAndSmiley(enableSmileys: false).UseYamlFrontMatter().UseMathematics();
             pipelineBuilder.Extensions.Add(extension);
             pipelineBuilder.Extensions.Add(softlineBreak);
 
