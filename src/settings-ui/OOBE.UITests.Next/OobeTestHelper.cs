@@ -124,7 +124,10 @@ internal static class OobeTestHelper
             var caption = window.FindAll<TextBlock>(By.Name(window.WindowTitle), 5_000)
                 .Where(text => text.Width > 0 && text.Height > 0)
                 .OrderBy(text => text.Y)
-                .First();
+                .FirstOrDefault();
+            Assert.IsNotNull(
+                caption,
+                $"'{window.WindowTitle}' has no visible caption for foreground recovery: {WindowControl.GetForegroundWindowInfo()}.");
             caption.Click(msPostAction: 0);
         }
 
