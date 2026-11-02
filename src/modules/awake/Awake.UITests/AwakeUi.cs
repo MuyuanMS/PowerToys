@@ -155,7 +155,9 @@ internal sealed class AwakeUi(TestContext context)
         var settings = Settings;
         var card = settings.Find<Element>(By.AccessibilityId(cardId));
         var tree = WinappCli.InvokeJson("ui", "inspect", card.Selector, settings.TargetFlag, settings.TargetValue, "--json", "-d", "8");
-        var button = Nodes(tree).Single(node => node.TryGetProperty("automationId", out var id) && id.GetString() == "FlyoutButton");
+        var buttons = Nodes(tree).Where(node => node.TryGetProperty("automationId", out var id) && id.GetString() == "FlyoutButton").ToArray();
+        Assert.AreEqual(1, buttons.Length, $"{cardId} must expose exactly one picker flyout button. Tree: {tree}");
+        var button = buttons[0];
         settings.Find<Button>(By.Slug(button.GetProperty("selector").GetString()!)).Invoke(msPostAction: 0);
         var part = settings.Find<Element>(By.AccessibilityId(partId));
         var choices = WinappCli.InvokeJson("ui", "inspect", part.Selector, settings.TargetFlag, settings.TargetValue, "--json", "-d", "2");
