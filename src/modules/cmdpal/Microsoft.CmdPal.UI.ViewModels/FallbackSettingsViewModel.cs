@@ -85,7 +85,7 @@ public partial class FallbackSettingsViewModel : ObservableObject
     {
         // A fallback that shows in the main results must be on. Keep the two flags
         // agreed, whichever one the user changed.
-        newSettings = newSettings.IncludeInGlobalResults && !newSettings.IsEnabled
+        newSettings = propertyName != nameof(IsEnabled) && newSettings.IncludeInGlobalResults && !newSettings.IsEnabled
             ? newSettings with { IsEnabled = true }
             : newSettings;
         newSettings = newSettings.IsEnabled
@@ -97,9 +97,20 @@ public partial class FallbackSettingsViewModel : ObservableObject
             return;
         }
 
+        var previousSettings = _fallbackSettings;
         _fallbackSettings = newSettings;
         _providerSettingsViewModel.UpdateFallbackSettings(Id, _fallbackSettings);
         OnPropertyChanged(propertyName);
+        if (propertyName != nameof(IsEnabled) && previousSettings.IsEnabled != newSettings.IsEnabled)
+        {
+            OnPropertyChanged(nameof(IsEnabled));
+        }
+
+        if (propertyName != nameof(IncludeInGlobalResults) && previousSettings.IncludeInGlobalResults != newSettings.IncludeInGlobalResults)
+        {
+            OnPropertyChanged(nameof(IncludeInGlobalResults));
+        }
+
         WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>(new());
     }
 

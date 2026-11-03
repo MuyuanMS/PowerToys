@@ -115,6 +115,64 @@ public partial class ProviderFallbackSettingsTests
     }
 
     [TestMethod]
+    public async Task FallbackSettings_DisablingIncludedFallback_ClearsBothFlagsAndNotifies()
+    {
+        var settingsService = new FakeSettingsService();
+        await using var services = CreateServices(settingsService);
+        var wrapper = new CommandProviderWrapper(new TestCommandProvider(), TaskScheduler.Default);
+        await wrapper.LoadTopLevelCommands(services);
+        using var provider = new ProviderSettingsViewModel(wrapper, new ProviderSettings(), settingsService);
+        var fallback = new FallbackSettingsViewModel(
+            wrapper.FallbackItems[0],
+            new FallbackSettings { IsEnabled = true, IncludeInGlobalResults = true },
+            provider);
+        System.Collections.Generic.List<string?> properties = [];
+        fallback.PropertyChanged += (_, args) => properties.Add(args.PropertyName);
+        var writesBeforeChange = settingsService.WriteCount;
+
+        fallback.IsEnabled = false;
+
+        Assert.IsFalse(fallback.IsEnabled);
+        Assert.IsFalse(fallback.IncludeInGlobalResults);
+        var saved = settingsService.Settings.ProviderSettings[ProviderId].FallbackCommands[FallbackId];
+        Assert.IsFalse(saved.IsEnabled);
+        Assert.IsFalse(saved.IncludeInGlobalResults);
+        Assert.AreEqual(writesBeforeChange + 1, settingsService.WriteCount);
+        CollectionAssert.AreEquivalent(
+            new[] { nameof(FallbackSettingsViewModel.IsEnabled), nameof(FallbackSettingsViewModel.IncludeInGlobalResults) },
+            properties);
+    }
+
+    [TestMethod]
+    public async Task FallbackSettings_IncludingDisabledFallback_EnablesBothFlagsAndNotifies()
+    {
+        var settingsService = new FakeSettingsService();
+        await using var services = CreateServices(settingsService);
+        var wrapper = new CommandProviderWrapper(new TestCommandProvider(), TaskScheduler.Default);
+        await wrapper.LoadTopLevelCommands(services);
+        using var provider = new ProviderSettingsViewModel(wrapper, new ProviderSettings(), settingsService);
+        var fallback = new FallbackSettingsViewModel(
+            wrapper.FallbackItems[0],
+            new FallbackSettings { IsEnabled = false, IncludeInGlobalResults = false },
+            provider);
+        System.Collections.Generic.List<string?> properties = [];
+        fallback.PropertyChanged += (_, args) => properties.Add(args.PropertyName);
+        var writesBeforeChange = settingsService.WriteCount;
+
+        fallback.IncludeInGlobalResults = true;
+
+        Assert.IsTrue(fallback.IsEnabled);
+        Assert.IsTrue(fallback.IncludeInGlobalResults);
+        var saved = settingsService.Settings.ProviderSettings[ProviderId].FallbackCommands[FallbackId];
+        Assert.IsTrue(saved.IsEnabled);
+        Assert.IsTrue(saved.IncludeInGlobalResults);
+        Assert.AreEqual(writesBeforeChange + 1, settingsService.WriteCount);
+        CollectionAssert.AreEquivalent(
+            new[] { nameof(FallbackSettingsViewModel.IsEnabled), nameof(FallbackSettingsViewModel.IncludeInGlobalResults) },
+            properties);
+    }
+
+    [TestMethod]
     public async Task LoadTopLevelCommands_WhenFallbacksAreKnown_DoesNotWriteSettingsAgain()
     {
         var settingsService = new FakeSettingsService();
