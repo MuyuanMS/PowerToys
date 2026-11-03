@@ -59,4 +59,5 @@ BEGIN
     IDS_TIMEOUT             "Timeout waiting for files to be unlocked.\n"
     IDS_ERROR_INVALID_TIMEOUT "Error: Invalid timeout value.\n"
     IDS_ERROR_TIMEOUT_ARG   "Error: --timeout requires an argument.\n"
+    IDS_ERROR_QUERY_FAILED  "Error: File Locksmith could not scan the selected paths.\n"
 END

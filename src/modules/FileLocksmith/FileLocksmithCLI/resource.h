@@ -14,3 +14,4 @@
 #define IDS_TIMEOUT                     111
 #define IDS_ERROR_INVALID_TIMEOUT       112
 #define IDS_ERROR_TIMEOUT_ARG           113
+#define IDS_ERROR_QUERY_FAILED          114
