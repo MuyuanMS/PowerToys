@@ -629,7 +629,7 @@ namespace Awake.Core
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to toggle lock display policy: {ex.Message}");
+                Logger.LogError("Failed to toggle lock display policy.", ex);
             }
         }
 
