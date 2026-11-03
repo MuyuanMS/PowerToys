@@ -111,6 +111,7 @@
                                         Click="DeleteTrayTime_Click"
                                         Content="{ui:FontIcon Glyph=&#xE74D;,
                                                               FontSize=14}"
+                                        IsEnabled="{x:Bind CanRemove, Mode=OneTime}"
                                         Style="{StaticResource SubtleButtonStyle}"
                                         Tag="{x:Bind}" />
                                 </tkcontrols:SettingsCard>

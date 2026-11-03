@@ -57,6 +57,26 @@ public class Awake
     }
 
     [TestMethod]
+    [DataRow(600u)]
+    [DataRow(7200u)]
+    public void AddTrayTimeRejectsLabelCollisionWithoutChangingCustomTimes(uint existingSeconds)
+    {
+        var settings = new AwakeSettings();
+        settings.Properties.CustomTrayTimes.Add("3600s", existingSeconds);
+        var viewModel = CreateViewModel(settings);
+        viewModel.NewTrayTimeHours = 1;
+        viewModel.NewTrayTimeMinutes = 0;
+
+        bool canAdd = viewModel.CanAddTrayTime;
+        bool added = viewModel.AddTrayTime();
+
+        Assert.AreEqual(existingSeconds, settings.Properties.CustomTrayTimes["3600s"]);
+        Assert.IsFalse(canAdd);
+        Assert.IsFalse(added);
+        Assert.HasCount(1, settings.Properties.CustomTrayTimes);
+    }
+
+    [TestMethod]
     [DataRow(0d, 0d)]
     [DataRow(2d, 0d)]
     [DataRow(0d, 60d)]
@@ -93,8 +113,29 @@ public class Awake
         var viewModel = CreateViewModel(settings);
 
         Assert.IsFalse(viewModel.CanRemoveTrayTime);
+        Assert.IsFalse(viewModel.TrayTimes.Single().CanRemove);
         Assert.IsFalse(viewModel.RemoveTrayTime(viewModel.TrayTimes.Single()));
         Assert.HasCount(1, viewModel.ModuleSettings.Properties.CustomTrayTimes);
+    }
+
+    [TestMethod]
+    public void TrayTimeRemovalStateRefreshesAfterRemoveAddAndReset()
+    {
+        var settings = new AwakeSettings();
+        settings.Properties.CustomTrayTimes.Add("Short", 600);
+        settings.Properties.CustomTrayTimes.Add("Long", 7200);
+        var viewModel = CreateViewModel(settings);
+        Assert.IsTrue(viewModel.TrayTimes.All(item => item.CanRemove));
+
+        Assert.IsTrue(viewModel.RemoveTrayTime(viewModel.TrayTimes.First()));
+        Assert.IsFalse(viewModel.TrayTimes.Single().CanRemove);
+
+        viewModel.NewTrayTimeHours = 1;
+        Assert.IsTrue(viewModel.AddTrayTime());
+        Assert.IsTrue(viewModel.TrayTimes.All(item => item.CanRemove));
+
+        viewModel.ResetTrayTimes();
+        Assert.IsTrue(viewModel.TrayTimes.All(item => item.CanRemove));
     }
 
     [TestMethod]

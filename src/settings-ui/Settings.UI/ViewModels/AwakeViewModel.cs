@@ -254,14 +254,20 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             get
             {
                 uint? seconds = GetNewTrayTimeSeconds();
-                return seconds.HasValue && !TrayTimes.Any(item => item.Seconds == seconds.Value);
+                if (!seconds.HasValue)
+                {
+                    return false;
+                }
+
+                string label = _trayTimeFormatter(seconds.Value);
+                return !TrayTimes.Any(item => item.Seconds == seconds.Value || string.Equals(item.Label, label, StringComparison.Ordinal));
             }
         }
 
         /// <summary>
         /// Adds a tray time shortcut using <see cref="NewTrayTimeHours"/> and <see cref="NewTrayTimeMinutes"/>.
         /// </summary>
-        /// <returns>True if the shortcut was added; false if the duration is invalid or already present.</returns>
+        /// <returns>True if the shortcut was added; false if the duration is invalid or its duration or label is already present.</returns>
         public bool AddTrayTime()
         {
             if (!CanAddTrayTime)
@@ -336,10 +342,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                 ? ModuleSettings.Properties.CustomTrayTimes.Select(entry => new AwakeTrayTimeItem(entry.Key, entry.Value))
                 : AwakeDefaults.TrayTimeSeconds.Select(seconds => new AwakeTrayTimeItem(_trayTimeFormatter(seconds), seconds));
 
+            AwakeTrayTimeItem[] orderedItems = items.OrderBy(item => item.Seconds).ToArray();
             TrayTimes.Clear();
-            foreach (AwakeTrayTimeItem item in items.OrderBy(item => item.Seconds))
+            foreach (AwakeTrayTimeItem item in orderedItems)
             {
-                TrayTimes.Add(item);
+                TrayTimes.Add(new AwakeTrayTimeItem(item.Label, item.Seconds, orderedItems.Length > 1));
             }
 
             OnPropertyChanged(nameof(CanRemoveTrayTime));
@@ -349,11 +356,13 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         private void SaveTrayTimes(IEnumerable<AwakeTrayTimeItem> items)
         {
             // The tray menu lists the entries in dictionary order, so keep them sorted by duration.
+            Dictionary<string, uint> orderedTrayTimes = items.OrderBy(item => item.Seconds)
+                .ToDictionary(item => item.Label, item => item.Seconds, StringComparer.Ordinal);
             Dictionary<string, uint> customTrayTimes = ModuleSettings.Properties.CustomTrayTimes;
             customTrayTimes.Clear();
-            foreach (AwakeTrayTimeItem item in items.OrderBy(item => item.Seconds))
+            foreach (KeyValuePair<string, uint> item in orderedTrayTimes)
             {
-                customTrayTimes.TryAdd(item.Label, item.Seconds);
+                customTrayTimes.Add(item.Key, item.Value);
             }
 
             RefreshTrayTimes();

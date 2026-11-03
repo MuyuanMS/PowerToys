@@ -9,10 +9,11 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
     /// </summary>
     public sealed class AwakeTrayTimeItem
     {
-        public AwakeTrayTimeItem(string label, uint seconds)
+        public AwakeTrayTimeItem(string label, uint seconds, bool canRemove = true)
         {
             Label = label;
             Seconds = seconds;
+            CanRemove = canRemove;
         }
 
         /// <summary>
@@ -24,5 +25,10 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         /// Gets the keep-awake duration in seconds.
         /// </summary>
         public uint Seconds { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this shortcut can be removed.
+        /// </summary>
+        public bool CanRemove { get; }
     }
 }
