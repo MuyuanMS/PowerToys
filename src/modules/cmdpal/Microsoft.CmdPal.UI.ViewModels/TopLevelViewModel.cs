@@ -375,7 +375,7 @@ public partial class TopLevelViewModel : ObservableObject, IListItem, IExtendedA
         }
     }
 
-    internal virtual bool SafeUpdateFallbackTextSynchronous(string newQuery) => false;
+    internal virtual bool SafeUpdateFallbackTextSynchronous(string newQuery, bool reportTitleChanges, CancellationToken cancellationToken) => false;
 
     public PerformCommandMessage GetPerformCommandMessage()
     {
