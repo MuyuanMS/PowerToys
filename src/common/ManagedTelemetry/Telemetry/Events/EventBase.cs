@@ -14,6 +14,17 @@ namespace Microsoft.PowerToys.Telemetry.Events
     [EventData]
     public class EventBase
     {
+        /// <summary>
+        /// The approved PowerToys product identity for WinExt telemetry.
+        /// Events without this identity are blocked by the provider.
+        /// </summary>
+        public ushort PartA_PrivacyProduct => 13;
+
+        /// <summary>
+        /// The client diagnostic data category required for WinExt telemetry.
+        /// </summary>
+        public ushort PartA_PrivacyDataCategory => 1;
+
         public bool UTCReplace_AppSessionGuid => true;
 
         public string EventName { get; set; }
