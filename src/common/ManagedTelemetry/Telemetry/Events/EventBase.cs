@@ -15,9 +15,8 @@ namespace Microsoft.PowerToys.Telemetry.Events
     public class EventBase
     {
         /// <summary>
-        /// The product identity required for WinExt telemetry. Our
-        /// telemetry will be blocked without it. refer to the internal
-        /// "winext-provider-group-usage-guide" docs.
+        /// The approved PowerToys product identity for WinExt telemetry.
+        /// Events without this identity are blocked by the provider.
         /// </summary>
         public ushort PartA_PrivacyProduct => 13;
 
