@@ -780,6 +780,10 @@ Describe "release title selection" {
         @("# $ExpectedTitle") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md")
         { & (Join-Path $scripts "create-github-draft-release.ps1") @parameters } |
             Should Throw "must not contain an H1 title"
+
+        @("$ExpectedTitle", "===") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md")
+        { & (Join-Path $scripts "create-github-draft-release.ps1") @parameters } |
+            Should Throw "must not contain an H1 title"
     }
 
     It "does not append another component to an existing four-component display version" {
@@ -788,7 +792,7 @@ Describe "release title selection" {
 }
 
 Describe "draft preview release dry run" {
-    It "removes only the legacy leading H1 and preserves sections on repeated upserts with <LineEnding> line endings" -TestCases @(
+    It "removes only the legacy leading H1 and preserves sections on repeated upserts for <LineEnding> input" -TestCases @(
         @{ LineEnding = "LF"; NewLine = "`n" },
         @{ LineEnding = "CRLF"; NewLine = "`r`n" }
     ) {
@@ -810,8 +814,8 @@ Describe "draft preview release dry run" {
             "Keep highlights",
             "<!-- END POWERTOYS PREVIEW AGENT -->"
         ) -join $NewLine
-        Set-Content -LiteralPath $bodyPath -Value $content -NoNewline
-        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
+        Set-Content -LiteralPath $bodyPath -Value $content -Encoding utf8 -NoNewline
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
         $expected = $content.Replace("# Dev preview v0.101.2181.0$NewLine$NewLine", "")
         $previousBody = $null
@@ -891,8 +895,8 @@ Describe "draft preview release dry run" {
         "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
 
-        foreach ($heading in @("#`tLegacy title", "#", "   # Legacy title")) {
-            $heading | Set-Content -LiteralPath $bodyPath
+        foreach ($heading in @("#`tLegacy title", "#", "   # Legacy title", "Legacy title`n===")) {
+            $heading | Set-Content -LiteralPath $bodyPath -Encoding utf8
 
             $result = & (Join-Path $scripts "upsert-draft-preview-release.ps1") `
                 -Tag "v0.101.2181" `
@@ -916,6 +920,33 @@ Describe "draft preview release dry run" {
                 -DryRun
             $verified.status | Should Be "PASS"
         }
+    }
+
+    It "preserves indentation after removing a legacy H1" {
+        $bodyPath = Join-Path $TestDrive "indented-legacy.md"
+        $assetsPath = Join-Path $TestDrive "indented-assets"
+        New-Item -ItemType Directory -Path $assetsPath | Out-Null
+        $content = @(
+            "<!-- BEGIN POWERTOYS PREVIEW AGENT -->",
+            "# Legacy title",
+            "",
+            "    Indented content",
+            "<!-- END POWERTOYS PREVIEW AGENT -->"
+        ) -join "`n"
+        Set-Content -LiteralPath $bodyPath -Value $content -Encoding utf8 -NoNewline
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
+        Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
+
+        & (Join-Path $scripts "upsert-draft-preview-release.ps1") `
+            -Tag "v0.101.2181" `
+            -SourceBranch "refs/heads/main" `
+            -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+            -BodyPath $bodyPath `
+            -AssetsDirectory $assetsPath `
+            -MergedBodyOutputPath $bodyPath `
+            -DryRun | Out-Null
+
+        (Get-Content -LiteralPath $bodyPath -Raw).Contains("`n    Indented content") | Should Be $true
     }
 
     It "preserves human text outside managed body markers" {
@@ -1091,7 +1122,8 @@ Preview notes
     It "rejects a body H1 <Heading> even when the release title is correct" -TestCases @(
         @{ Heading = "# Dev preview v0.101.2181" },
         @{ Heading = "# Dev preview v0.101.2181.0" },
-        @{ Heading = "# Release preview v0.101.2181.0" }
+        @{ Heading = "# Release preview v0.101.2181.0" },
+        @{ Heading = "Dev preview v0.101.2181.0`n===" }
     ) {
         param($Heading)
 
