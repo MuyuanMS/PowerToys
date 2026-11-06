@@ -88,13 +88,11 @@ The activation process works as follows:
 
        m_drawing = true;
        m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, m_hinstance, 0);
-       if (SetTimer(m_hwnd, CURSOR_POSITION_TIMER_ID, CURSOR_POSITION_TIMER_INTERVAL_MS, NULL) == 0)
-       {
-           const DWORD error = GetLastError();
-           Logger::error("Failed to create cursor position timer. Last error: {}", error);
-       }
+       SetCursorPositionTimer(!m_externalControl);
    }
    ```
+
+`SetCursorPositionTimer` handles timer creation failure and keeps polling stopped while external control owns cursor updates.
 
 4. **Stop Drawing Function**
    - The `StopDrawing()` function is called to:
