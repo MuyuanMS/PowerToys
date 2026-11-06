@@ -80,6 +80,7 @@ public:
                 if (instance != nullptr)
                 {
                     instance->m_externalControl = enabled;
+                    instance->SetCursorPositionTimer(!enabled && instance->m_drawing);
                     if (enabled && instance->m_mouseHook)
                     {
                         UnhookWindowsHookEx(instance->m_mouseHook);
@@ -128,6 +129,8 @@ private:
     static constexpr auto m_className = L"MousePointerCrosshairs";
     static constexpr auto m_windowTitle = L"PowerToys Mouse Pointer Crosshairs";
     static constexpr DWORD AUTO_HIDE_TIMER_ID = 101;
+    static constexpr UINT_PTR CURSOR_POSITION_TIMER_ID = 102;
+    static constexpr UINT CURSOR_POSITION_TIMER_INTERVAL_MS = 16;
     HWND m_hwndOwner = NULL;
     HWND m_hwnd = NULL;
     HINSTANCE m_hinstance = NULL;
@@ -152,7 +155,9 @@ private:
     bool m_destroyed = false;
     bool m_hiddenCursor = false;
     bool m_externalControl = false;
+    POINT m_lastDrawnCursorPosition{};
     void SetAutoHideTimer() noexcept;
+    void SetCursorPositionTimer(bool enabled) noexcept;
 
     // Configurable Settings
     winrt::Windows::UI::Color m_crosshairs_border_color = INCLUSIVE_MOUSE_DEFAULT_CROSSHAIRS_BORDER_COLOR;
@@ -293,6 +298,8 @@ void InclusiveCrosshairs::UpdateCrosshairsPosition()
     ptMonitorBottomRight.x = monitorInfo.rcMonitor.right;
     ptMonitorBottomRight.y = monitorInfo.rcMonitor.bottom;
 
+    m_lastDrawnCursorPosition = ptCursor;
+
     // Convert everything to client coordinates.
     ScreenToClient(m_hwnd, &ptCursor);
     ScreenToClient(m_hwnd, &ptMonitorUpperLeft);
@@ -401,6 +408,29 @@ void InclusiveCrosshairs::StartDrawing()
 
     m_drawing = true;
     m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, m_hinstance, 0);
+
+    // Windows Ink can move the cursor without producing low-level mouse events.
+    SetCursorPositionTimer(!m_externalControl);
+}
+
+void InclusiveCrosshairs::SetCursorPositionTimer(bool enabled) noexcept
+{
+    if (m_hwnd == nullptr)
+    {
+        return;
+    }
+
+    if (!enabled)
+    {
+        KillTimer(m_hwnd, CURSOR_POSITION_TIMER_ID);
+        return;
+    }
+
+    if (SetTimer(m_hwnd, CURSOR_POSITION_TIMER_ID, CURSOR_POSITION_TIMER_INTERVAL_MS, NULL) == 0)
+    {
+        const DWORD error = GetLastError();
+        Logger::error("Failed to create cursor position timer. Last error: {}", error);
+    }
 }
 
 void InclusiveCrosshairs::StopDrawing()
@@ -411,6 +441,7 @@ void InclusiveCrosshairs::StopDrawing()
     UnhookWindowsHookEx(m_mouseHook);
     m_mouseHook = NULL;
     KillTimer(m_hwnd, AUTO_HIDE_TIMER_ID);
+    SetCursorPositionTimer(false);
 }
 
 void InclusiveCrosshairs::SwitchActivationMode()
@@ -538,6 +569,16 @@ LRESULT CALLBACK InclusiveCrosshairs::WndProc(HWND hWnd, UINT message, WPARAM wP
                         ShowWindow(instance->m_hwnd, SW_HIDE);
                     }
                 }
+            }
+        }
+        else if (wParam == CURSOR_POSITION_TIMER_ID && instance->m_drawing && !instance->m_externalControl)
+        {
+            POINT ptCursor{};
+            if (GetCursorPos(&ptCursor) &&
+                (ptCursor.x != instance->m_lastDrawnCursorPosition.x ||
+                 ptCursor.y != instance->m_lastDrawnCursorPosition.y))
+            {
+                instance->UpdateCrosshairsPosition();
             }
         }
         break;
