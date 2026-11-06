@@ -776,6 +776,14 @@ Describe "release title selection" {
         $output.Contains("--prerelease") | Should Be $Prerelease
         $output.Contains("--target 0123456789abcdef0123456789abcdef01234567") | Should Be $true
         $output.Contains("release create v0.101.2181 ") | Should Be $true
+
+        @("# $ExpectedTitle") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md") -Encoding utf8
+        { & (Join-Path $scripts "create-github-draft-release.ps1") @parameters } |
+            Should Throw "must not contain an H1 title"
+
+        @("$ExpectedTitle", "===") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md") -Encoding utf8
+        { & (Join-Path $scripts "create-github-draft-release.ps1") @parameters } |
+            Should Throw "must not contain an H1 title"
     }
 
     It "does not append another component to an existing four-component display version" {
@@ -784,6 +792,61 @@ Describe "release title selection" {
 }
 
 Describe "draft preview release dry run" {
+    It "removes only the legacy leading H1 and preserves sections on repeated upserts for <LineEnding> input" -TestCases @(
+        @{ LineEnding = "LF"; NewLine = "`n" },
+        @{ LineEnding = "CRLF"; NewLine = "`r`n" }
+    ) {
+        param($LineEnding, $NewLine)
+
+        $bodyPath = Join-Path $TestDrive "legacy-$LineEnding.md"
+        $assetsPath = Join-Path $TestDrive "legacy-assets-$LineEnding"
+        New-Item -ItemType Directory -Path $assetsPath | Out-Null
+        $content = @(
+            "<!-- BEGIN POWERTOYS PREVIEW AGENT -->",
+            "# Dev preview v0.101.2181.0",
+            "",
+            "Public introduction",
+            "",
+            "## Installer Hashes",
+            "Keep hashes",
+            "",
+            "## Highlights",
+            "Keep highlights",
+            "<!-- END POWERTOYS PREVIEW AGENT -->"
+        ) -join $NewLine
+        Set-Content -LiteralPath $bodyPath -Value $content -Encoding utf8 -NoNewline
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
+        Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
+        $expected = $content.Replace("# Dev preview v0.101.2181.0$NewLine$NewLine", "")
+        $previousBody = $null
+
+        foreach ($iteration in 1..2) {
+            & (Join-Path $scripts "upsert-draft-preview-release.ps1") `
+                -Tag "v0.101.2181" `
+                -SourceBranch "refs/heads/main" `
+                -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+                -BodyPath $bodyPath `
+                -AssetsDirectory $assetsPath `
+                -MergedBodyOutputPath $bodyPath `
+                -DryRun | Out-Null
+
+            $actual = Get-Content -LiteralPath $bodyPath -Raw
+            ($actual.TrimEnd() -replace "`r`n", "`n") | Should Be ($expected -replace "`r`n", "`n")
+            $actualContent = $actual -replace '(?:\r\n|\n|\r)$', ''
+            if ($LineEnding -eq "CRLF") {
+                $actualContent.Contains("`r`n") | Should Be $true
+                [regex]::IsMatch($actualContent, '(?<!\r)\n') | Should Be $false
+            }
+            else {
+                $actualContent.Contains("`r") | Should Be $false
+            }
+            if ($iteration -eq 2) {
+                $actual | Should Be $previousBody
+            }
+            $previousBody = $actual
+        }
+    }
+
     It "prepares and verifies the documented dry-run route for <SourceBranch> without contacting GitHub" -TestCases @(
         @{ SourceBranch = "refs/heads/main"; ExpectedTitle = "Dev preview v0.101.2181.0" },
         @{ SourceBranch = "refs/heads/stable"; ExpectedTitle = "Release preview v0.101.2181.0" }
@@ -795,7 +858,7 @@ Describe "draft preview release dry run" {
         New-Item -ItemType Directory -Path $assetsPath | Out-Null
         $oldTitle = if ($SourceBranch -eq "refs/heads/main") { "Development preview v0.101.2181" } else { "Release preview v0.101.2181" }
         "# $oldTitle`n`nPreview notes" | Set-Content -LiteralPath $bodyPath
-        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
         "local audit only" | Set-Content -LiteralPath (Join-Path $assetsPath "release-manifest.json")
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
 
@@ -812,7 +875,9 @@ Describe "draft preview release dry run" {
         $result.prerelease | Should Be $true
         $result.tag | Should Be "v0.101.2181"
         $result.title | Should Be $ExpectedTitle
-        ((Get-Content -LiteralPath $bodyPath) -contains "# $ExpectedTitle") | Should Be $true
+        $preparedBody = Get-Content -LiteralPath $bodyPath -Raw
+        ($preparedBody -match '(?m)^ {0,3}#(?:[ \t]+|$)') | Should Be $false
+        $preparedBody.Contains("Preview notes") | Should Be $true
         $result.assetNames.Count | Should Be 1
         $result.assetNames[0] | Should Be "PowerToysSetup-0.101.2181.0-x64.exe"
         ($result.assetNames -contains "release-manifest.json") | Should Be $false
@@ -831,6 +896,67 @@ Describe "draft preview release dry run" {
         $verified.draftUrl | Should Be $null
     }
 
+    It "removes tabbed, empty, and indented legacy H1 headings before verification" {
+        $bodyPath = Join-Path $TestDrive "release-notes.md"
+        $assetsPath = Join-Path $TestDrive "assets"
+        New-Item -ItemType Directory -Path $assetsPath | Out-Null
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
+        Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
+
+        foreach ($heading in @("#`tLegacy title", "#", "   # Legacy title", "Legacy title`n===")) {
+            $heading | Set-Content -LiteralPath $bodyPath -Encoding utf8
+
+            $result = & (Join-Path $scripts "upsert-draft-preview-release.ps1") `
+                -Tag "v0.101.2181" `
+                -SourceBranch "refs/heads/main" `
+                -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+                -BodyPath $bodyPath `
+                -AssetsDirectory $assetsPath `
+                -MergedBodyOutputPath $bodyPath `
+                -DryRun
+
+            $result.draft | Should Be $true
+            $preparedBody = Get-Content -LiteralPath $bodyPath -Raw
+            ($preparedBody -match '(?m)^ {0,3}#(?:[ \t]+|$)') | Should Be $false
+            $verified = & (Join-Path $scripts "verify-draft-preview-release.ps1") `
+                -Tag "v0.101.2181" `
+                -SourceBranch "refs/heads/main" `
+                -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+                -AssetsDirectory $assetsPath `
+                -BodyPath $bodyPath `
+                -OutputPath (Join-Path $TestDrive "prepared-dry-run-review.md") `
+                -DryRun
+            $verified.status | Should Be "PASS"
+        }
+    }
+
+    It "preserves indentation after removing a legacy H1" {
+        $bodyPath = Join-Path $TestDrive "indented-legacy.md"
+        $assetsPath = Join-Path $TestDrive "indented-assets"
+        New-Item -ItemType Directory -Path $assetsPath | Out-Null
+        $content = @(
+            "<!-- BEGIN POWERTOYS PREVIEW AGENT -->",
+            "# Legacy title",
+            "",
+            "    Indented content",
+            "<!-- END POWERTOYS PREVIEW AGENT -->"
+        ) -join "`n"
+        Set-Content -LiteralPath $bodyPath -Value $content -Encoding utf8 -NoNewline
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
+        Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
+
+        & (Join-Path $scripts "upsert-draft-preview-release.ps1") `
+            -Tag "v0.101.2181" `
+            -SourceBranch "refs/heads/main" `
+            -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+            -BodyPath $bodyPath `
+            -AssetsDirectory $assetsPath `
+            -MergedBodyOutputPath $bodyPath `
+            -DryRun | Out-Null
+
+        (Get-Content -LiteralPath $bodyPath -Raw).Contains("`n    Indented content") | Should Be $true
+    }
+
     It "preserves human text outside managed body markers" {
         $bodyPath = Join-Path $TestDrive "generated-notes.md"
         $assetsPath = Join-Path $TestDrive "managed-assets"
@@ -841,7 +967,7 @@ Describe "draft preview release dry run" {
 <!-- BEGIN POWERTOYS PREVIEW AGENT -->
 New generated notes
 <!-- END POWERTOYS PREVIEW AGENT -->
-'@ | Set-Content -LiteralPath $bodyPath
+'@ | Set-Content -LiteralPath $bodyPath -Encoding utf8
         "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
         @'
@@ -867,7 +993,7 @@ New generated notes
         $merged.Contains("New generated notes") | Should Be $true
         $merged.Contains("Old generated notes") | Should Be $false
         $merged.Contains("Human conclusion") | Should Be $true
-        $merged.Contains("# Dev preview v0.101.2181.0") | Should Be $true
+        $merged.Contains("# Dev preview v0.101.2181.0") | Should Be $false
     }
 
     It "refuses to update a published release" {
@@ -949,7 +1075,6 @@ New generated notes
         New-Item -ItemType Directory -Path $deltaPath | Out-Null
         @"
 <!-- BEGIN POWERTOYS PREVIEW AGENT -->
-# $ExpectedTitle
 Preview notes
 <!-- END POWERTOYS PREVIEW AGENT -->
 "@ | Set-Content -LiteralPath $bodyPath
@@ -1002,13 +1127,20 @@ Preview notes
         $review.Contains("Delta mode: same-lineage") | Should Be $true
     }
 
-    It "rejects a stale three-component body heading even when the release title is correct" {
+    It "rejects a body H1 <Heading> even when the release title is correct" -TestCases @(
+        @{ Heading = "# Dev preview v0.101.2181" },
+        @{ Heading = "# Dev preview v0.101.2181.0" },
+        @{ Heading = "# Release preview v0.101.2181.0" },
+        @{ Heading = "Dev preview v0.101.2181.0`n===" }
+    ) {
+        param($Heading)
+
         $bodyPath = Join-Path $TestDrive "stale-heading.md"
-        @'
+        @"
 <!-- BEGIN POWERTOYS PREVIEW AGENT -->
-# Dev preview v0.101.2181
+$Heading
 <!-- END POWERTOYS PREVIEW AGENT -->
-'@ | Set-Content -LiteralPath $bodyPath
+"@ | Set-Content -LiteralPath $bodyPath
 
         {
             & (Join-Path $scripts "verify-draft-preview-release.ps1") `
@@ -1019,7 +1151,7 @@ Preview notes
                 -BodyPath $bodyPath `
                 -OutputPath (Join-Path $TestDrive "stale-heading-review.md") `
                 -DryRun
-        } | Should Throw "Managed release-note heading"
+        } | Should Throw "must not contain an H1 title"
     }
 
     It "rejects a title source branch that conflicts with the build context" {

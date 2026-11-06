@@ -31,6 +31,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "preview-release-assets.ps1")
 . (Join-Path $PSScriptRoot "github-tag-target.ps1")
 . (Join-Path $PSScriptRoot "release-title.ps1")
+. (Join-Path $PSScriptRoot "release-note-headings.ps1")
 
 $beginMarker = "<!-- BEGIN POWERTOYS PREVIEW AGENT -->"
 $endMarker = "<!-- END POWERTOYS PREVIEW AGENT -->"
@@ -48,11 +49,7 @@ function Get-ManagedBlock {
         $block = "$beginMarker`n$($Body.Trim())`n$endMarker"
     }
 
-    $heading = [regex]::new('(?m)^# [^\r\n]*\r?$')
-    if ($heading.IsMatch($block)) {
-        return $heading.Replace($block, "# $releaseTitle", 1)
-    }
-    return $block.Replace($beginMarker, "$beginMarker`n# $releaseTitle`n")
+    return Remove-LeadingReleaseNotesH1 -Text $block -Marker $beginMarker
 }
 
 function Merge-ReleaseBody {

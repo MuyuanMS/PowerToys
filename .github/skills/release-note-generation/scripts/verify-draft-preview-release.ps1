@@ -31,6 +31,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "preview-release-assets.ps1")
 . (Join-Path $PSScriptRoot "github-tag-target.ps1")
 . (Join-Path $PSScriptRoot "release-title.ps1")
+. (Join-Path $PSScriptRoot "release-note-headings.ps1")
 
 $context = if ($ContextPath) {
     Get-Content -LiteralPath $ContextPath -Raw | ConvertFrom-Json
@@ -97,9 +98,8 @@ if ([string]$release.body -notmatch "<!-- BEGIN POWERTOYS PREVIEW AGENT -->" -or
     throw "Release '$Tag' is missing the managed preview body markers."
 }
 $managedBody = [regex]::Match([string]$release.body, '(?s)<!-- BEGIN POWERTOYS PREVIEW AGENT -->(.*?)<!-- END POWERTOYS PREVIEW AGENT -->').Groups[1].Value
-$heading = [regex]::Match($managedBody, '(?m)^# ([^\r\n]+)\r?$').Groups[1].Value
-if ($heading -cne $releaseTitle) {
-    throw "Managed release-note heading '$heading' does not match '$releaseTitle'."
+if (Test-ReleaseNotesContainsH1 -Text $managedBody) {
+    throw "Managed release notes must not contain an H1 title; use the GitHub release title instead."
 }
 
 $localFiles = @(Get-PreviewReleaseAssets -AssetsDirectory $AssetsDirectory)

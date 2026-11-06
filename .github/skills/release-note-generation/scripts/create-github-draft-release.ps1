@@ -43,6 +43,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "release-title.ps1")
+. (Join-Path $PSScriptRoot "release-note-headings.ps1")
 
 function Resolve-ExistingPath {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Description)
@@ -101,6 +102,10 @@ function Get-ReleaseNotesFile {
 function Test-ReleaseNotesInstallerLinks {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Tag, [Parameter(Mandatory)][string]$Version)
     $content = Get-Content -LiteralPath $Path -Raw
+    if (Test-ReleaseNotesContainsH1 -Text $content) {
+        throw "Release notes must not contain an H1 title; use the GitHub release title instead."
+    }
+
     $expectedLinks = @{
         "ptUserX64" = "https://github.com/$GitHubRepo/releases/download/$Tag/PowerToysUserSetup-$Version-x64.exe"
         "ptUserArm64" = "https://github.com/$GitHubRepo/releases/download/$Tag/PowerToysUserSetup-$Version-arm64.exe"
