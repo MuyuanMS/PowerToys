@@ -88,7 +88,11 @@ The activation process works as follows:
 
        m_drawing = true;
        m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, m_hinstance, 0);
-       SetTimer(m_hwnd, CURSOR_POSITION_TIMER_ID, CURSOR_POSITION_TIMER_INTERVAL_MS, NULL);
+       if (SetTimer(m_hwnd, CURSOR_POSITION_TIMER_ID, CURSOR_POSITION_TIMER_INTERVAL_MS, NULL) == 0)
+       {
+           const DWORD error = GetLastError();
+           Logger::error("Failed to create cursor position timer. Last error: {}", error);
+       }
    }
    ```
 
@@ -103,7 +107,7 @@ The activation process works as follows:
 
 While active, the low-level mouse hook (`WH_MOUSE_LL`) provides immediate mouse movement updates. A separate timer samples `GetCursorPos()` approximately every 16 ms to track pen and Windows Ink input, which can move the system cursor without producing low-level mouse events. The timer redraws only when the screen position differs from the last drawn position.
 
-While external control is enabled for Gliding Cursor, the timer skips position sampling; Gliding Cursor requests its own position updates. Stopping the crosshairs removes the mouse hook and stops both timers.
+While external control is enabled for Gliding Cursor, the cursor position timer is stopped; it is restarted when external control ends while the crosshairs are still active. Gliding Cursor requests its own position updates. Stopping the crosshairs removes the mouse hook and stops both timers.
 
 ## Debugging
 
