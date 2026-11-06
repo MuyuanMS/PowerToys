@@ -415,6 +415,11 @@ void InclusiveCrosshairs::StartDrawing()
 
 void InclusiveCrosshairs::SetCursorPositionTimer(bool enabled) noexcept
 {
+    if (m_hwnd == nullptr)
+    {
+        return;
+    }
+
     if (!enabled)
     {
         KillTimer(m_hwnd, CURSOR_POSITION_TIMER_ID);
