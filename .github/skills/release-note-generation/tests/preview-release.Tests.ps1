@@ -864,7 +864,7 @@ Describe "draft preview release dry run" {
         $result.tag | Should Be "v0.101.2181"
         $result.title | Should Be $ExpectedTitle
         $preparedBody = Get-Content -LiteralPath $bodyPath -Raw
-        ($preparedBody -match '(?m)^# ') | Should Be $false
+        ($preparedBody -match '(?m)^ {0,3}#(?:[ \t]+|$)') | Should Be $false
         $preparedBody.Contains("Preview notes") | Should Be $true
         $result.assetNames.Count | Should Be 1
         $result.assetNames[0] | Should Be "PowerToysSetup-0.101.2181.0-x64.exe"
@@ -882,6 +882,40 @@ Describe "draft preview release dry run" {
 
         $verified.status | Should Be "PASS"
         $verified.draftUrl | Should Be $null
+    }
+
+    It "removes tabbed, empty, and indented legacy H1 headings before verification" {
+        $bodyPath = Join-Path $TestDrive "release-notes.md"
+        $assetsPath = Join-Path $TestDrive "assets"
+        New-Item -ItemType Directory -Path $assetsPath | Out-Null
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
+        Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
+
+        foreach ($heading in @("#`tLegacy title", "#", "   # Legacy title")) {
+            $heading | Set-Content -LiteralPath $bodyPath
+
+            $result = & (Join-Path $scripts "upsert-draft-preview-release.ps1") `
+                -Tag "v0.101.2181" `
+                -SourceBranch "refs/heads/main" `
+                -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+                -BodyPath $bodyPath `
+                -AssetsDirectory $assetsPath `
+                -MergedBodyOutputPath $bodyPath `
+                -DryRun
+
+            $result.draft | Should Be $true
+            $preparedBody = Get-Content -LiteralPath $bodyPath -Raw
+            ($preparedBody -match '(?m)^ {0,3}#(?:[ \t]+|$)') | Should Be $false
+            $verified = & (Join-Path $scripts "verify-draft-preview-release.ps1") `
+                -Tag "v0.101.2181" `
+                -SourceBranch "refs/heads/main" `
+                -TargetCommit "0123456789abcdef0123456789abcdef01234567" `
+                -AssetsDirectory $assetsPath `
+                -BodyPath $bodyPath `
+                -OutputPath (Join-Path $TestDrive "prepared-dry-run-review.md") `
+                -DryRun
+            $verified.status | Should Be "PASS"
+        }
     }
 
     It "preserves human text outside managed body markers" {

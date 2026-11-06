@@ -48,7 +48,7 @@ function Get-ManagedBlock {
         $block = "$beginMarker`n$($Body.Trim())`n$endMarker"
     }
 
-    $heading = [regex]::new('\A' + [regex]::Escape($beginMarker) + '\s*# [^\r\n]*(?:\r?\n|$)\s*')
+    $heading = [regex]::new('\A' + [regex]::Escape($beginMarker) + '\s*#(?:[ \t]+[^\r\n]*|(?=\r?\n|$))(?:\r?\n|$)\s*')
     return $heading.Replace($block, "$beginMarker`n", 1)
 }
 
