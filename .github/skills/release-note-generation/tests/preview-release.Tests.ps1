@@ -777,11 +777,11 @@ Describe "release title selection" {
         $output.Contains("--target 0123456789abcdef0123456789abcdef01234567") | Should Be $true
         $output.Contains("release create v0.101.2181 ") | Should Be $true
 
-        @("# $ExpectedTitle") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md")
+        @("# $ExpectedTitle") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md") -Encoding utf8
         { & (Join-Path $scripts "create-github-draft-release.ps1") @parameters } |
             Should Throw "must not contain an H1 title"
 
-        @("$ExpectedTitle", "===") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md")
+        @("$ExpectedTitle", "===") + $links | Set-Content -LiteralPath (Join-Path $releasePath "release-notes.md") -Encoding utf8
         { & (Join-Path $scripts "create-github-draft-release.ps1") @parameters } |
             Should Throw "must not contain an H1 title"
     }
@@ -815,7 +815,7 @@ Describe "draft preview release dry run" {
             "<!-- END POWERTOYS PREVIEW AGENT -->"
         ) -join $NewLine
         Set-Content -LiteralPath $bodyPath -Value $content -Encoding utf8 -NoNewline
-        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
         $expected = $content.Replace("# Dev preview v0.101.2181.0$NewLine$NewLine", "")
         $previousBody = $null
@@ -832,6 +832,14 @@ Describe "draft preview release dry run" {
 
             $actual = Get-Content -LiteralPath $bodyPath -Raw
             ($actual.TrimEnd() -replace "`r`n", "`n") | Should Be ($expected -replace "`r`n", "`n")
+            $actualContent = $actual -replace '(?:\r\n|\n|\r)$', ''
+            if ($LineEnding -eq "CRLF") {
+                $actualContent.Contains("`r`n") | Should Be $true
+                [regex]::IsMatch($actualContent, '(?<!\r)\n') | Should Be $false
+            }
+            else {
+                $actualContent.Contains("`r") | Should Be $false
+            }
             if ($iteration -eq 2) {
                 $actual | Should Be $previousBody
             }
@@ -850,7 +858,7 @@ Describe "draft preview release dry run" {
         New-Item -ItemType Directory -Path $assetsPath | Out-Null
         $oldTitle = if ($SourceBranch -eq "refs/heads/main") { "Development preview v0.101.2181" } else { "Release preview v0.101.2181" }
         "# $oldTitle`n`nPreview notes" | Set-Content -LiteralPath $bodyPath
-        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
         "local audit only" | Set-Content -LiteralPath (Join-Path $assetsPath "release-manifest.json")
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
 
@@ -892,7 +900,7 @@ Describe "draft preview release dry run" {
         $bodyPath = Join-Path $TestDrive "release-notes.md"
         $assetsPath = Join-Path $TestDrive "assets"
         New-Item -ItemType Directory -Path $assetsPath | Out-Null
-        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
+        "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe") -Encoding utf8
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
 
         foreach ($heading in @("#`tLegacy title", "#", "   # Legacy title", "Legacy title`n===")) {
@@ -959,7 +967,7 @@ Describe "draft preview release dry run" {
 <!-- BEGIN POWERTOYS PREVIEW AGENT -->
 New generated notes
 <!-- END POWERTOYS PREVIEW AGENT -->
-'@ | Set-Content -LiteralPath $bodyPath
+'@ | Set-Content -LiteralPath $bodyPath -Encoding utf8
         "installer" | Set-Content -LiteralPath (Join-Path $assetsPath "PowerToysSetup-0.101.2181.0-x64.exe")
         Write-TestAssetsManifest -AssetsPath $assetsPath -AssetNames @("PowerToysSetup-0.101.2181.0-x64.exe")
         @'

@@ -1,7 +1,9 @@
 function Test-ReleaseNotesContainsH1 {
     param([AllowEmptyString()][string]$Text)
 
-    return $Text -match '(?m)^ {0,3}#(?:[ \t]+|$)|^ {0,3}\S[^\r\n]*\r?\n {0,3}=+[ \t]*\r?$'
+    $atxH1 = '^ {0,3}#(?:[ \t]+|$)'
+    $setextH1 = '^ {0,3}\S[^\r\n]*\r?\n {0,3}=+[ \t]*\r?$'
+    return $Text -match "(?m)(?:$atxH1|$setextH1)"
 }
 
 function Remove-LeadingReleaseNotesH1 {
@@ -10,8 +12,13 @@ function Remove-LeadingReleaseNotesH1 {
         [Parameter(Mandatory)][string]$Marker
     )
 
-    $pattern = '\A' + [regex]::Escape($Marker) + '\r?\n(?:[ \t]*\r?\n)*' +
-        '(?: {0,3}#(?:[ \t]+[^\r\n]*|(?=\r?\n|$))(?:\r?\n|$)(?:[ \t]*\r?\n)*|' +
-        ' {0,3}\S[^\r\n]*\r?\n {0,3}=+[ \t]*(?:\r?\n|$)(?:[ \t]*\r?\n)*)'
-    return [regex]::new($pattern).Replace($Text, "$Marker`n", 1)
+    $markerPrefix = '\A' + [regex]::Escape($Marker) + '\r?\n(?:[ \t]*\r?\n)*'
+    $atxH1 = ' {0,3}#(?:[ \t]+[^\r\n]*|(?=\r?\n|$))(?:\r?\n|$)(?:[ \t]*\r?\n)*'
+    $setextH1 = ' {0,3}\S[^\r\n]*\r?\n {0,3}=+[ \t]*(?:\r?\n|$)(?:[ \t]*\r?\n)*'
+    $pattern = $markerPrefix + '(?:' + $atxH1 + '|' + $setextH1 + ')'
+    $markerNewLine = [regex]::Match(
+        $Text,
+        '\A' + [regex]::Escape($Marker) + '(?<newline>\r?\n)'
+    ).Groups['newline'].Value
+    return [regex]::new($pattern).Replace($Text, $Marker + $markerNewLine, 1)
 }
