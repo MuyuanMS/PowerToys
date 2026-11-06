@@ -72,6 +72,8 @@ namespace RunnerUnitTests
             Assert::IsTrue(packagedBackup.find("synthetic-backup-key") == std::string::npos);
             Assert::AreEqual(otherLogs, ReadFile(extracted / L"FancyZones" / L"Logs" / L"diagnostics.log"));
             const auto parsed = winrt::Windows::Data::Json::JsonObject::Parse(winrt::to_hstring(packagedSettings));
+            const auto packagedSecurityKey = parsed.GetNamedObject(L"properties").GetNamedObject(L"SecurityKey");
+            Assert::AreEqual(std::string{ "<private_data>" }, winrt::to_string(packagedSecurityKey.GetNamedString(L"value")));
             Assert::IsFalse(parsed.GetNamedObject(L"properties").GetNamedObject(L"UseService").GetNamedBoolean(L"value"));
             Assert::AreEqual(settings, ReadFile(original / L"MouseWithoutBorders" / L"settings.json"));
             Assert::AreEqual(backup, ReadFile(original / L"MouseWithoutBorders.backup" / L"settings.json"));

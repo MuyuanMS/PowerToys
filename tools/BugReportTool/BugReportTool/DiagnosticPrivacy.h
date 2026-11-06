@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <vector>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Foundation.Collections.h>
 
@@ -30,7 +31,25 @@ namespace diagnostic_privacy
             }
             if (object.HasKey(L"SecurityKey"))
             {
-                object.SetNamedValue(L"SecurityKey", JsonValue::CreateStringValue(L"<private_data>"));
+                const auto securityKey = object.GetNamedValue(L"SecurityKey");
+                if (securityKey.ValueType() == JsonValueType::Object)
+                {
+                    const auto securityKeyObject = securityKey.GetObjectW();
+                    if (securityKeyObject.HasKey(L"value"))
+                    {
+                        securityKeyObject.SetNamedValue(L"value", JsonValue::CreateStringValue(L"<private_data>"));
+                    }
+                    else
+                    {
+                        JsonObject redactedSecurityKey;
+                        redactedSecurityKey.SetNamedValue(L"value", JsonValue::CreateStringValue(L"<private_data>"));
+                        object.SetNamedValue(L"SecurityKey", redactedSecurityKey);
+                    }
+                }
+                else
+                {
+                    object.SetNamedValue(L"SecurityKey", JsonValue::CreateStringValue(L"<private_data>"));
+                }
                 changed = true;
             }
         }
@@ -86,6 +105,7 @@ namespace diagnostic_privacy
 
     inline void sanitize_report(const std::filesystem::path& reportDirectory)
     {
+        std::vector<std::filesystem::path> sensitiveLogPaths;
         for (const auto& entry : std::filesystem::recursive_directory_iterator{ reportDirectory })
         {
             if (!entry.is_regular_file())
@@ -96,7 +116,7 @@ namespace diagnostic_privacy
             // Exclude historical log sources without attempting to recover embedded or malformed payloads.
             if (is_sensitive_log_path(entry.path().lexically_relative(reportDirectory)))
             {
-                std::filesystem::remove(entry.path());
+                sensitiveLogPaths.push_back(entry.path());
                 continue;
             }
 
@@ -122,6 +142,11 @@ namespace diagnostic_privacy
             output.exceptions(std::ios::failbit | std::ios::badbit);
             output << contents;
             output.close();
+        }
+
+        for (const auto& path : sensitiveLogPaths)
+        {
+            std::filesystem::remove(path);
         }
     }
 }
