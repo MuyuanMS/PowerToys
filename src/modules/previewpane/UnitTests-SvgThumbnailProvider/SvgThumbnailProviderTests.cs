@@ -252,6 +252,7 @@ namespace SvgThumbnailProviderUnitTests
         [DataRow(128, 128, PixelFormat.Format32bppArgb, true)]
         [DataRow(256, 256, PixelFormat.Format24bppRgb, true)]
         [DataRow(256, 256, PixelFormat.Format32bppRgb, true)]
+        [DataRow(256, 256, PixelFormat.Format32bppPArgb, true)]
         public void IsResizeRequiredShouldOnlySkipFittingArgbImages(int width, int height, PixelFormat pixelFormat, bool expected)
         {
             using Bitmap image = new Bitmap(width, height, pixelFormat);

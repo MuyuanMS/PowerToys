@@ -253,10 +253,10 @@ namespace Microsoft.PowerToys.ThumbnailHandler.Svg
         /// <param name="image">The captured image.</param>
         /// <param name="cx">The maximum thumbnail size, in pixels.</param>
         /// <returns>True unless the longest side is exactly <paramref name="cx"/> and the image is already 32bpp ARGB.</returns>
-        public static bool IsResizeRequired(Image image, uint cx)
+        internal static bool IsResizeRequired(Image image, uint cx)
         {
-            return ((image.Width != cx || image.Height > cx) && (image.Height != cx || image.Width > cx)) ||
-                image.PixelFormat != PixelFormat.Format32bppArgb;
+            int longestSide = Math.Max(image.Width, image.Height);
+            return longestSide != cx || image.PixelFormat != PixelFormat.Format32bppArgb;
         }
 
         /// <summary>
