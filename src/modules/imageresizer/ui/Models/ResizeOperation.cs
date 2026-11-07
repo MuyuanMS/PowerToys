@@ -161,9 +161,8 @@ namespace ImageResizer.Models
                 {
                     _fileSystem.File.Move(path, renamed);
                     path = renamed;
+                    backup = _file;
                 }
-
-                backup = _file;
             }
             else if (_settings.Replace)
             {

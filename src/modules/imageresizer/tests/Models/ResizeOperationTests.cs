@@ -13,6 +13,7 @@ using ImageResizer.Properties;
 using ImageResizer.Test;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 
 namespace ImageResizer.Models
 {
@@ -158,6 +159,56 @@ namespace ImageResizer.Models
         }
 
         [TestMethod]
+        public async Task ExecuteFlattensTransparentPixelsWhenConvertingToJpeg()
+        {
+            var sourcePath = Path.Combine(_directory, "Transparent.png");
+            using (var stream = new InMemoryRandomAccessStream())
+            {
+                var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+                encoder.SetPixelData(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied,
+                    2,
+                    2,
+                    96,
+                    96,
+                    new byte[16]);
+                await encoder.FlushAsync();
+
+                stream.Seek(0);
+                using var file = File.Create(sourcePath);
+                await stream.AsStreamForRead().CopyToAsync(file);
+            }
+
+            var operation = new ResizeOperation(
+                sourcePath,
+                _directory,
+                Settings(s => s.OutputFormat = OutputFormat.Jpeg));
+
+            await operation.ExecuteAsync();
+
+            var outputPath = Path.Combine(_directory, "Transparent (Test).jpg");
+            await AssertEx.ImageAsync(
+                outputPath,
+                async decoder =>
+                {
+                    var frame = await decoder.GetFrameAsync(0);
+                    var pixelData = await frame.GetPixelDataAsync(
+                        BitmapPixelFormat.Bgra8,
+                        BitmapAlphaMode.Ignore,
+                        new BitmapTransform(),
+                        ExifOrientationMode.IgnoreExifOrientation,
+                        ColorManagementMode.DoNotColorManage);
+                    var pixels = pixelData.DetachPixelData();
+
+                    for (int p = 0; p < pixels.Length; p += 4)
+                    {
+                        Assert.IsTrue(pixels[p] >= 240 && pixels[p + 1] >= 240 && pixels[p + 2] >= 240, "Transparent pixels should be flattened onto white.");
+                    }
+                });
+        }
+
+        [TestMethod]
         public async Task ExecuteKeepsFirstFrameWhenOutputFormatIsSingleFrame()
         {
             var operation = new ResizeOperation("Test.gif", _directory, Settings(s => s.OutputFormat = OutputFormat.Png));
@@ -187,6 +238,31 @@ namespace ImageResizer.Models
             await operation.ExecuteAsync();
 
             Assert.AreEqual("Test.jpg", _directory.FileNames.Single());
+        }
+
+        [TestMethod]
+        public async Task ExecutePreservesOriginalWhenConvertedReplacementNameExists()
+        {
+            var originalPath = Path.Combine(_directory, "Test.png");
+            File.Copy("Test.png", originalPath);
+            var existingPath = Path.Combine(_directory, "Test.jpg");
+            File.WriteAllText(existingPath, "existing");
+
+            var operation = new ResizeOperation(
+                originalPath,
+                null,
+                Settings(
+                    s =>
+                    {
+                        s.Replace = true;
+                        s.OutputFormat = OutputFormat.Jpeg;
+                    }));
+
+            await operation.ExecuteAsync();
+
+            Assert.IsTrue(File.Exists(originalPath));
+            Assert.AreEqual("existing", File.ReadAllText(existingPath));
+            CollectionAssert.Contains(_directory.FileNames.ToList(), "Test (Test).jpg");
         }
 
         [TestMethod]
