@@ -19,7 +19,9 @@ enum PowerRenameFlags
     ExtensionOnly = 0x100,
     Uppercase = 0x200,
     Lowercase = 0x400,
+    // Retained for compatibility; use TitleCase for new code.
     Titlecase = 0x800,
+    TitleCase = Titlecase,
     Capitalized = 0x1000,
     RandomizeItems = 0x2000,
     CreationTime = 0x4000,
@@ -28,6 +30,8 @@ enum PowerRenameFlags
     // Metadata source flags
     MetadataSourceEXIF = 0x20000,    // Default
     MetadataSourceXMP = 0x40000,
+    // Additional casing flags
+    SentenceCase = 0x80000,
 };
 
 enum PowerRenameFilters
