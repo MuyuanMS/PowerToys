@@ -199,7 +199,7 @@
     <PRIResource Include="Strings\en-us\Resources.resw">
       <SubType>Designer</SubType>
     </PRIResource>
-    <_WildCardPRIResource Include="Strings\*\Resources.resw" />
+    <_WildCardPRIResource Include="Strings\*\Resources.resw" Exclude="Strings\en-us\Resources.resw" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)src\common\logger\logger.vcxproj">
