@@ -63,6 +63,7 @@ namespace ViewModelTests
             Assert.AreEqual(originalSettings.Properties.FancyzonesMakeDraggedWindowTransparent.Value, viewModel.MakeDraggedWindowsTransparent);
             Assert.AreEqual(originalSettings.Properties.FancyzonesMouseSwitch.Value, viewModel.MouseSwitch);
             Assert.AreEqual(originalSettings.Properties.FancyzonesMoveWindowsAcrossMonitors.Value, viewModel.MoveWindowsAcrossMonitors);
+            Assert.AreEqual(originalSettings.Properties.FancyzonesCycleThroughAllZones.Value, viewModel.CycleThroughAllZones);
             Assert.AreEqual(originalSettings.Properties.FancyzonesMoveWindowsBasedOnPosition.Value, viewModel.MoveWindowsBasedOnPosition);
             Assert.AreEqual(originalSettings.Properties.FancyzonesOpenWindowOnActiveMonitor.Value, viewModel.OpenWindowOnActiveMonitor);
             Assert.AreEqual(originalSettings.Properties.FancyzonesOverrideSnapHotkeys.Value, viewModel.OverrideSnapHotkeys);
@@ -189,6 +190,24 @@ namespace ViewModelTests
             // assert
             var expected = viewModel.MoveWindowsAcrossMonitors;
             var actual = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesMoveWindowsAcrossMonitors.Value;
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestMethod]
+        public void CycleThroughAllZonesShouldSetValue2FalseWhenSuccessful()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+
+            // arrange
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+            Assert.IsTrue(viewModel.CycleThroughAllZones);
+
+            // act
+            viewModel.CycleThroughAllZones = false;
+
+            // assert
+            var expected = viewModel.CycleThroughAllZones;
+            var actual = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesCycleThroughAllZones.Value;
             Assert.AreEqual(expected, actual);
         }
 
