@@ -360,6 +360,10 @@ public class FileExplorerAddonsTests : UITestBase
             providerLog,
             $"Windows Shell did not invoke the PowerToys {providerName} shim for the cold {extension} thumbnail.");
 
+        var initialProviderLogPath = ArtifactPath($"{scenario}-provider-initial", ".log");
+        File.WriteAllText(initialProviderLogPath, ReadAllTextWithRetry(providerLog!));
+        TestContext.AddResultFile(initialProviderLogPath);
+
         var extraLarge = CaptureStableFileItem(explorer, assetName, $"{scenario}-extra-large");
 
         SetExplorerViewAndWait(
