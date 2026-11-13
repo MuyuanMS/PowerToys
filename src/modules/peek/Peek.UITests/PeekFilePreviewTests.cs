@@ -233,6 +233,15 @@ public class PeekFilePreviewTests : UITestBase
         TestSingleFilePreview(pngPath, "8");
     }
 
+    [TestMethod("Peek.FilePreview.ReopenDifferentPreviewTypes")]
+    [TestCategory("Preview files")]
+    public void TestReopenDifferentPreviewTypes()
+    {
+        TestSingleFilePreview(Path.GetFullPath(@".\TestAssets\6.md"), "6");
+        TestSingleFilePreview(Path.GetFullPath(@".\TestAssets\8.png"), "8");
+        TestSingleFilePreview(Path.GetFullPath(@".\TestAssets\5.cpp"), "5");
+    }
+
     /// <summary>
     /// Test window pinning functionality - pin window and switch between different sized images
     /// Verify the window stays at the same place and the same size

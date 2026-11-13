@@ -44,6 +44,7 @@ namespace Peek.UI
         /// </summary>
         private bool _isDeleteInProgress;
         private bool _exitAfterClose;
+        private TaskCompletionSource<bool>? _uninitializationCompletion;
 
         private IntPtr _keyboardHookHandle;
         private NativeMethods.LowLevelKeyboardProc? _keyboardHookProc;
@@ -139,11 +140,16 @@ namespace Peek.UI
         /// <summary>
         /// Toggling the window visibility and querying files when necessary.
         /// </summary>
-        public void Toggle(bool firstActivation, SelectedItem selectedItem, bool exitAfterClose)
+        public async Task ToggleAsync(bool firstActivation, SelectedItem selectedItem, bool exitAfterClose)
         {
             if (exitAfterClose)
             {
                 _exitAfterClose = true;
+            }
+
+            if (_uninitializationCompletion is { } uninitialization)
+            {
+                await uninitialization.Task;
             }
 
             if (firstActivation)
@@ -167,7 +173,7 @@ namespace Peek.UI
                 }
                 else
                 {
-                    Uninitialize();
+                    await UninitializeAsync();
                 }
             }
             else
@@ -183,14 +189,14 @@ namespace Peek.UI
             appWindow.TitleBar.ButtonForegroundColor = ThemeHelpers.GetAppTheme() == AppTheme.Light ? Colors.DarkSlateGray : Colors.White;
         }
 
-        private void PeekWindow_Activated(object sender, WindowActivatedEventArgs args)
+        private async void PeekWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
                 var userSettings = Application.Current.GetService<IUserSettings>();
                 if (userSettings.CloseAfterLosingFocus)
                 {
-                    Uninitialize();
+                    await UninitializeAsync();
                 }
             }
         }
@@ -205,9 +211,9 @@ namespace Peek.UI
             ViewModel.AttemptNextNavigation();
         }
 
-        private void CloseInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        private async void CloseInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
         {
-            Uninitialize();
+            await UninitializeAsync();
         }
 
         private void Initialize(SelectedItem selectedItem)
@@ -238,10 +244,36 @@ namespace Peek.UI
             PowerToysTelemetry.Log.WriteEvent(new OpenedEvent() { FileExtension = ViewModel.CurrentItem?.Extension ?? string.Empty, HotKeyToVisibleTimeMs = bootTime.ElapsedMilliseconds });
         }
 
-        private void Uninitialize()
+        private Task UninitializeAsync()
+        {
+            if (_uninitializationCompletion is { } uninitialization)
+            {
+                return uninitialization.Task;
+            }
+
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _uninitializationCompletion = completion;
+            _ = CompleteUninitializationAsync(completion);
+            return completion.Task;
+        }
+
+        private async Task CompleteUninitializationAsync(TaskCompletionSource<bool> completion)
         {
             try
             {
+                // Blank the WebView while it is still visible; otherwise it shows this file again on next open.
+                try
+                {
+                    if (AppWindow.IsVisible)
+                    {
+                        await FilePreviewer.ClearBrowserPreviewAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to clear the browser preview while uninitializing Peek; continuing cleanup.", ex);
+                }
+
                 // Keep teardown best-effort: one failure must not skip later cleanup
                 // or prevent the CLI/-FilePath exit-after-close contract.
                 TryRunUninitializeStep(UninstallKeyboardHook, nameof(UninstallKeyboardHook));
@@ -252,8 +284,14 @@ namespace Peek.UI
                 TryRunUninitializeStep(() => this.Content.KeyUp -= Content_KeyUp, nameof(Content_KeyUp));
                 TryRunUninitializeStep(ShellPreviewHandlerPreviewer.ReleaseHandlerFactories, nameof(ShellPreviewHandlerPreviewer.ReleaseHandlerFactories));
             }
+            catch (Exception ex)
+            {
+                Logger.LogError("Unhandled exception in Peek MainWindow.Uninitialize; continuing close.", ex);
+            }
             finally
             {
+                _uninitializationCompletion = null;
+                completion.TrySetResult(true);
                 if (_exitAfterClose)
                 {
                     Environment.Exit(0);
@@ -329,7 +367,7 @@ namespace Peek.UI
         /// </summary>
         /// <param name="sender">AppWindow</param>
         /// <param name="args">AppWindowClosingEventArgs</param>
-        private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+        private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
         {
             // Any exception that escapes a WinRT event handler is projected back to
             // the CsWinRT dispatcher as a failed HRESULT, and CFlat fail-fasts the
@@ -340,7 +378,7 @@ namespace Peek.UI
             {
                 args.Cancel = true;
                 PowerToysTelemetry.Log.WriteEvent(new ClosedEvent());
-                Uninitialize();
+                await UninitializeAsync();
             }
             catch (Exception ex)
             {
@@ -461,7 +499,7 @@ namespace Peek.UI
                         {
                             if (!_isDeleteInProgress)
                             {
-                                Uninitialize();
+                                _ = UninitializeAsync();
                             }
                         });
                     }
@@ -471,7 +509,7 @@ namespace Peek.UI
                         {
                             if (!_isDeleteInProgress)
                             {
-                                Uninitialize();
+                                _ = UninitializeAsync();
                             }
                         });
                     }
@@ -522,11 +560,11 @@ namespace Peek.UI
         /// <summary>
         /// Handle InfoBar closed - if there's no current item, close the window.
         /// </summary>
-        private void ErrorInfoBar_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+        private async void ErrorInfoBar_Closed(InfoBar sender, InfoBarClosedEventArgs args)
         {
             if (ViewModel.CurrentItem == null)
             {
-                Uninitialize();
+                await UninitializeAsync();
             }
         }
     }
