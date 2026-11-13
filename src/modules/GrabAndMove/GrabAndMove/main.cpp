@@ -2526,16 +2526,17 @@ static HookDisposition HandleKeyboardEvent(WPARAM message, const KBDLLHOOKSTRUCT
         !g_modifierSession.consumed &&
         !g_modifierSession.replayedDown)
     {
-        // Swallow the physical keydown only when both injected events were inserted.
-        // A short insert leaves the session unchanged so this key is chained once below.
-        // Repeats after a successful replay no longer match and are chained.
-        if (ReplayModifierChord(key) == 2)
+        const UINT inserted = ReplayModifierChord(key);
+        if (inserted > 0)
         {
             g_modifierSession.absorbed = false;
             g_modifierSession.pressed = false;
             g_modifierSession.replayedDown = true;
-            TrackHeldNonModifierKey(key.vkCode, message);
-            return HookDisposition::Swallow;
+            if (inserted == 2)
+            {
+                TrackHeldNonModifierKey(key.vkCode, message);
+                return HookDisposition::Swallow;
+            }
         }
     }
 
