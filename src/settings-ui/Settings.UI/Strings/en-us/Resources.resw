@@ -3821,7 +3821,7 @@ Activate by holding the key for the character you want to add an accent to, then
     <value>Close</value>
   </data>
   <data name="AdvancedPaste_AIComplianceModelNotice" xml:space="preserve">
-    <value>AI agents and models that you host and choose to connect to is your choice. If you choose a third party agent or model, Microsoft may not provide, host, operate, or monitor them. If you use {0} to interact with an agent or model you host, you do so at your own risk.</value>
+    <value>AI agents and models that you host and choose to connect to are your choice. If you choose a third-party agent or model, Microsoft may not provide, host, operate, or monitor them. If you use {0} to interact with an agent or model you host, you do so at your own risk.</value>
     <comment>{0} is the localized product name from AdvancedPaste.ModuleTitle.</comment>
   </data>
   <data name="AdvancedPaste_AIComplianceModelResponsibilities.Text" xml:space="preserve">
