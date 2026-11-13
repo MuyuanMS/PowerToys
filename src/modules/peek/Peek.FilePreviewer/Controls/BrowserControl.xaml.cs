@@ -161,8 +161,8 @@ namespace Peek.FilePreviewer.Controls
                 // Avoid NavigationStarting treating about:blank as a user navigation (open-in-browser dialog).
                 _navigatedUri = null;
 
-                var navigated = new TaskCompletionSource();
-                void OnCompleted(CoreWebView2 s, CoreWebView2NavigationCompletedEventArgs a) => navigated.TrySetResult();
+                var navigated = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnCompleted(CoreWebView2 s, CoreWebView2NavigationCompletedEventArgs a) => navigated.TrySetResult(true);
                 core.NavigationCompleted += OnCompleted;
                 try
                 {
@@ -170,7 +170,7 @@ namespace Peek.FilePreviewer.Controls
 
                     // Cap the wait so closing Peek is never held up noticeably; if the renderer is slower, the old frame may still flash.
                     var deadline = Task.Delay(100);
-                    if (await Task.WhenAny(navigated.Task, deadline) == deadline)
+                    if (await Task.WhenAny(navigated.Task, deadline) != navigated.Task)
                     {
                         return;
                     }
@@ -179,7 +179,14 @@ namespace Peek.FilePreviewer.Controls
                     var painted = core.CallDevToolsProtocolMethodAsync(
                         "Runtime.evaluate",
                         "{\"expression\":\"new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(0))))\",\"awaitPromise\":true}").AsTask();
-                    await Task.WhenAny(painted, deadline);
+                    if (await Task.WhenAny(painted, deadline) == painted)
+                    {
+                        await painted;
+                    }
+                    else
+                    {
+                        _ = ObserveLatePaintFailureAsync(painted);
+                    }
                 }
                 finally
                 {
@@ -188,7 +195,19 @@ namespace Peek.FilePreviewer.Controls
             }
             catch (Exception ex)
             {
-                Logger.LogError("BrowserControl.ClearAsync failed: " + ex.Message);
+                Logger.LogError("BrowserControl.ClearAsync failed.", ex);
+            }
+        }
+
+        private static async Task ObserveLatePaintFailureAsync(Task painted)
+        {
+            try
+            {
+                await painted.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("BrowserControl.ClearAsync paint wait failed after the clear deadline.", ex);
             }
         }
 

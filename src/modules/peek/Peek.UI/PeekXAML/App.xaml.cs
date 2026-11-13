@@ -235,28 +235,39 @@ namespace Peek.UI
         /// <summary>
         /// Handle Peek hotkey
         /// </summary>
-        private void OnShowPeek()
+        private async void OnShowPeek()
         {
-            // null means explorer, not null means CLI
-            if (_selectedItem == null)
+            try
             {
-                // Need to read the foreground HWND before activating Peek to avoid focus stealing
-                // Foreground HWND must always be Explorer or Desktop
-                var foregroundWindowHandle = Windows.Win32.PInvoke_PeekUI.GetForegroundWindow();
-                _selectedItem = new SelectedItemByWindowHandle(foregroundWindowHandle);
+                // null means explorer, not null means CLI
+                var selectedItem = _selectedItem;
+                if (selectedItem == null)
+                {
+                    // Need to read the foreground HWND before activating Peek to avoid focus stealing
+                    // Foreground HWND must always be Explorer or Desktop
+                    var foregroundWindowHandle = Windows.Win32.PInvoke_PeekUI.GetForegroundWindow();
+                    selectedItem = new SelectedItemByWindowHandle(foregroundWindowHandle);
+                }
+
+                var exitAfterClose = _launchedFromCli;
+                _launchedFromCli = false;
+                _selectedItem = null;
+
+                bool firstActivation = false;
+                var window = Window;
+                if (window == null)
+                {
+                    firstActivation = true;
+                    window = new MainWindow();
+                    Window = window;
+                }
+
+                await window.ToggleAsync(firstActivation, selectedItem, exitAfterClose);
             }
-
-            bool firstActivation = false;
-
-            if (Window == null)
+            catch (Exception ex)
             {
-                firstActivation = true;
-                Window = new MainWindow();
+                Logger.LogError("Failed to show or toggle the Peek window.", ex);
             }
-
-            Window.Toggle(firstActivation, _selectedItem, _launchedFromCli);
-            _launchedFromCli = false;
-            _selectedItem = null;
         }
 
         protected virtual void Dispose(bool disposing)
