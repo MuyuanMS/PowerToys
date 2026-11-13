@@ -235,7 +235,7 @@ public class PeekFilePreviewTests : UITestBase
 
     [TestMethod("Peek.FilePreview.ReopenDifferentPreviewTypes")]
     [TestCategory("Preview files")]
-    public void TestBrowserPreviewIsClearedBeforeReopening()
+    public void TestReopenDifferentPreviewTypes()
     {
         TestSingleFilePreview(Path.GetFullPath(@".\TestAssets\6.md"), "6");
         TestSingleFilePreview(Path.GetFullPath(@".\TestAssets\8.png"), "8");

@@ -273,7 +273,7 @@ namespace Peek.FilePreviewer
         /// </summary>
         public Task ClearBrowserPreviewAsync()
         {
-            return BrowserPreviewer != null ? BrowserPreview.ClearAsync() : Task.CompletedTask;
+            return BrowserPreview.ClearAsync();
         }
 
         private async Task OnScalingFactorPropertyChanged()
