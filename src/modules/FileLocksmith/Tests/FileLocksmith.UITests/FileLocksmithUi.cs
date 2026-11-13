@@ -109,6 +109,17 @@ internal static class FileLocksmithUi
     /// </summary>
     public static int CountRows(Session ui, int timeoutMS = 5_000) => EndTaskLabels(ui, timeoutMS).Count;
 
+    /// <summary>
+    /// Press End task in the confirmation dialog. True once the dialog has closed; until then its own
+    /// "End task" button text could be counted as a row, so count rows only after this returns.
+    /// </summary>
+    public static bool ConfirmEndTask(Session ui) =>
+        AnswerEndTaskDialog(ui, FileLocksmithConstants.EndTaskConfirmAutomationId);
+
+    /// <summary>Press Cancel in the confirmation dialog. True once the dialog has closed.</summary>
+    public static bool CancelEndTask(Session ui) =>
+        AnswerEndTaskDialog(ui, FileLocksmithConstants.EndTaskCancelAutomationId);
+
     /// <summary>True when at least one row is headed by <paramref name="processName"/>.</summary>
     public static bool HasProcessRow(Session ui, string processName, int timeoutMS = 5_000) =>
         ui.FindAll<TextBlock>(By.Name(processName), timeoutMS)
@@ -192,6 +203,14 @@ internal static class FileLocksmithUi
         while (DateTime.UtcNow < deadline);
 
         return false;
+    }
+
+    private static bool AnswerEndTaskDialog(Session ui, string buttonAutomationId)
+    {
+        // Find polls until the dialog has animated in.
+        var button = ui.Find<Button>(By.AccessibilityId(buttonAutomationId), timeoutMS: 10_000);
+        button.Invoke(msPostAction: 0);
+        return button.WaitForGone(10_000);
     }
 
     /// <summary>
