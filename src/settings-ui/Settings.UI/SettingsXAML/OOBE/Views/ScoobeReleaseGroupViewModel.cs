@@ -41,7 +41,7 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
                 var latestRelease = releases[0];
                 IsPreview = releases.All(release => release.IsPrerelease);
                 VersionText = GetVersionFromRelease(latestRelease);
-                var formatter = ScoobeDateFormatter.Create("month year");
+                var formatter = ScoobeDateFormatter.CreateMonthYearFormatter();
                 DateText = IsPreview ?
                     ResourceLoaderInstance.ResourceLoader.GetString("ScoobeReleaseGroup_Preview") :
                     formatter.Format(latestRelease.PublishedDate);

@@ -96,7 +96,7 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
             }
 
             StringBuilder releaseNotesHtmlBuilder = new StringBuilder(string.Empty);
-            var formatter = ScoobeDateFormatter.Create("longdate");
+            var formatter = ScoobeDateFormatter.CreateReleaseDetailsDateFormatter();
 
             // Regex to remove installer hash sections from the release notes.
             Regex removeHashRegex = new Regex(RemoveInstallerHashesRegex, RemoveInstallerHashesRegexOptions);

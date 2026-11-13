@@ -14,6 +14,7 @@ using Microsoft.PowerToys.Settings.UI;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Windows.Globalization.DateTimeFormatting;
 
 namespace Settings.UI.UnitTests
 {
@@ -53,6 +54,17 @@ namespace Settings.UI.UnitTests
             var languages = ScoobeDateFormatter.GetLanguages(string.Empty, new[] { "en-US", "ja-JP" });
 
             CollectionAssert.AreEqual(new[] { "en-US", "ja-JP" }, languages.ToArray());
+        }
+
+        [TestMethod]
+        public void ReleaseDetailsDateFormatterUsesMonthDayYearTemplate()
+        {
+            var formatter = ScoobeDateFormatter.CreateReleaseDetailsDateFormatter();
+            var expectedFormatter = new DateTimeFormatter("month day year", formatter.Languages);
+            var publishedDate = new DateTimeOffset(2023, 3, 8, 0, 0, 0, TimeSpan.Zero);
+
+            Assert.AreEqual("month day year", formatter.Template);
+            Assert.AreEqual(expectedFormatter.Format(publishedDate), formatter.Format(publishedDate));
         }
 
         [TestMethod]

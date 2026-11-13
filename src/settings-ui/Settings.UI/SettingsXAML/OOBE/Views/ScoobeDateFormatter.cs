@@ -12,7 +12,17 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
 {
     internal static class ScoobeDateFormatter
     {
-        internal static DateTimeFormatter Create(string template)
+        internal static DateTimeFormatter CreateMonthYearFormatter()
+        {
+            return Create("month year");
+        }
+
+        internal static DateTimeFormatter CreateReleaseDetailsDateFormatter()
+        {
+            return Create("month day year");
+        }
+
+        private static DateTimeFormatter Create(string template)
         {
             var languages = GetLanguages(ApplicationLanguages.PrimaryLanguageOverride, ApplicationLanguages.Languages);
             return new DateTimeFormatter(template, languages);
