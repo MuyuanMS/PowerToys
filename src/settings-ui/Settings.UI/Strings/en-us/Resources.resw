@@ -4421,6 +4421,15 @@ Activate by holding the key for the character you want to add an accent to, then
     <value>Shell integration</value>
     <comment>This refers to directly integrating in with Windows</comment>
   </data>
+  <data name="FileLocksmith_EndTaskGroup.Header" xml:space="preserve">
+    <value>End task</value>
+  </data>
+  <data name="FileLocksmith_ConfirmOnlyForOthers.Header" xml:space="preserve">
+    <value>Ask only for system and other users' processes</value>
+  </data>
+  <data name="FileLocksmith_ConfirmOnlyForOthers.Description" xml:space="preserve">
+    <value>When off, File Locksmith asks before ending any process.</value>
+  </data>
   <data name="GPO_SettingIsManaged.Title" xml:space="preserve">
     <value>This setting is managed by your organization.</value>
   </data>

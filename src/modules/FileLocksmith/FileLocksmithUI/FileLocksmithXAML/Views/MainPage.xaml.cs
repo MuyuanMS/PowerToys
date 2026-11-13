@@ -54,6 +54,12 @@ namespace PowerToys.FileLocksmithUI.Views
 
                 var loader = ResourceLoaderInstance.ResourceLoader;
                 var ownerKind = ProcessOwner.Classify(process.user, Environment.UserName);
+                if (ViewModel.ConfirmOnlyForOthers && ownerKind == ProcessOwnerKind.CurrentUser)
+                {
+                    ViewModel.EndTaskCommand.Execute(process);
+                    return;
+                }
+
                 EndTaskConfirmDialog.Title = string.Format(CultureInfo.CurrentCulture, loader.GetString("EndTaskConfirmTitle"), process.name);
                 EndTaskConfirmMessage.Text = ownerKind == ProcessOwnerKind.OtherUser
                     ? string.Format(CultureInfo.CurrentCulture, loader.GetString("EndTaskConfirmOtherUserMessage"), process.user)

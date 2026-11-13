@@ -25,6 +25,8 @@ public sealed class FileLocksmithProcessListTests : UITestBase
 
     private static readonly string[] FileLocksmithModule = { FileLocksmithConstants.ModuleName };
 
+    private static IDisposable? settingsSnapshot;
+
     private readonly List<LockingProcessFixture> fixtures = new();
 
     public FileLocksmithProcessListTests()
@@ -41,10 +43,30 @@ public sealed class FileLocksmithProcessListTests : UITestBase
         FileLocksmithConstants.UiProcessName,
     };
 
+    [ClassInitialize]
+    public static void PreserveSettings(TestContext testContext)
+    {
+        _ = testContext;
+        settingsSnapshot = SettingsConfigHelper.PreserveFile(FileLocksmithUi.SettingsFilePath);
+    }
+
+    [ClassCleanup]
+    public static void RestoreSettings()
+    {
+        settingsSnapshot?.Dispose();
+        settingsSnapshot = null;
+    }
+
     [TestInitialize]
-    public void PrepareTest() => Assert.IsTrue(
-        FileLocksmithUi.Close(),
-        "A stale File Locksmith window could not be closed before the test.");
+    public void PrepareTest()
+    {
+        Assert.IsTrue(
+            FileLocksmithUi.Close(),
+            "A stale File Locksmith window could not be closed before the test.");
+
+        // Every test starts from the default: End task always asks for confirmation.
+        FileLocksmithUi.SetConfirmOnlyForOthers(false);
+    }
 
     [TestCleanup]
     public async Task CleanupTest()
@@ -120,6 +142,30 @@ public sealed class FileLocksmithProcessListTests : UITestBase
         // Waiting (not a one-off read) also catches a kill that lands just after the dialog closed.
         Assert.IsFalse(fixture.WaitForRunningCount(0, timeoutMS: 3_000), "Cancel ended the process anyway.");
         Assert.AreEqual(1, FileLocksmithUi.CountRows(ui), "The row must stay listed after Cancel.");
+    }
+
+    /// <summary>
+    /// Checklist: with "ask only for system and other users' processes" on, End task on the current
+    /// user's own process ends it without a confirmation dialog.
+    /// </summary>
+    [TestMethod("FileLocksmith.List.EndTaskSkipsConfirmationForOwnProcess")]
+    [TestCategory("File Locksmith")]
+    public void EndTaskSkipsConfirmationForOwnProcess()
+    {
+        FileLocksmithUi.SetConfirmOnlyForOthers(true);
+        var fixture = CreateFixture();
+        fixture.Start();
+
+        var ui = FileLocksmithUi.Launch(fixture.TargetPath);
+        AssertRowCount(ui, expected: 1, timeoutMS: 30_000, "File Locksmith did not list the locking process.");
+
+        FileLocksmithUi.EndTaskLabels(ui)[0].Click();
+        Assert.IsTrue(
+            fixture.WaitForRunningCount(0, timeoutMS: 15_000),
+            "End task did not end the current user's process without confirmation.");
+        Assert.IsFalse(
+            ui.Has<Button>(By.AccessibilityId(FileLocksmithConstants.EndTaskCancelAutomationId), timeoutMS: 1_000),
+            "End task asked for confirmation for the current user's own process.");
     }
 
     /// <summary>

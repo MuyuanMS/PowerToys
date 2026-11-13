@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json.Nodes;
 using Microsoft.PowerToys.UITest.Next;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -36,6 +37,23 @@ internal static class FileLocksmithUi
         SettingsConfigHelper.PowerToysSettingsRoot,
         FileLocksmithConstants.ModuleName,
         "last-run.log");
+
+    /// <summary>The module-owned settings file the window reads once at startup.</summary>
+    public static string SettingsFilePath => Path.Combine(
+        SettingsConfigHelper.PowerToysSettingsRoot,
+        FileLocksmithConstants.ModuleName,
+        "file-locksmith-settings.json");
+
+    /// <summary>Set whether End task asks only for system and other users' processes, keeping the other keys.</summary>
+    public static void SetConfirmOnlyForOthers(bool value)
+    {
+        var settings = File.Exists(SettingsFilePath)
+            ? JsonNode.Parse(File.ReadAllText(SettingsFilePath)) as JsonObject ?? new JsonObject()
+            : new JsonObject();
+        settings["confirmOnlyForOthers"] = value;
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsFilePath)!);
+        File.WriteAllText(SettingsFilePath, settings.ToJsonString());
+    }
 
     /// <summary>Start File Locksmith on <paramref name="paths"/> and wait until its list has loaded.</summary>
     public static Session Launch(params string[] paths) => Launch(LaunchTimeoutMS, elevated: false, paths);
