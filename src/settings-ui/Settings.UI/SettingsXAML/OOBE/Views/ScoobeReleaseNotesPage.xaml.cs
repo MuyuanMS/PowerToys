@@ -15,8 +15,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
-using Microsoft.Windows.Globalization;
-using Windows.Globalization.DateTimeFormatting;
 
 namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
 {
@@ -98,8 +96,7 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
             }
 
             StringBuilder releaseNotesHtmlBuilder = new StringBuilder(string.Empty);
-            var language = ApplicationLanguages.PrimaryLanguageOverride;
-            var formatter = new DateTimeFormatter("longdate", string.IsNullOrEmpty(language) ? ApplicationLanguages.Languages : new[] { language });
+            var formatter = ScoobeDateFormatter.Create("longdate");
 
             // Regex to remove installer hash sections from the release notes.
             Regex removeHashRegex = new Regex(RemoveInstallerHashesRegex, RemoveInstallerHashesRegexOptions);

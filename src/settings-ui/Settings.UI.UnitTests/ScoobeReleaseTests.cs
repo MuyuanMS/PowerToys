@@ -40,6 +40,22 @@ namespace Settings.UI.UnitTests
         }
 
         [TestMethod]
+        public void GetDateFormatterLanguagesPutsOverrideFirstAndPreservesUniqueFallbacks()
+        {
+            var languages = ScoobeDateFormatter.GetLanguages("fr-FR", new[] { "FR-fr", "en-US", "de-DE" });
+
+            CollectionAssert.AreEqual(new[] { "fr-FR", "en-US", "de-DE" }, languages.ToArray());
+        }
+
+        [TestMethod]
+        public void GetDateFormatterLanguagesPreservesApplicationLanguagesWithoutOverride()
+        {
+            var languages = ScoobeDateFormatter.GetLanguages(string.Empty, new[] { "en-US", "ja-JP" });
+
+            CollectionAssert.AreEqual(new[] { "en-US", "ja-JP" }, languages.ToArray());
+        }
+
+        [TestMethod]
         public void UpdatingSettingsReadsPrereleaseState()
         {
             var settings = JsonSerializer.Deserialize<UpdatingSettings>("""{"state":2,"isPrerelease":true}""");
