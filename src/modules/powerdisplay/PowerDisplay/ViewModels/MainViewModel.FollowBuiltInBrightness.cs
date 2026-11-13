@@ -67,7 +67,6 @@ public partial class MainViewModel
         // built-in panel. Mirroring the panel's echo would overwrite the externals' saved values.
         if (Volatile.Read(ref _bulkApplyDepth) > 0 || _clock.UtcNow.Ticks < Interlocked.Read(ref _suppressFollowUntilTicks))
         {
-            Logger.LogInfo($"[FollowBuiltInBrightness] Ignoring {value}% during profile/restore apply");
             return;
         }
 
