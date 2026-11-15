@@ -80,7 +80,7 @@ EnvironmentVariableUILib            # Abstracted UI methods and implementations
 | `IElevationHelper` | Current process token; no elevation request |
 | `ILogger`, `ITelemetry` | No-op |
 
-- **Group Policy**: the library reads `ConfigureEnabledUtilityEnvironmentVariables`, falling back to `ConfigureGlobalUtilityEnabledState`. When disabled, the page shows an error and loads or writes nothing. `EnvironmentVariablesPolicy.IsDisabled()` lets a host hide its entry point.
+- **Group Policy**: the library reads `ConfigureEnabledUtilityEnvironmentVariables`, falling back to `ConfigureGlobalUtilityEnabledState`. When disabled, loading is skipped and the page shows an error with its editing controls hidden. Hosts must also honor this state when invoking page commands programmatically. `EnvironmentVariablesPolicy.IsDisabled()` lets a host hide its entry point.
 - **Elevation**: unelevated hosts get read-only System variables. Implement `IElevationHelper.CanRequestElevation` and `RequestElevation()` to show a **Restart as administrator** button.
 - **Environment changes**: set `MainViewModel.EnvironmentState` to `EnvironmentMessageReceived` when the host window receives `WM_SETTINGCHANGE` for `Environment`.
 - **Shared with PowerToys, not configurable**: the profiles file (`%LOCALAPPDATA%\Microsoft\PowerToys\EnvironmentVariables\profiles.json`), the backup naming pattern and the `.pri` resource name.

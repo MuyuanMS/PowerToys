@@ -47,7 +47,7 @@ namespace EnvironmentVariablesUILib.ViewModels
         public ProfileVariablesSet AppliedProfile { get; set; }
 
         /// <summary>
-        /// Gets a value indicating whether Group Policy disables the editor. When set, nothing is loaded or written.
+        /// Gets a value indicating whether Group Policy disables the editor. When set, loading is skipped and the page hides its editing controls.
         /// </summary>
         public bool IsDisabledByPolicy { get; }
 
