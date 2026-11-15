@@ -63,12 +63,12 @@ namespace EnvironmentVariablesUILib.ViewModels
         /// <param name="environmentVariablesService">Profile storage.</param>
         /// <param name="logger">Optional logger.</param>
         /// <param name="telemetry">Optional telemetry sink.</param>
-        public MainViewModel(IElevationHelper? elevationHelper, IEnvironmentVariablesService environmentVariablesService, ILogger? logger, ITelemetry? telemetry)
+        public MainViewModel(IElevationHelper elevationHelper, IEnvironmentVariablesService environmentVariablesService, ILogger logger, ITelemetry telemetry)
             : this(elevationHelper, environmentVariablesService, logger, telemetry, EnvironmentVariablesPolicy.IsDisabled())
         {
         }
 
-        internal MainViewModel(IElevationHelper? elevationHelper, IEnvironmentVariablesService environmentVariablesService, ILogger? logger, ITelemetry? telemetry, bool isDisabledByPolicy)
+        internal MainViewModel(IElevationHelper elevationHelper, IEnvironmentVariablesService environmentVariablesService, ILogger logger, ITelemetry telemetry, bool isDisabledByPolicy)
         {
             ArgumentNullException.ThrowIfNull(environmentVariablesService);
 
