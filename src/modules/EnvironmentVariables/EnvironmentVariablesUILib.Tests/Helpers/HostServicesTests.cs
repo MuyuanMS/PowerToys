@@ -8,6 +8,7 @@ using EnvironmentVariablesUILib.Models;
 namespace EnvironmentVariablesUILib.UnitTests.Helpers;
 
 [TestClass]
+[DoNotParallelize]
 public class HostServicesTests
 {
     private sealed class FakeElevationHelper : IElevationHelper

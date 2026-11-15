@@ -135,8 +135,7 @@
         <StackPanel Orientation="Horizontal" Visibility="{x:Bind ViewModel.IsDisabledByPolicy, Converter={StaticResource BoolToInvertedVisibilityConverter}}">
             <Button
                 AutomationProperties.AutomationId="NewProfileButton"
-                Command="{x:Bind NewProfileCommand}"
-                IsEnabled="{x:Bind ViewModel.IsDisabledByPolicy, Converter={StaticResource BoolNegationConverter}}">
+                Command="{x:Bind NewProfileCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon
                         x:Name="Icon"
