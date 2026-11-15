@@ -26,14 +26,14 @@ namespace EnvironmentVariablesUILib.Helpers
         /// <returns><see langword="true"/> when the editor policy, or the global utility policy if the editor policy is not set, is disabled.</returns>
         public static bool IsDisabled() => IsDisabled(ReadPolicyValue);
 
-        internal static bool IsDisabled(Func<RegistryHive, string, object> readValue)
+        internal static bool IsDisabled(Func<RegistryHive, string, object?> readValue)
         {
             var configured = GetConfiguredValue(readValue, UtilityValueName) ?? GetConfiguredValue(readValue, GlobalValueName);
             return configured == false;
         }
 
         // A machine value takes precedence over a user value. Only DWORD 0 or 1 counts as configured.
-        private static bool? GetConfiguredValue(Func<RegistryHive, string, object> readValue, string valueName)
+        private static bool? GetConfiguredValue(Func<RegistryHive, string, object?> readValue, string valueName)
         {
             var value = readValue(RegistryHive.LocalMachine, valueName) ?? readValue(RegistryHive.CurrentUser, valueName);
             return value switch
@@ -44,7 +44,7 @@ namespace EnvironmentVariablesUILib.Helpers
             };
         }
 
-        private static object ReadPolicyValue(RegistryHive hive, string valueName)
+        private static object? ReadPolicyValue(RegistryHive hive, string valueName)
         {
             try
             {

@@ -11,7 +11,7 @@ namespace EnvironmentVariablesUILib.Helpers
 {
     internal static class HostServices
     {
-        internal static void Initialize(IElevationHelper elevationHelper, ILogger logger, ITelemetry telemetry)
+        internal static void Initialize(IElevationHelper? elevationHelper, ILogger? logger, ITelemetry? telemetry)
         {
             ElevationHelper.ElevationHelperInstance = elevationHelper ?? new ElevationHelper();
             LoggerInstance.Logger = logger ?? new NoOpLogger();

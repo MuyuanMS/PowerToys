@@ -17,13 +17,13 @@ public class EnvironmentVariablesPolicyTests
 
     private static bool IsDisabled(params (RegistryHive Hive, string Name, object Value)[] values)
     {
-        var map = new Dictionary<(RegistryHive, string), object>();
+        var map = new Dictionary<(RegistryHive, string), object?>();
         foreach (var (hive, name, value) in values)
         {
             map[(hive, name)] = value;
         }
 
-        return EnvironmentVariablesPolicy.IsDisabled((hive, name) => map.TryGetValue((hive, name), out var value) ? value : null!);
+        return EnvironmentVariablesPolicy.IsDisabled((hive, name) => map.TryGetValue((hive, name), out var value) ? value : null);
     }
 
     [TestMethod]

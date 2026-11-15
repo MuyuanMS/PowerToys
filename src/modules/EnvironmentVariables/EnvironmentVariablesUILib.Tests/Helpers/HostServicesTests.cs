@@ -18,8 +18,10 @@ public class HostServicesTests
     [TestMethod]
     public void Initialize_WithoutLoggerOrTelemetry_UsesNoOpServices()
     {
-        HostServices.Initialize(new FakeElevationHelper(), null!, null!);
+        HostServices.Initialize(new FakeElevationHelper(), null, null);
 
+        Assert.IsNotNull(LoggerInstance.Logger);
+        Assert.IsNotNull(TelemetryInstance.Telemetry);
         LoggerInstance.Logger.LogError("message", new System.InvalidOperationException());
         TelemetryInstance.Telemetry.LogEnvironmentVariablesVariableChangedEvent(VariablesSetType.User);
     }
@@ -27,7 +29,7 @@ public class HostServicesTests
     [TestMethod]
     public void Initialize_WithoutElevationHelper_UsesProcessElevation()
     {
-        HostServices.Initialize(null!, null!, null!);
+        HostServices.Initialize(null, null, null);
 
         Assert.IsInstanceOfType<ElevationHelper>(ElevationHelper.ElevationHelperInstance);
     }
@@ -35,7 +37,7 @@ public class HostServicesTests
     [TestMethod]
     public void SystemVariable_IsReadOnlyWhenHostIsNotElevated()
     {
-        HostServices.Initialize(new FakeElevationHelper(), null!, null!);
+        HostServices.Initialize(new FakeElevationHelper(), null, null);
 
         Assert.IsFalse(new Variable("Name", "Value", VariablesSetType.System).IsEditable);
         Assert.IsTrue(new Variable("Name", "Value", VariablesSetType.User).IsEditable);
