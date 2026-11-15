@@ -174,7 +174,7 @@ namespace HostsUILib.Views
             }
         }
 
-        public Visibility GetContentVisibility(bool isLoading)
+        private Visibility GetContentVisibility(bool isLoading)
         {
             return isLoading || ViewModel.IsDisabledByPolicy ? Visibility.Collapsed : Visibility.Visible;
         }
