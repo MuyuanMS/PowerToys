@@ -356,5 +356,6 @@
   </data>
   <data name="RestartAsAdmin.Content" xml:space="preserve">
     <value>Restart as administrator</value>
+    <comment>Shown on the action button in the InfoBar when the editor is not running as administrator</comment>
   </data>
 </root>
