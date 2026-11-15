@@ -352,7 +352,7 @@
   </data>
   <data name="NotElevated.Message" xml:space="preserve">
     <value>Run as administrator to save changes to the hosts file.</value>
-    <comment>"hosts" refers to the system hosts file, do not loc</comment>
+    <comment>"hosts" refers to the system hosts file, do not localize</comment>
   </data>
   <data name="RestartAsAdmin.Content" xml:space="preserve">
     <value>Restart as administrator</value>
