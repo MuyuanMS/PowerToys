@@ -57,6 +57,22 @@ public sealed class InputSimulationTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void CleanupWithoutReleasePreservesPolicyUntilRemoteKeyUp(bool initialPolicy)
+    {
+        var keyDown = new KEYBDDATA { wVk = (int)VK.RSHIFT };
+        var keyUp = new KEYBDDATA { wVk = keyDown.wVk, dwFlags = (int)WM.LLKHF.UP };
+
+        Assert.AreEqual(initialPolicy, InputSimulation.GetRemoteKeyboardBypassPolicy(keyDown, initialPolicy));
+        Assert.IsFalse(InputSimulation.ConsumeRemoteKeyboardBypassPolicy(keyDown.wVk, releaseKey: false));
+        Assert.AreEqual(initialPolicy, InputSimulation.GetRemoteKeyboardBypassPolicy(keyDown, !initialPolicy));
+        Assert.AreEqual(initialPolicy, InputSimulation.GetRemoteKeyboardBypassPolicy(keyUp, !initialPolicy));
+        Assert.AreEqual(!initialPolicy, InputSimulation.GetRemoteKeyboardBypassPolicy(keyDown, !initialPolicy));
+        _ = InputSimulation.ConsumeRemoteKeyboardBypassPolicy(keyDown.wVk);
+    }
+
+    [TestMethod]
     public void CleanupReleaseUsesTrackedRemoteBypassPolicy()
     {
         var keyDown = new KEYBDDATA { wVk = (int)VK.RMENU };

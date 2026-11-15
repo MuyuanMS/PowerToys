@@ -162,11 +162,11 @@ namespace MouseWithoutBorders.Class
             }
         }
 
-        internal static bool ConsumeRemoteKeyboardBypassPolicy(int vkCode)
+        internal static bool ConsumeRemoteKeyboardBypassPolicy(int vkCode, bool releaseKey = true)
         {
             lock (RemoteKeyboardBypassLock)
             {
-                return RemoteKeyboardBypassPolicies.Remove(vkCode, out bool bypassKeyboardManager)
+                return releaseKey && RemoteKeyboardBypassPolicies.Remove(vkCode, out bool bypassKeyboardManager)
                     && bypassKeyboardManager;
             }
         }
