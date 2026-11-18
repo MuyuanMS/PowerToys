@@ -28,7 +28,6 @@ namespace Microsoft.PowerToys.Run.Plugin.Calculator
                 null :
                 new Result
                 {
-                    // Using CurrentCulture since this is user facing
                     Title = resultText,
                     IcoPath = iconPath,
                     Score = 300,
