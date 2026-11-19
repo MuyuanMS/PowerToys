@@ -13,7 +13,7 @@ namespace Microsoft.CmdPal.Ext.Indexer;
 
 internal interface IIndexerFallbackSearchEngine : IDisposable
 {
-    SearchNoticeInfo? Query(string query, uint queryCookie);
+    void Query(string query, uint queryCookie);
 
     IList<IListItem> FetchNextItems(int limit, uint queryCookie, out bool hasMore, out SearchNoticeInfo? notice);
 }

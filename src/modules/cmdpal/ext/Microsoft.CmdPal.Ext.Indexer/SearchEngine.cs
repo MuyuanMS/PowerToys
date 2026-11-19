@@ -20,6 +20,17 @@ public sealed partial class SearchEngine : IIndexerFallbackSearchEngine
 
     public SearchNoticeInfo? Query(string query, uint queryCookie)
     {
+        var searchQuery = StartQuery(query, queryCookie);
+        return searchQuery is null ? null : BuildNotice(searchQuery);
+    }
+
+    void IIndexerFallbackSearchEngine.Query(string query, uint queryCookie)
+    {
+        StartQuery(query, queryCookie);
+    }
+
+    private SearchQuery? StartQuery(string query, uint queryCookie)
+    {
         var searchQuery = _searchQuery;
         if (searchQuery is null)
         {
@@ -42,7 +53,7 @@ public sealed partial class SearchEngine : IIndexerFallbackSearchEngine
         stopwatch.Stop();
         Logger.LogDebug($"Query time: {stopwatch.ElapsedMilliseconds} ms, query: \"{query}\"");
 
-        return BuildNotice(searchQuery);
+        return searchQuery;
     }
 
     public IList<IListItem> FetchItems(int offset, int limit, uint queryCookie, out bool hasMore, out SearchNoticeInfo? notice)

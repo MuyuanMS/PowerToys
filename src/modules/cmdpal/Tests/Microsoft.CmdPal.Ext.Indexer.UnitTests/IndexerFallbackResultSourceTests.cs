@@ -214,10 +214,9 @@ public class IndexerFallbackResultSourceTests
 
         public SearchNoticeInfo? Notice { get; set; }
 
-        public SearchNoticeInfo? Query(string query, uint queryCookie)
+        public void Query(string query, uint queryCookie)
         {
             QueryCount++;
-            return Notice;
         }
 
         public IList<IListItem> FetchNextItems(int limit, uint queryCookie, out bool hasMore, out SearchNoticeInfo? notice)
