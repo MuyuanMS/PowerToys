@@ -1,0 +1,6 @@
+PowerScripts makes everyday auto-
+mation available wherever people work.
+No native feature is needed for every personal rule.
+
+One script can serve multiple modules,
+while in-line hyphens stay unchanged.

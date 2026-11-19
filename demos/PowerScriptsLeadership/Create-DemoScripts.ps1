@@ -82,15 +82,6 @@ foreach ($definition in $definitions) {
     if ($definition.implementation) {
         [IO.File]::Copy((Read-KitFile $definition.implementation), $entry, $true)
     }
-    if ($options.projectName -eq 'Read a screenshot') {
-        $descriptorPath = $entry + '.tool.json'
-        $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json -AsHashtable
-        $parameter = $descriptor.inputSchema.properties.parameters.properties.SourceFile
-        $parameter.title = 'Screenshot'
-        $parameter.description = 'Choose a PNG or JPEG image. Text recognition runs locally; no cloud model is used.'
-        $parameter['x-powerscript'].extensions = @('.png', '.jpg', '.jpeg')
-        [IO.File]::WriteAllText($descriptorPath, ($descriptor | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
-    }
     $installed += [pscustomobject]@{ title = $options.projectName; entryPath = $entry }
 }
 
@@ -113,6 +104,6 @@ $result = foreach ($package in $installed) {
 $indexPath = Join-Path $PSScriptRoot 'installed-demo.json'
 [IO.File]::WriteAllText($indexPath, (ConvertTo-Json -InputObject @($result) -Depth 8), [Text.UTF8Encoding]::new($false))
 $result | Format-Table title, input, output, trusted -AutoSize
-Write-Host "Created four NEW, UNTRUSTED packages in $ScriptsRoot"
+Write-Host "Created $($installed.Count) NEW, UNTRUSTED packages in $ScriptsRoot"
 Write-Host 'No script was executed; no settings, policy, trust approvals or hotkeys were changed.'
 Write-Host "Machine-local IDs: $indexPath"

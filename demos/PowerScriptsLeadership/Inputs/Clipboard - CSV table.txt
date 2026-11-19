@@ -1,5 +1,7 @@
 Scenario,Consumer,Capability
-Paste a Markdown table,Advanced Paste,Text transformation
-Read a screenshot,Command Palette,Local OCR
+Paste a Markdown table,Advanced Paste,Structured text
+Clean copied PDF text,Advanced Paste,Paragraph cleanup
+Extract text from image,File Explorer,Local OCR
 Combine CSV reports,File Explorer,Multi-file processing
-Toggle light and dark,Keyboard Manager,PowerToys CLI action
+Switch to dark theme,CmdPal / Keyboard Manager,Light Switch CLI
+Switch to light theme,CmdPal / Keyboard Manager,Shared script

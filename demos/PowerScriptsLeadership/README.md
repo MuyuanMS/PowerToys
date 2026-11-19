@@ -8,11 +8,15 @@ The source snapshot includes the current editor UX work, including uncommitted c
 | Consumer | Script | Contract |
 |---|---|---|
 | Advanced Paste | Paste a Markdown table | text -> text; no options |
+| Advanced Paste | Clean copied PDF text | text -> text; no options |
 | File Explorer | Combine CSV reports | 1-20 CSVs -> new HTML file; no options |
-| Command Palette | Read a screenshot | no primary input -> text; one screenshot picker |
-| Keyboard Manager | Toggle light and dark | no primary input -> CLI status text; visible theme change |
+| File Explorer | Extract text from image | one PNG/JPEG -> separate OCR TXT; no options |
+| CmdPal + Keyboard Manager | Switch to dark theme | no primary input/options; fixed Light Switch CLI action |
+| CmdPal + Keyboard Manager | Switch to light theme | no primary input/options; fixed Light Switch CLI action |
 
-`Create from template\Remove hyphens.txt` is the small PowerShell body for the live template-creation segment. `Inputs` contains synthetic CSV/text/image samples; `Icons` contains five matching custom ICOs.
+Six prepared scripts give each consumer at least two relevant choices, with the two no-input theme actions reused across CmdPal and Keyboard Manager. OCR belongs to the Explorer image-selection demo, not a CmdPal file-picker flow.
+
+`Create from template\Remove hyphens.txt` is the small PowerShell body for the live template-creation segment. `Inputs` contains synthetic CSV/text/image samples; `Icons` includes matching custom ICOs and a six-script preview.
 
 ## Import after building
 
@@ -28,7 +32,7 @@ The importer:
 - Scaffolds through the matching Host, so CLI launch paths are generated for **this installation**, not copied from the original x64 machine.
 - Respects an explicit `-ScriptsRoot`, then `POWERSCRIPTS_ROOT`, configured `scriptsRoot`, then the normal LocalAppData root.
 - Refuses duplicate demo titles rather than overwriting existing packages.
-- Creates fresh IDs and leaves all four packages **untrusted**.
+- Creates fresh IDs and leaves all six packages **untrusted**.
 - Does not execute scripts, approve trust, change configuration/policies, archive existing packages or create hotkeys.
 
 IDs are written to ignored, machine-local `installed-demo.json`. Never copy another machine's `trust.json`, runtime configuration or keyboard bindings.
@@ -36,15 +40,21 @@ IDs are written to ignored, machine-local `installed-demo.json`. Never copy anot
 ## Run order
 
 1. Create **Remove hyphens** live: PowerShell, text -> text, no options; paste the TXT body, use `Icons\hyphens.ico`, save and review normally. Show **Consumer modules > Advanced Paste** activation. Copy the hyphen input and invoke through Advanced Paste.
-2. Advanced Paste: copy `Inputs\Clipboard - CSV table.txt`; choose **Paste a Markdown table**. Show the resulting Markdown.
-3. Explorer: select **both** CSVs in `Inputs\Reports`; invoke **PowerScripts > Combine CSV reports**. The new HTML is exported alongside the selected files when they share a folder; open it manually. Expect 2 source files, 6 rows, 4 data columns. Originals stay unchanged.
-4. CmdPal: search **Read a screenshot**, choose `Inputs\Screenshots\Meeting notes.png`, run and show the recognized action items.
-5. Keyboard Manager: use its normal UI to bind **Toggle light and dark** to a confirmed-unused shortcut, e.g. Ctrl+Alt+Shift+D. Review/approve before silent invocation. Test only with permission: once switches theme, again switches back. Check the original app/system themes first; two toggles are not guaranteed to restore a mixed initial theme.
+2. Advanced Paste: copy `Inputs\Clipboard - PDF paragraphs.txt`; choose **Clean copied PDF text**. Show repaired `auto-` + line break + `mation`, preserved paragraph breaks and the unchanged `in-line` hyphen. Then copy the CSV-table input and show **Paste a Markdown table**.
+3. Explorer: select `Inputs\Screenshots\Meeting notes.png`; invoke **Extract text from image**. Open the newly exported TXT and show the three recognized action items. Then select **both** report CSVs and invoke **Combine CSV reports**. Open the exported HTML manually: 2 files, 6 rows, 4 columns. Originals stay unchanged.
+4. CmdPal: search **Switch to dark theme** and invoke it directly; use **Switch to light theme** for the opposite action. No file picker or transformation form.
+5. Keyboard Manager: through its normal UI, bind the SAME dark/light scripts to confirmed-unused shortcuts, e.g. Ctrl+Alt+Shift+D / Ctrl+Alt+Shift+L. Review/approve first. Show that two consumers invoke the same script IDs, not copied implementations. Record the original theme before any test; setting light is not guaranteed to restore an initially mixed app/system theme.
+
+## Two obvious existing CLI modules
+
+**Light Switch:** the dark/light scripts fix `Command` to `dark` / `light`, respectively. They do not expose a confusing action dropdown or change scheduling. **Advanced Paste:** Explorer OCR fixes its CLI action to `image-to-text` and binds the selected image as primary input.
+
+To explain CLI-backed creation, show **New script > PowerToys action**, select the module/action and fix these arguments instead of exposing parameters. The importer uses the same Host scaffolding.
 
 OCR is real **local Windows OCR**, not an LLM placeholder. OCR and theme changes use fixed, approved host CLI recipes; their host actions are **outside MXC**, while the script remains contained. The generic file-transform recipe declares network capability, but this fixed OCR configuration has no provider, prompt, custom action or destination path. Keep MXC and its restrictions enabled.
 
 ## What this backup does not claim
 
-The original packages passed discovery/schema/icon/syntax checks. They had **not been executed or rehearsed** because normal user approval and execution consent were pending. An ARM64 build has not been run on the original x64 machine. A clean clone is not automatically demo-ready: finish the prompt's build and all four real consumer checks.
+Packages are prepared and discoverable but **not yet executed or rehearsed**: normal user approval and execution consent are still required. An ARM64 build has not been run on the original x64 machine. A clean clone is not automatically demo-ready: finish the prompt's build and all four real consumer checks.
 
 Old local demo collections and the private leadership PPTX/PDF are intentionally not in this public branch. The slides have a separate OneDrive backup. No credentials, trust database, personal PowerToys settings or compiled binaries are bundled.

@@ -12,17 +12,32 @@
     }
   },
   {
+    "icon": "Icons\\pdf.ico",
+    "implementation": "Source\\Clean copied PDF text.ps1",
+    "options": {
+      "projectName": "Clean copied PDF text",
+      "description": "Repair wrapped prose and line-break hyphenation from copied PDFs. Preserve blank-line paragraphs and in-line hyphens. Not for code or lists.",
+      "runtime": "powershell",
+      "input": "text",
+      "output": "text",
+      "parameters": []
+    }
+  },
+  {
     "icon": "Icons\\ocr.ico",
     "options": {
-      "projectName": "Read a screenshot",
-      "description": "Extract text from an image with local Windows OCR through the approved Advanced Paste CLI. No cloud model or network request.",
+      "projectName": "Extract text from image",
+      "description": "Select one PNG or JPEG in Explorer and extract its text with local Windows OCR through Advanced Paste CLI. Produces a separate TXT; originals unchanged. No cloud model.",
       "runtime": "powershell",
-      "input": "none",
+      "input": "files",
       "output": "text",
+      "fileExtensions": ".png, .jpg, .jpeg",
+      "minFiles": 1,
+      "maxFiles": 1,
       "parameters": [],
       "cliContent": "advanced-paste-transform",
       "cliBindings": {
-        "SourceFile": { "source": "parameter" },
+        "SourceFile": { "source": "input" },
         "Action": { "source": "fixed", "value": "image-to-text" },
         "CustomAction": { "source": "fixed", "value": "" },
         "Prompt": { "source": "fixed", "value": "" },
@@ -48,17 +63,34 @@
     }
   },
   {
-    "icon": "Icons\\theme.ico",
+    "icon": "Icons\\dark.ico",
     "options": {
-      "projectName": "Toggle light and dark",
-      "description": "One-key theme switch through the approved Light Switch CLI. Changes the Windows theme; run again to switch back. No parameters.",
+      "projectName": "Switch to dark theme",
+      "description": "Apply the dark Windows theme through the approved Light Switch CLI. Launch from CmdPal or a Keyboard Manager shortcut. No parameters or schedule changes.",
       "runtime": "powershell",
       "input": "none",
       "output": "text",
       "parameters": [],
       "cliContent": "light-switch",
       "cliBindings": {
-        "Command": { "source": "fixed", "value": "toggle" },
+        "Command": { "source": "fixed", "value": "dark" },
+        "ScheduleMode": { "source": "fixed", "value": "fixed-hours" },
+        "Json": { "source": "fixed", "value": false }
+      }
+    }
+  },
+  {
+    "icon": "Icons\\light.ico",
+    "options": {
+      "projectName": "Switch to light theme",
+      "description": "Apply the light Windows theme through the approved Light Switch CLI. Launch from CmdPal or a Keyboard Manager shortcut. No parameters or schedule changes.",
+      "runtime": "powershell",
+      "input": "none",
+      "output": "text",
+      "parameters": [],
+      "cliContent": "light-switch",
+      "cliBindings": {
+        "Command": { "source": "fixed", "value": "light" },
         "ScheduleMode": { "source": "fixed", "value": "fixed-hours" },
         "Json": { "source": "fixed", "value": false }
       }

@@ -159,15 +159,26 @@ It respects the normal scripts-root configuration; -ScriptsRoot is an
 explicit alternative, not a request to change effective settings silently.
 installed-demo.json contains NEW machine-local IDs; use those exact IDs later.
 
-Prepared set:
-  Advanced Paste: Paste a Markdown table -- text -> text, no parameters.
-  File Explorer: Combine CSV reports -- 1-20 CSVs -> a NEW HTML file, no options.
-  CmdPal: Read a screenshot -- no primary input -> text; one Screenshot file
-    picker. Uses real local Windows OCR via the fixed Advanced Paste CLI
-    image-to-text action, not an LLM, placeholder, or cloud request.
-  Keyboard Manager: Toggle light and dark -- no primary input/options; fixed
-    Light Switch toggle action. Its visible result is the Windows theme;
-    Keyboard Manager does not present the returned CLI status text.
+Prepared set: SIX scripts, with no unnecessary parameters.
+  Advanced Paste has TWO text transforms:
+    Paste a Markdown table -- copied CSV -> Markdown.
+    Clean copied PDF text -- repair line wraps and line-break hyphenation,
+      preserve blank-line paragraphs and in-line hyphens; prose, not code/lists.
+  File Explorer has TWO file-oriented transforms:
+    Extract text from image -- one selected PNG/JPEG -> separate OCR TXT.
+      Uses real local Windows OCR through Advanced Paste CLI image-to-text,
+      with the selected file as primary input. No picker parameter or LLM.
+    Combine CSV reports -- 1-20 matching-column CSVs -> a NEW HTML report.
+  CmdPal AND Keyboard Manager share TWO no-input actions:
+    Switch to dark theme -- fixed Light Switch CLI command dark.
+    Switch to light theme -- fixed Light Switch CLI command light.
+      No action dropdown, scheduling changes or file transformation.
+      The visible result is the theme; KBM does not show returned CLI text.
+
+These are three CLI-backed scripts using TWO existing modules: Light Switch
+and Advanced Paste. To explain creation, show New script > PowerToys action,
+select the module/action and use fixed arguments rather than exposing options.
+The same script IDs are reused in CmdPal and KBM; do not make duplicate copies.
 
 OCR and theme actions are explicitly approved HOST CLI recipes outside MXC;
 do not describe their host actions as sandbox-contained. The generic AP
@@ -175,7 +186,7 @@ file-transform recipe declares network capability, but the reviewed OCR
 bindings fix Action=image-to-text and leave prompt/provider/custom action/
 output path empty. Do not add a cloud model or credentials.
 
-Keep all five matching ICOs, clipboard samples, both report CSVs and the
+Keep the matching ICOs, clipboard samples, both report CSVs and the
 synthetic meeting-notes image in this kit. Use a short local, non-reparse input
 folder for Explorer. Copy only demo fixtures if preparing a presentation folder.
 
@@ -183,7 +194,7 @@ folder for Explorer. Copy only demo fixtures if preparing a presentation folder.
 
 The source machine had only completed discovery/schema/icon/syntax checks.
 Do not claim these scripts have already passed runtime or consumer tests.
-The importer creates UNTRUSTED scripts and never executes them.
+The importer creates SIX UNTRUSTED scripts and never executes them.
 
 Obtain explicit permission to execute synthetic-input tests and modify the
 clipboard/theme. Have ME review and approve each exact package normally.
@@ -193,23 +204,31 @@ with --consumer command-line, not direct PowerShell execution of demo bodies.
 Check stderr even on exit 0 and verify real outputs.
 
 Then verify separately through each real consumer:
-  - Advanced Paste: copy Inputs\Clipboard - CSV table.txt, run Paste a Markdown
-    table, confirm the header, separator and four rows. Use a scratch editor.
-  - Explorer: select BOTH Inputs\Reports CSVs and invoke Combine CSV reports.
+  - Advanced Paste: use Inputs\Clipboard - PDF paragraphs.txt for Clean copied
+    PDF text. Confirm auto- plus the next-line mation becomes automation,
+    two paragraphs remain, and in-line keeps its hyphen. Then copy the CSV-table
+    sample, run Paste a Markdown table and check header/separator/six rows.
+    Use a scratch editor; do not execute sample code or overwrite documents.
+  - Explorer OCR: select Inputs\Screenshots\Meeting notes.png and invoke
+    Extract text from image. Confirm a NEW exported TXT genuinely contains
+    the three recognized action items. The image remains unchanged.
+    Windows English OCR language must be present. If missing, explain the
+    supported Windows language capability setup and obtain approval;
+    no LLM key or Phi Silica/NPU provisioning is needed.
+  - Explorer CSV: select BOTH Inputs\Reports CSVs and invoke Combine CSV reports.
     A new HTML is exported beside same-parent selections; no save dialog is
     necessarily shown. Open it manually, confirm 2 files / 6 rows / 4 columns.
     Verify input hashes unchanged. Text output does NOT mean rename/clipboard.
-  - CmdPal: search Read a screenshot, use the Screenshot picker for
-    Inputs\Screenshots\Meeting notes.png, and confirm the three action items
-    are genuinely recognized. Windows English OCR language must be present.
-    If missing, explain the supported Windows language capability setup and
-    obtain approval; no LLM key or Phi Silica/NPU provisioning is needed.
+  - CmdPal: invoke Switch to dark theme and Switch to light theme by search.
+    They should launch immediately with no file picker or parameter form.
+    This showcases CmdPal as an activator, not an image transformation surface.
   - Keyboard Manager: inspect existing shortcuts; with permission add a
-    confirmed-unused shortcut via its NORMAL UI, e.g. Ctrl+Alt+Shift+D.
-    Do not edit KBM JSON or replace a mapping. Approve before silent invocation.
-    With permission, test the actual hotkey and restore the original theme.
-    Read initial app/system theme state first: two toggles may not restore a
-    mixed initial theme. Do not surprise someone working on another monitor.
+    confirmed-unused shortcut for each SAME theme script via its NORMAL UI,
+    e.g. Ctrl+Alt+Shift+D and Ctrl+Alt+Shift+L. Do not edit KBM JSON or replace
+    mappings. Approve before silent invocation. Test only with permission.
+    Record initial app/system theme state: setting light after dark does not
+    necessarily restore a mixed initial theme. Do not surprise someone working
+    on another monitor. This proves script reuse across two consumers.
 
 Live creation flow:
   New script > Script; name Remove hyphens; runtime PowerShell; text -> text;
@@ -218,7 +237,7 @@ Live creation flow:
   Demonstrate Consumer modules > Advanced Paste activation, then use
   Inputs\Clipboard - remove hyphens.txt through Advanced Paste.
   Expected identifiers: PT2026001, AB1234CD, 808012345678.
-  Do not pre-create that fifth script if we want a genuinely fresh live flow.
+  Do not pre-create that seventh script if we want a genuinely fresh live flow.
 
 Finish with a concise readiness report: exact branch/commit, ARM64 build root,
 running Runner path, enabled consumers, package IDs, real observed outcomes,
