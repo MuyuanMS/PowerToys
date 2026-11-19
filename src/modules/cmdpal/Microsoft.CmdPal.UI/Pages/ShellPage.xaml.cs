@@ -762,7 +762,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         if (!RootFrame.CanGoBack)
         {
-            ViewModel.GoHome(withAnimation, focusSearch);
+            // GoHome() may clear search on the root page, so use OnNavigatedHome().
+            ViewModel.OnNavigatedHome();
         }
 
         // Only move focus when the palette is actually on screen. FocusActiveControl uses keyboard
