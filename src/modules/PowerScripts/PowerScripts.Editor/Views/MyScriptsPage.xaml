@@ -66,7 +66,6 @@
             <Button
                 x:Uid="PowerScripts_CreateScriptAction"
                 AutomationProperties.AutomationId="PowerScriptsCreateScript"
-                Click="CreateScript_Click"
                 IsEnabled="{x:Bind ViewModel.IsEnabled, Mode=OneWay}"
                 Style="{StaticResource AccentButtonStyle}">
                 <Button.KeyboardAccelerators>
@@ -75,7 +74,34 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon FontSize="14" Glyph="&#xE710;" />
                     <TextBlock x:Uid="PowerScripts_CreateScriptButton" />
+                    <FontIcon FontSize="12" Glyph="&#xE70D;" />
                 </StackPanel>
+                <Button.Flyout>
+                    <Flyout x:Name="NewScriptFlyout" Placement="BottomEdgeAlignedLeft">
+                        <StackPanel Width="400" Spacing="4">
+                            <TextBlock
+                                x:Uid="PowerScripts_NewScriptDialogDescription"
+                                Margin="0,0,0,12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                            <tkcontrols:SettingsCard
+                                x:Uid="PowerScripts_NewScriptChoiceScript"
+                                AutomationProperties.AutomationId="PowerScriptsNewScriptChoice"
+                                Click="CreateScript_Click"
+                                HeaderIcon="{ui:FontIcon Glyph=&#xE943;}"
+                                IsClickEnabled="True" />
+                            <tkcontrols:SettingsCard
+                                x:Uid="PowerScripts_NewScriptChoiceOperation"
+                                AutomationProperties.AutomationId="PowerScriptsNewOperationChoice"
+                                Click="CreatePowerToysAction_Click"
+                                IsClickEnabled="True">
+                                <tkcontrols:SettingsCard.HeaderIcon>
+                                    <BitmapIcon ShowAsMonochrome="False" UriSource="ms-appx:///Assets/Settings/Icons/PowerToys.png" />
+                                </tkcontrols:SettingsCard.HeaderIcon>
+                            </tkcontrols:SettingsCard>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
             </Button>
             <StackPanel
                 Grid.Column="2"
@@ -309,35 +335,5 @@
                     Click="ClearFilters_Click" />
             </StackPanel>
         </Grid>
-        <ContentDialog
-            x:Name="NewScriptDialog"
-            x:Uid="PowerScripts_NewScriptDialog"
-            AutomationProperties.AutomationId="PowerScriptsNewScriptDialog"
-            DefaultButton="None">
-            <StackPanel Spacing="4">
-                <TextBlock
-                    x:Uid="PowerScripts_NewScriptDialogDescription"
-                    Margin="0,0,0,12"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    TextWrapping="Wrap" />
-                <tkcontrols:SettingsCard
-                    x:Uid="PowerScripts_NewScriptChoiceScript"
-                    AutomationProperties.AutomationId="PowerScriptsNewScriptChoice"
-                    Click="NewScriptChoice_Click"
-                    HeaderIcon="{ui:FontIcon Glyph=&#xE943;}"
-                    IsClickEnabled="True"
-                    Tag="Script" />
-                <tkcontrols:SettingsCard
-                    x:Uid="PowerScripts_NewScriptChoiceOperation"
-                    AutomationProperties.AutomationId="PowerScriptsNewOperationChoice"
-                    Click="NewScriptChoice_Click"
-                    IsClickEnabled="True"
-                    Tag="Operation">
-                    <tkcontrols:SettingsCard.HeaderIcon>
-                        <BitmapIcon ShowAsMonochrome="False" UriSource="ms-appx:///Assets/Settings/Icons/PowerToys.png" />
-                    </tkcontrols:SettingsCard.HeaderIcon>
-                </tkcontrols:SettingsCard>
-            </StackPanel>
-        </ContentDialog>
     </Grid>
 </Page>

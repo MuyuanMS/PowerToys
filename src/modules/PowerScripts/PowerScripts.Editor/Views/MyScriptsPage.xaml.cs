@@ -22,7 +22,6 @@ namespace PowerScripts.Editor.Views
     {
         private bool _preserveCatalogueOnLoad;
         private bool _refreshingConfiguration;
-        private string _newScriptChoice;
 
         private PowerScriptsViewModel ViewModel { get; set; }
 
@@ -124,30 +123,18 @@ namespace PowerScripts.Editor.Views
             }
         }
 
-        private async void CreateScript_Click(object sender, RoutedEventArgs e)
+        private void CreateScript_Click(object sender, RoutedEventArgs e) => NavigateToCreation(isCliContent: false);
+
+        private void CreatePowerToysAction_Click(object sender, RoutedEventArgs e) => NavigateToCreation(isCliContent: true);
+
+        private void NavigateToCreation(bool isCliContent)
         {
-            _newScriptChoice = null;
-            NewScriptDialog.XamlRoot = XamlRoot;
-            await NewScriptDialog.ShowAsync();
-
-            var (page, failure) = _newScriptChoice switch
-            {
-                "Script" => (typeof(PowerScriptTemplatesPage), "PowerScripts_TemplateNavigationFailed"),
-                "Operation" => (typeof(PowerToysOperationsPage), "PowerScripts_OperationNavigationFailed"),
-                _ => (null, null),
-            };
-
-            if (page is not null && !Frame.Navigate(page, ViewModel))
+            NewScriptFlyout.Hide();
+            if (!Frame.Navigate(typeof(PowerScriptTemplatesPage), new EditorNavigation.ScriptCreation(ViewModel, isCliContent)))
             {
                 ShowScriptSettingsError(new InvalidOperationException(
-                    ResourceLoaderInstance.ResourceLoader.GetString(failure)));
+                    ResourceLoaderInstance.ResourceLoader.GetString("PowerScripts_TemplateNavigationFailed")));
             }
-        }
-
-        private void NewScriptChoice_Click(object sender, RoutedEventArgs e)
-        {
-            _newScriptChoice = (string)((FrameworkElement)sender).Tag;
-            NewScriptDialog.Hide();
         }
 
         private void ClearFilters_Click(object sender, RoutedEventArgs e)

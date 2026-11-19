@@ -7,11 +7,14 @@ using System.Diagnostics;
 using System.IO;
 using Microsoft.UI.Xaml.Controls;
 using PowerScripts.Editor.Views;
+using PowerScripts.UI.ViewModels;
 
 namespace PowerScripts.Editor.Helpers;
 
 internal static class EditorNavigation
 {
+    internal sealed record ScriptCreation(PowerScriptsViewModel ViewModel, bool IsCliContent);
+
     internal static bool GoBack(Frame frame)
     {
         if (!frame.CanGoBack || frame.Content is PowerScriptTemplatesPage { IsCreating: true })

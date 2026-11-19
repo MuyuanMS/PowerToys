@@ -1,0 +1,67 @@
+[
+  {
+    "icon": "Icons\\clipboard.ico",
+    "implementation": "Source\\Paste a Markdown table.ps1",
+    "options": {
+      "projectName": "Paste a Markdown table",
+      "description": "Turn copied CSV into a clean Markdown table. No options, network or extra packages.",
+      "runtime": "powershell",
+      "input": "text",
+      "output": "text",
+      "parameters": []
+    }
+  },
+  {
+    "icon": "Icons\\ocr.ico",
+    "options": {
+      "projectName": "Read a screenshot",
+      "description": "Extract text from an image with local Windows OCR through the approved Advanced Paste CLI. No cloud model or network request.",
+      "runtime": "powershell",
+      "input": "none",
+      "output": "text",
+      "parameters": [],
+      "cliContent": "advanced-paste-transform",
+      "cliBindings": {
+        "SourceFile": { "source": "parameter" },
+        "Action": { "source": "fixed", "value": "image-to-text" },
+        "CustomAction": { "source": "fixed", "value": "" },
+        "Prompt": { "source": "fixed", "value": "" },
+        "Provider": { "source": "fixed", "value": "" },
+        "OutputPath": { "source": "fixed", "value": "" },
+        "Json": { "source": "fixed", "value": false }
+      }
+    }
+  },
+  {
+    "icon": "Icons\\report.ico",
+    "implementation": "Source\\Combine CSV reports.ps1",
+    "options": {
+      "projectName": "Combine CSV reports",
+      "description": "Combine selected CSVs into one polished HTML report. Matching columns; originals stay unchanged. Local processing only.",
+      "runtime": "powershell",
+      "input": "files",
+      "output": "files",
+      "fileExtensions": ".csv",
+      "minFiles": 1,
+      "maxFiles": 20,
+      "parameters": []
+    }
+  },
+  {
+    "icon": "Icons\\theme.ico",
+    "options": {
+      "projectName": "Toggle light and dark",
+      "description": "One-key theme switch through the approved Light Switch CLI. Changes the Windows theme; run again to switch back. No parameters.",
+      "runtime": "powershell",
+      "input": "none",
+      "output": "text",
+      "parameters": [],
+      "cliContent": "light-switch",
+      "cliBindings": {
+        "Command": { "source": "fixed", "value": "toggle" },
+        "ScheduleMode": { "source": "fixed", "value": "fixed-hours" },
+        "Json": { "source": "fixed", "value": false }
+      }
+    }
+  }
+]

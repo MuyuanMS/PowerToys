@@ -73,15 +73,6 @@
             Grid.Row="1">
             <layout:ManagementPage.ModuleContent>
                 <StackPanel Spacing="12">
-                    <ComboBox
-                        x:Name="ContentKindComboBox"
-                        x:Uid="PowerScripts_TemplateContent"
-                        HorizontalAlignment="Stretch"
-                        AutomationProperties.AutomationId="PowerScriptsTemplateContent"
-                        SelectionChanged="Content_SelectionChanged">
-                        <ComboBoxItem x:Uid="PowerScripts_TemplateContentExample" Tag="example" />
-                        <ComboBoxItem x:Uid="PowerScripts_TemplateContentCli" Tag="cli" />
-                    </ComboBox>
                     <Border Style="{StaticResource EditorSurfaceStyle}">
                         <StackPanel Spacing="8">
                             <TextBlock x:Uid="PowerScripts_TemplateConsumers" Style="{StaticResource SubtitleTextBlockStyle}" />

@@ -1,0 +1,42 @@
+{
+  "baseCommit": "e4fd0b4f56469eb001ea4b149386ef0d78bc6f35",
+  "capturedAt": "2026-11-19T19:59:39.5486501+08:00",
+  "description": "Captured editor UX changes; gitBlob identifies the normalized committed content.",
+  "files": [
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Helpers/EditorNavigation.cs",
+      "capturedSha256": "3E28B0077765E0F57E810B7D38F30FD98E284CC2F1D466207E32AFF9E04CDFFB",
+      "gitBlob": "b5a7d7001ffebefa6c1e914d6ea78621f1856a2c"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/UI/Strings/Resources.resx",
+      "capturedSha256": "29AC4A10DB216C9C072A9CAE9CF99F3931C9095FAF3AD398984B06E2840A73F0",
+      "gitBlob": "545670ae970db09e629ac1a64600596c9feff049"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/MyScriptsPage.xaml",
+      "capturedSha256": "E0346A007EC85D2C52599E309CC1D78A6CF2172413A74F56E27A807761DD1A1C",
+      "gitBlob": "1c1ee92ca5dd4a6350e25ac09eb17e395c4d9281"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/MyScriptsPage.xaml.cs",
+      "capturedSha256": "8AE8F6F72504BD0D5B4DF4BC720B5DE0E279FA34E6F897F384A05C87559EC512",
+      "gitBlob": "eee123297ebc2f5aa362f24c79bd7562cb1404c1"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/PowerScriptTemplatesPage.xaml",
+      "capturedSha256": "9A777F136EE5CC3C736C99E02B5584D68605841F1BF60DFD2E913EB692D613A1",
+      "gitBlob": "a8d64b1b4db17791b6422ac68e00824f53d2f94e"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/PowerScriptTemplatesPage.xaml.cs",
+      "capturedSha256": "68859828EE54858A3EA2A456823001594299A17802A3D67FC5042A6A7AAB963F",
+      "gitBlob": "30023fd220fc4890f8f7180ee8ea183f05619fef"
+    },
+    {
+      "path": "src/modules/PowerScripts/test-helpers/test-creation-menu.ps1",
+      "capturedSha256": "B20009D84E2E4A00A8631EE086AE27B1A61EB27FADCE060479E1D739E325FF09",
+      "gitBlob": "dd2e202cc8c66843f9628890e5cf1bd0009c8df9"
+    }
+  ]
+}

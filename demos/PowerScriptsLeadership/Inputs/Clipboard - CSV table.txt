@@ -1,0 +1,5 @@
+Scenario,Consumer,Capability
+Paste a Markdown table,Advanced Paste,Text transformation
+Read a screenshot,Command Palette,Local OCR
+Combine CSV reports,File Explorer,Multi-file processing
+Toggle light and dark,Keyboard Manager,PowerToys CLI action

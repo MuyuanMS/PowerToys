@@ -35,7 +35,7 @@ public sealed partial class PowerScriptTemplatesPage : Page
     private bool _isActive;
     private bool _updatingCliSelection;
 
-    private bool IsCliContent => (ContentKindComboBox?.SelectedItem as ComboBoxItem)?.Tag as string == "cli";
+    private bool IsCliContent { get; set; }
 
     private PowerScriptOperationTemplate SelectedCliContent => IsCliContent ? (CliContentComboBox?.SelectedItem as ComboBoxItem)?.Tag as PowerScriptOperationTemplate : null;
 
@@ -53,19 +53,24 @@ public sealed partial class PowerScriptTemplatesPage : Page
         UpdateOptions();
     }
 
-    protected override void OnNavigatedTo(NavigationEventArgs e)
+    protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
-        ViewModel = e.Parameter as PowerScriptsViewModel
-            ?? throw new ArgumentException("Creation navigation requires the PowerScripts view model.", nameof(e));
+        var creation = e.Parameter as EditorNavigation.ScriptCreation
+            ?? throw new ArgumentException("Creation navigation requires script creation options.", nameof(e));
+        ViewModel = creation.ViewModel;
         _isActive = true;
         RuntimeComboBox.SelectedIndex = 0;
-        ContentKindComboBox.SelectedIndex = 0;
         InputComboBox.SelectedIndex = 0;
         OutputComboBox.SelectedIndex = 1;
         IconGrid.SelectedIndex = 0;
+        IsCliContent = creation.IsCliContent;
         TemplateBreadcrumb.ItemsSource = new[] { "PowerScripts", ResourceLoaderInstance.ResourceLoader.GetString("PowerScripts_CreateScriptTitle") };
-        UpdatePreview();
+        UpdateOptions();
+        if (IsCliContent)
+        {
+            await LoadCliContentAsync();
+        }
     }
 
     protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -130,25 +135,6 @@ public sealed partial class PowerScriptTemplatesPage : Page
     }
 
     private void Consumer_Changed(object sender, RoutedEventArgs e) => UpdateOptions();
-
-    private async void Content_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (ViewModel is null)
-        {
-            return;
-        }
-
-        if (IsCliContent)
-        {
-            RuntimeComboBox.SelectedIndex = 0;
-        }
-
-        UpdateOptions();
-        if (IsCliContent && CliModuleComboBox.Items.Count == 0 && !_loadingCliContent)
-        {
-            await LoadCliContentAsync();
-        }
-    }
 
     private void RestrictedOperation_Click(object sender, RoutedEventArgs e)
     {
@@ -425,7 +411,7 @@ public sealed partial class PowerScriptTemplatesPage : Page
         }
 
         FileInputOptions.Visibility = (InputComboBox.SelectedItem as GridViewItem)?.Tag as string == "files" ? Visibility.Visible : Visibility.Collapsed;
-        if (ContentKindComboBox is not null && RuntimeComboBox is not null)
+        if (RuntimeComboBox is not null)
         {
             RuntimeComboBox.IsEnabled = !IsCliContent;
             CliContentOptions.Visibility = BoolToVisibility(IsCliContent);

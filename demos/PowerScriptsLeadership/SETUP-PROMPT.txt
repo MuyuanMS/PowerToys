@@ -1,0 +1,228 @@
+Prepare this Windows ARM64 machine for my PowerScripts leadership live demo.
+Start from no repository clone. Deliver a working, locally rehearsed demo, not
+just a successful build or script discovery. Keep changes narrowly scoped.
+
+SOURCE / BACKUP
+
+Repository: https://github.com/MuyuanMS/PowerToys.git
+Branch: demo/powerscripts-leadership-2026-11-19
+Kit: demos\PowerScriptsLeadership
+
+This is a separate backup snapshot of the PowerScripts UX demo branch,
+including the uncommitted editor-creation-flow polish present at capture time.
+Do NOT push to, reset, or replace muyuanli/powerscripts-niels-ux.
+Do not assume this prototype is merged upstream or available in Store binaries.
+Source snapshot.json records the captured base and changed-file hashes.
+
+No private presentation deck, credentials, trust database, personal settings,
+old demo archives or compiled binaries are in this public backup.
+The presentation PPTX/PDF remain in my separate OneDrive backup; obtain them
+through my normal signed-in access if needed. Do not invent a public deck URL.
+
+1. INVENTORY / PREREQUISITES
+
+Confirm Windows 11 ARM64, interactive desktop, free disk space, Git, native
+PowerShell 7, Visual Studio, installed .NET SDKs and Windows SDKs.
+Use a short, local, non-reparse clone path, e.g. C:\src\PowerToys-demo.
+Do not use OneDrive or a network share as the build/scripts/input location.
+Do not overwrite an existing clone, replace existing PowerToys settings,
+uninstall unrelated applications, stop unrelated processes, or show Desktop.
+Avoid disturbing other monitors.
+
+Install missing prerequisites through trusted official channels, with approval
+for installations/elevation/system changes. Prefer native ARM64 Visual Studio
+2026 (18.x). This snapshot uses PowerToys.slnx and global.json pins .NET SDK
+10.0.403 with rollForward=disable. Check the actual files after cloning; do not
+substitute the old ".NET 8 / VS 17.4" minimum from stale generic documentation.
+Install the exact matching SDK for the build tool host architecture; prefer the
+ARM64 SDK on this machine. Do not edit global.json just to bypass a missing SDK.
+
+Import .vsconfig through Visual Studio Installer. It specifies C++ desktop,
+.NET desktop, WinUI/Windows App SDK/UWP support, Windows SDKs 22621 and 26100,
+ARM64 UWP C++/ATL components, and vcpkg. Also check the ARM64 MSVC toolset
+selected by this revision and its ARM64 Spectre/ATL requirements if MSBuild
+reports them missing. VS may use emulated build tools; output must be ARM64.
+Do not mix x64 shell DLLs, module executables or MXC binaries into ARM64 output.
+The demos themselves need PowerShell, not Python, Pillow, an NPU or an LLM.
+
+2. CLONE THE EXACT BACKUP
+
+Once Git is installed, use:
+
+  git -c core.longpaths=true clone --single-branch --branch demo/powerscripts-leadership-2026-11-19 https://github.com/MuyuanMS/PowerToys.git C:\src\PowerToys-demo
+  Set-Location C:\src\PowerToys-demo
+  git config core.longpaths true
+  git submodule update --init --recursive
+  git status --short --branch
+  git log -1 --oneline
+
+Read AGENTS.md, .github\copilot-instructions.md, tools\build\BUILD-GUIDELINES.md,
+src\modules\PowerScripts\README.md, and demos\PowerScriptsLeadership\README.md.
+Read more-specific instructions before changing any code.
+Load src\modules\PowerScripts\AgentSkills\powertoys-powerscripts\SKILL.md and
+the authoring/consumer/runtime references needed for this work.
+
+If needed, tools\build\setup-dev-environment.ps1 guides long paths, Developer
+Mode, VS components and submodules. Inspect its switches first: it can request
+elevation and install/change system components. Ask before such changes.
+Developer Mode is needed for loose development package registration.
+
+3. BUILD A COMPLETE ARM64 DEBUG DEMO
+
+Use the repository's build wrappers, not a copied x64 output tree, raw cl.exe,
+a made-up root build.ps1, or dotnet build of only the editor.
+From the clone root, run these as separate operations; check exit code 0
+before proceeding:
+
+  & .\tools\build\build-essentials.ps1 -Platform ARM64 -Configuration Debug
+  & .\tools\build\build.ps1 -Platform ARM64 -Configuration Debug -ExtraArgs '/p:BuildTests=false'
+
+The essentials step restores/builds runner and settings; it is NOT the whole
+demo. The second command builds the full solution's non-test graph. BuildTests
+is a supported property here; this is a demo build, not a claim tests passed.
+Build, do not Rebuild/clean everything unnecessarily.
+
+Read artifacts\logs\<project>\build.Debug.ARM64.errors.log on failure, then
+the matching all.log/binlog. Do not launch a failed or partial build. Fix
+missing prerequisites first; make surgical ARM64 fixes only when necessary
+and preserve this snapshot. Do not merge unrelated upstream changes merely
+to obtain a different SDK version.
+
+If an unrelated full-solution project blocks the build, use tools\build\build.ps1
+-Path <actual-project-directory> for a focused graph after inspecting the
+solution/project references. Do not call a partial editor build "demo-ready".
+Required areas include:
+  - runner and Settings UI;
+  - PowerScripts Core/Client/Host/Editor and ARM64 MXC payload;
+  - AdvancedPaste UI/module interface AND AdvancedPaste.CLI;
+  - Keyboard Manager engine/module interface and its current shortcut editor;
+  - LightSwitch CLI and needed module dependencies;
+  - FileExplorerScripts Core/app/native shell and powerpreview;
+  - current CmdPal UI plus Microsoft.CmdPal.Ext.PowerScripts.
+Use actual project directories from this clone, not guessed old paths.
+
+Expected output root: C:\src\PowerToys-demo\ARM64\Debug.
+Run:
+
+  & .\demos\PowerScriptsLeadership\Check-DemoBuild.ps1 -BuildRoot .\ARM64\Debug
+
+This checks PE architecture and presence of runner/editor/Host, wxc-exec,
+AdvancedPaste UI + CLI and LightSwitch CLI, then probes MXC support.
+It intentionally does not claim shell registration or end-to-end readiness.
+
+Mxc.Runtime.targets restores pinned MXC 0.8.0 for ARM64 and verifies its hash;
+allow its normal build-time dependency downloads. Never copy the x64
+wxc-exec.exe, weaken MXC, disable a restriction, or accept a risk dialog to
+paper over a failed probe. If this Windows build needs additional legitimate
+OS provisioning/reboot for MXC, explain and obtain approval first.
+No WSL/Python container setup is needed for these PowerShell demos.
+
+4. REGISTER / LAUNCH THE CORRECT CONSUMERS
+
+All consumers must resolve the Host from THIS SAME complete ARM64 output.
+Do not accidentally launch a Store/old x64 CmdPal or a Host from another clone.
+Do not set a machine-wide POWERSCRIPTS_HOST pointing at a stale build.
+If a development override is needed, inspect the current client contract and
+scope it to the launched process tree; clear it afterward.
+
+CmdPal: follow src\modules\cmdpal\README.md. In native Visual Studio, open
+CommandPalette.slnf, choose Debug / ARM64, Build then Deploy Microsoft.CmdPal.UI.
+Deploy registers loose development output; do not invent a signing certificate
+or uninstall the existing package merely for normal development registration.
+Inspect its development manifest/Host resolution to verify the correct build.
+
+Explorer: read src\modules\previewpane\README.md and the FileExplorerScripts
+projects. Build the managed Core/app, native ShellExtension and powerpreview
+for ARM64. Debug uses loose developer registration (Developer Mode), not
+production unsigned-package settings. Launch/restart only the matching Debug
+Runner after a successful build and enable its File Explorer integration.
+Try a fresh Explorer window before proposing an Explorer restart. Do not kill
+every explorer.exe or hand-register unrelated preview-handler DLLs.
+
+After dealing with any already-running PowerToys instance through normal UI,
+start ARM64\Debug\PowerToys.exe, verify the expected executable stays running,
+open Settings > PowerScripts > Edit scripts, and verify the standalone editor.
+Use the PowerScripts app's Consumer modules to enable Advanced Paste,
+Keyboard Manager, Command Palette and File Explorer as needed.
+Preserve global MXC/runtime/policy settings; use the supported settings UI.
+
+5. CREATE THE PORTABLE DEMO SCRIPTS
+
+Inspect Scripts.json, Source and Create-DemoScripts.ps1, then run:
+
+  & .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe
+
+It uses the matching Host's template creation, generating correct ARM64-build
+CLI paths. No hardcoded original-user paths, trust approvals or bindings are
+imported. Existing script titles are refused, not overwritten.
+It respects the normal scripts-root configuration; -ScriptsRoot is an
+explicit alternative, not a request to change effective settings silently.
+installed-demo.json contains NEW machine-local IDs; use those exact IDs later.
+
+Prepared set:
+  Advanced Paste: Paste a Markdown table -- text -> text, no parameters.
+  File Explorer: Combine CSV reports -- 1-20 CSVs -> a NEW HTML file, no options.
+  CmdPal: Read a screenshot -- no primary input -> text; one Screenshot file
+    picker. Uses real local Windows OCR via the fixed Advanced Paste CLI
+    image-to-text action, not an LLM, placeholder, or cloud request.
+  Keyboard Manager: Toggle light and dark -- no primary input/options; fixed
+    Light Switch toggle action. Its visible result is the Windows theme;
+    Keyboard Manager does not present the returned CLI status text.
+
+OCR and theme actions are explicitly approved HOST CLI recipes outside MXC;
+do not describe their host actions as sandbox-contained. The generic AP
+file-transform recipe declares network capability, but the reviewed OCR
+bindings fix Action=image-to-text and leave prompt/provider/custom action/
+output path empty. Do not add a cloud model or credentials.
+
+Keep all five matching ICOs, clipboard samples, both report CSVs and the
+synthetic meeting-notes image in this kit. Use a short local, non-reparse input
+folder for Explorer. Copy only demo fixtures if preparing a presentation folder.
+
+6. NORMAL TRUST + REAL REHEARSAL
+
+The source machine had only completed discovery/schema/icon/syntax checks.
+Do not claim these scripts have already passed runtime or consumer tests.
+The importer creates UNTRUSTED scripts and never executes them.
+
+Obtain explicit permission to execute synthetic-input tests and modify the
+clipboard/theme. Have ME review and approve each exact package normally.
+Never auto-run trust approve, copy trust.json, bypass policy, or approve
+dialogs on my behalf. Agent execution checks must use PowerScripts.Host.exe
+with --consumer command-line, not direct PowerShell execution of demo bodies.
+Check stderr even on exit 0 and verify real outputs.
+
+Then verify separately through each real consumer:
+  - Advanced Paste: copy Inputs\Clipboard - CSV table.txt, run Paste a Markdown
+    table, confirm the header, separator and four rows. Use a scratch editor.
+  - Explorer: select BOTH Inputs\Reports CSVs and invoke Combine CSV reports.
+    A new HTML is exported beside same-parent selections; no save dialog is
+    necessarily shown. Open it manually, confirm 2 files / 6 rows / 4 columns.
+    Verify input hashes unchanged. Text output does NOT mean rename/clipboard.
+  - CmdPal: search Read a screenshot, use the Screenshot picker for
+    Inputs\Screenshots\Meeting notes.png, and confirm the three action items
+    are genuinely recognized. Windows English OCR language must be present.
+    If missing, explain the supported Windows language capability setup and
+    obtain approval; no LLM key or Phi Silica/NPU provisioning is needed.
+  - Keyboard Manager: inspect existing shortcuts; with permission add a
+    confirmed-unused shortcut via its NORMAL UI, e.g. Ctrl+Alt+Shift+D.
+    Do not edit KBM JSON or replace a mapping. Approve before silent invocation.
+    With permission, test the actual hotkey and restore the original theme.
+    Read initial app/system theme state first: two toggles may not restore a
+    mixed initial theme. Do not surprise someone working on another monitor.
+
+Live creation flow:
+  New script > Script; name Remove hyphens; runtime PowerShell; text -> text;
+  no parameters; choose Icons\hyphens.ico. Replace educational code with
+  Create from template\Remove hyphens.txt, save and review normally.
+  Demonstrate Consumer modules > Advanced Paste activation, then use
+  Inputs\Clipboard - remove hyphens.txt through Advanced Paste.
+  Expected identifiers: PT2026001, AB1234CD, 808012345678.
+  Do not pre-create that fifth script if we want a genuinely fresh live flow.
+
+Finish with a concise readiness report: exact branch/commit, ARM64 build root,
+running Runner path, enabled consumers, package IDs, real observed outcomes,
+any pending user approvals, and the precise unblocked demo sequence.
+Only call the machine demo-ready after build, registration, normal trust and
+the four actual consumer scenarios succeed. If blocked, identify the exact
+prerequisite rather than weakening security or claiming readiness.

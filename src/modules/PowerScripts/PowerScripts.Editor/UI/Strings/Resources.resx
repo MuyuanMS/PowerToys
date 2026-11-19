@@ -663,7 +663,7 @@ This can expose files, network access, the desktop, or elevated capabilities to 
     <value>New script</value>
   </data>
   <data name="PowerScripts_TemplatesPage.ModuleDescription" xml:space="preserve">
-    <value>Pick what it takes and what it gives back. You get a starter script to edit.</value>
+    <value>Choose what your script does, what it takes and what it gives back.</value>
   </data>
   <data name="PowerScripts_TemplateNavigationFailed" xml:space="preserve">
     <value>Could not open the script creation page. Try again.</value>
@@ -1290,9 +1290,6 @@ This can expose files, network access, the desktop, or elevated capabilities to 
   <data name="PowerScripts_TemplateConsumerKeyboardManager.Content" xml:space="preserve"><value>Keyboard Manager</value></data>
   <data name="PowerScripts_TemplateConsumerCommandPalette.Content" xml:space="preserve"><value>Command Palette</value></data>
   <data name="PowerScripts_TemplateConsumerExplorer.Content" xml:space="preserve"><value>File Explorer</value></data>
-  <data name="PowerScripts_TemplateContent.Header" xml:space="preserve"><value>Script type</value></data>
-  <data name="PowerScripts_TemplateContentExample.Content" xml:space="preserve"><value>General script</value></data>
-  <data name="PowerScripts_TemplateContentCli.Content" xml:space="preserve"><value>PowerToys module script</value></data>
   <data name="PowerScripts_TemplateRestrictedOperation.Content" xml:space="preserve"><value>Create a restricted operation instead (no script code)</value></data>
   <data name="PowerScripts_CliCatalogueLoading" xml:space="preserve"><value>Loading PowerToys module actions...</value></data>
   <data name="PowerScripts_TemplateCliModule.Header" xml:space="preserve"><value>PowerToys module</value></data>
@@ -1363,12 +1360,6 @@ This can expose files, network access, the desktop, or elevated capabilities to 
   <data name="PowerScripts_ScriptCaptionNotAllowed" xml:space="preserve">
     <value>Not allowed yet</value>
   </data>
-  <data name="PowerScripts_NewScriptDialog.Title" xml:space="preserve">
-    <value>New script</value>
-  </data>
-  <data name="PowerScripts_NewScriptDialog.CloseButtonText" xml:space="preserve">
-    <value>Cancel</value>
-  </data>
   <data name="PowerScripts_NewScriptDialogDescription.Text" xml:space="preserve">
     <value>Write your own, or start from a PowerToys action.</value>
   </data>
@@ -1382,7 +1373,7 @@ This can expose files, network access, the desktop, or elevated capabilities to 
     <value>PowerToys action</value>
   </data>
   <data name="PowerScripts_NewScriptChoiceOperation.Description" xml:space="preserve">
-    <value>A ready-made PowerToys command, like applying a FancyZones layout or keeping the PC awake. No code.</value>
+    <value>Start from a PowerToys command. Choose a module and action, then configure its arguments without writing code.</value>
   </data>
   <data name="PowerScripts_ActivityFilter.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Show</value>
