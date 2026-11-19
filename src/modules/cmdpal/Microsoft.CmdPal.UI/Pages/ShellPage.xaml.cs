@@ -762,7 +762,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
 
         if (!RootFrame.CanGoBack)
         {
-            // GoHome() clears search on the root page, use OnNavigatedHome()
+            // GoHome() may clear search on the root page, so use OnNavigatedHome().
             ViewModel.OnNavigatedHome();
         }
 

@@ -532,7 +532,7 @@ public partial class ShellViewModel : ObservableObject,
     }
 
     // Used when a command result should take us back to the home page.
-    // This will clear the search on the main page.
+    // The navigation request clears the search unless KeepPreviousQuery is enabled.
     public void GoHome(bool withAnimation = true, bool focusSearch = true)
     {
         _rootPageService.GoHome();
