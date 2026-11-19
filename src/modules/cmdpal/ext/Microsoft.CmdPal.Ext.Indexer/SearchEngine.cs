@@ -95,6 +95,7 @@ public sealed partial class SearchEngine : IIndexerFallbackSearchEngine
 
     public IList<IListItem> FetchNextItems(int limit, uint queryCookie, out bool hasMore, out SearchNoticeInfo? notice)
     {
+        // The rowset keeps its cursor between calls; zero skips no rows from that position.
         return FetchItems(0, limit, queryCookie, out hasMore, out notice);
     }
 
