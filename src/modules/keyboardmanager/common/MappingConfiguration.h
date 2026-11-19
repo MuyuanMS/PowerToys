@@ -96,9 +96,9 @@ public:
     // Stores the current configuration name.
     std::wstring currentConfig = KeyboardManagerConstants::DefaultConfiguration;
 
-    // Parses the single-key remap section of a settings JSON object into singleKeyReMap /
-    // aloneSingleKeyReMap / singleKeyToSequenceReMap, routing by the optional per-entry "condition" field. Public so the
-    // dual-key (tap-alone) condition round-trip can be unit tested without touching disk.
+    // Parses inProcess entries into singleKeyReMap / aloneSingleKeyReMap using the optional
+    // per-entry "condition" field, and inProcessSequence entries into singleKeyToSequenceReMap.
+    // Public so the dual-key (tap-alone) condition round-trip can be unit tested without touching disk.
     bool LoadSingleKeyRemaps(const json::JsonObject& jsonData);
 
     // Converts between a key sequence and its settings string: the VK codes in order, ';'-separated
