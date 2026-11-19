@@ -32,7 +32,7 @@ Avoid disturbing other monitors.
 Install missing prerequisites through trusted official channels, with approval
 for installations/elevation/system changes. Prefer native ARM64 Visual Studio
 2026 (18.x). This snapshot uses PowerToys.slnx and global.json pins .NET SDK
-10.0.403 with rollForward=disable. Check the actual files after cloning; do not
+10.0.404 with rollForward=disable. Check the actual files after cloning; do not
 substitute the old ".NET 8 / VS 17.4" minimum from stale generic documentation.
 Install the exact matching SDK for the build tool host architecture; prefer the
 ARM64 SDK on this machine. Do not edit global.json just to bypass a missing SDK.
@@ -141,7 +141,11 @@ every explorer.exe or hand-register unrelated preview-handler DLLs.
 
 After dealing with any already-running PowerToys instance through normal UI,
 start ARM64\Debug\PowerToys.exe, verify the expected executable stays running,
-open Settings > PowerScripts > Edit scripts, and verify the standalone editor.
+open Settings > PowerScripts > Launch PowerScripts editor, and verify the
+standalone editor. Settings has only the editor launcher, not AI setup help.
+Open a script and use Set up AI next to Edit script (also in the Code toolbar)
+to copy setup instructions containing that script's source and metadata paths.
+This only copies instructions; it does not install a skill or approve scripts.
 Use the PowerScripts app's Consumer modules to enable Advanced Paste,
 Keyboard Manager, Command Palette and File Explorer as needed.
 Preserve global MXC/runtime/policy settings; use the supported settings UI.

@@ -1193,6 +1193,37 @@ This can expose files, network access, the desktop, or elevated capabilities to 
   <data name="PowerScripts_ChoiceOutputImage.AutomationProperties.Name" xml:space="preserve"><value>Return an image</value></data>
   <data name="PowerScripts_ChoiceOutputAudio.AutomationProperties.Name" xml:space="preserve"><value>Return audio</value></data>
   <data name="PowerScripts_EditScriptAction.Content" xml:space="preserve"><value>Edit script</value></data>
+  <data name="PowerScripts_SetUpAIAction.Content" xml:space="preserve">
+    <value>Set up AI</value>
+  </data>
+  <data name="PowerScripts_SetUpAIAction.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Copy instructions to set up your AI agent to help with this script.</value>
+  </data>
+  <data name="PowerScripts_SetUpAI.Label" xml:space="preserve">
+    <value>Set up AI</value>
+  </data>
+  <data name="PowerScripts_SetUpAI.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Copy instructions to set up your AI agent to help with this script.</value>
+  </data>
+  <data name="PowerScripts_AgentInstructionsCopied" xml:space="preserve">
+    <value>Setup instructions copied for this script. Paste them into your AI agent's chat. PowerToys does not install or update agent skills automatically.</value>
+  </data>
+  <data name="PowerScripts_AgentSetupInstructions" xml:space="preserve">
+    <value>Help me set up the PowerToys PowerScripts skill for this AI agent.
+
+The complete bundled skill is available locally at:
+"{0}"
+
+Read SKILL.md in that folder, then copy the entire bundle, including all references, into the skills location supported by this agent, using powertoys-powerscripts as the destination folder name. If a copy already exists, compare it and ask before replacing any user changes. Do not delete existing skills.
+
+Use the agent's documented reload or discovery mechanism and verify that the skill is available. If this agent does not support skills, read the bundled instructions directly and explain the limitation. Remote, cloud, and WSL agents require separate setup; do not assume Windows paths are accessible there.
+
+Once ready, help me with this existing script. Read its source and metadata, then ask what I want to change:
+Script: "{1}"
+Metadata: "{2}"
+
+Follow the skill's consumer and runtime guidance. Installing the skill does not approve scripts or grant permissions: do not approve or execute scripts, change bindings, enable integrations, or weaken sandbox settings without my explicit consent.</value>
+  </data>
   <data name="PowerScripts_RuntimeOperation" xml:space="preserve"><value>PowerToys operation</value></data>
   <data name="PowerScripts_ExecutionOperation" xml:space="preserve"><value>Runs the selected PowerToys module command. Availability and sandbox restrictions are checked when the operation runs.</value></data>
   <data name="PowerScripts_DetailsPowerToysOperation" xml:space="preserve"><value>PowerToys operation</value></data>

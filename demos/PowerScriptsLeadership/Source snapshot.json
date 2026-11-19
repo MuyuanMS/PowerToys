@@ -1,17 +1,32 @@
 {
   "baseCommit": "e4fd0b4f56469eb001ea4b149386ef0d78bc6f35",
-  "capturedAt": "2026-11-19T19:59:39.5486501+08:00",
-  "description": "Captured editor UX changes; gitBlob identifies the normalized committed content.",
+  "capturedAt": "2026-11-19T23:26:22.7363777+08:00",
+  "description": "Captured editor UX and script-specific AI setup relocation. Exact SDK pin updated to the installed, successfully built 10.0.404 patch. No private demo state or compiled output.",
   "files": [
+    {
+      "path": "global.json",
+      "capturedSha256": "76B4CB7CF47577E8A8D2CAABA2BB25D43EC3C17D4AAC107D575224E69BE8AEE4",
+      "gitBlob": "38b1cdeccd3e3b5f3b9d957e42ed1e66f22221f8"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Core/AgentSkills/AgentSkillBundle.cs",
+      "capturedSha256": "CD669000FB98845CFAA3F399A86B59F6C9C04491B7C13A9E9D9599129BC1A72B",
+      "gitBlob": "b771f5110e70976f996f0866c242737d006063a1"
+    },
     {
       "path": "src/modules/PowerScripts/PowerScripts.Editor/Helpers/EditorNavigation.cs",
       "capturedSha256": "3E28B0077765E0F57E810B7D38F30FD98E284CC2F1D466207E32AFF9E04CDFFB",
       "gitBlob": "b5a7d7001ffebefa6c1e914d6ea78621f1856a2c"
     },
     {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/PowerScripts.Editor.csproj",
+      "capturedSha256": "14BF4B48F358EF985535299F321B6E5D76E6EBDAD2989719C5FC57A8E8B56993",
+      "gitBlob": "09f1feaa4e9166d7c56222f26c709dd01a7cf901"
+    },
+    {
       "path": "src/modules/PowerScripts/PowerScripts.Editor/UI/Strings/Resources.resx",
-      "capturedSha256": "29AC4A10DB216C9C072A9CAE9CF99F3931C9095FAF3AD398984B06E2840A73F0",
-      "gitBlob": "545670ae970db09e629ac1a64600596c9feff049"
+      "capturedSha256": "376095B6C3FA7C84BB72D81F097154A1BF950FD24CEBCEB25BD963E098B320C8",
+      "gitBlob": "01d21024cd68d3838792d1213406377fefb2f3fb"
     },
     {
       "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/MyScriptsPage.xaml",
@@ -24,6 +39,21 @@
       "gitBlob": "eee123297ebc2f5aa362f24c79bd7562cb1404c1"
     },
     {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/PowerScriptSettingsPage.AgentSkills.cs",
+      "capturedSha256": "4DB3108A26294E2A6CE88F99E8D6622F49A496FA014C3BE626839B89673F64E4",
+      "gitBlob": "58f46402c8120c85c31f4489450b8510ffd959c2"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/PowerScriptSettingsPage.xaml",
+      "capturedSha256": "44848A8059354B78C64A5703135B8354FFAD5923C73087BCDF742C2126E26DE8",
+      "gitBlob": "995ded623507702dee7c36f02568740bee9596f2"
+    },
+    {
+      "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/PowerScriptSettingsPage.xaml.cs",
+      "capturedSha256": "5DBAE53C9C601732726C2B4F30C7BB5E1CE028C8E47D7D6A9B67F385B5CBA286",
+      "gitBlob": "0905b56d685fee310284c1f167c52ca198b84fec"
+    },
+    {
       "path": "src/modules/PowerScripts/PowerScripts.Editor/Views/PowerScriptTemplatesPage.xaml",
       "capturedSha256": "9A777F136EE5CC3C736C99E02B5584D68605841F1BF60DFD2E913EB692D613A1",
       "gitBlob": "a8d64b1b4db17791b6422ac68e00824f53d2f94e"
@@ -34,9 +64,33 @@
       "gitBlob": "30023fd220fc4890f8f7180ee8ea183f05619fef"
     },
     {
+      "path": "src/modules/PowerScripts/test-helpers/test-ai-setup.ps1",
+      "capturedSha256": "55117A3DB227C9F44E3FE53702C466125D3B75B4F609E7614278EE69B9558A3E",
+      "gitBlob": "26b5af0b4b27ddc8f9e02e070d04c71987b106e5"
+    },
+    {
       "path": "src/modules/PowerScripts/test-helpers/test-creation-menu.ps1",
       "capturedSha256": "B20009D84E2E4A00A8631EE086AE27B1A61EB27FADCE060479E1D739E325FF09",
       "gitBlob": "dd2e202cc8c66843f9628890e5cf1bd0009c8df9"
+    },
+    {
+      "path": "src/settings-ui/Settings.UI/PowerToys.Settings.csproj",
+      "capturedSha256": "6A4B2AF97E9B4C5D29262E9305802616F4CA1A35B25029183F464018B7B7DA9B",
+      "gitBlob": "4acd6d2c5f16c360f4e0fd418a2d3893d06a5127"
+    },
+    {
+      "path": "src/settings-ui/Settings.UI/SettingsXAML/Views/PowerScriptsPage.AgentSkills.cs",
+      "deleted": true
+    },
+    {
+      "path": "src/settings-ui/Settings.UI/SettingsXAML/Views/PowerScriptsPage.xaml",
+      "capturedSha256": "94A8EC1FAB7DEE34E65B4F52DC628095B4FB2CFE97E4071819A9B23798344C85",
+      "gitBlob": "b2219d1dd0d901921b0a0d3f46a4a40d05e7f438"
+    },
+    {
+      "path": "src/settings-ui/Settings.UI/Strings/en-us/Resources.resw",
+      "capturedSha256": "EB46E76E97A18E09D0D6E3E6F949F41E01D932EC7D502FD556CC5221947A0C2B",
+      "gitBlob": "b1f47594a8702a38f23a731c2375ac8f16859d28"
     }
   ]
 }

@@ -34,6 +34,10 @@
     <ProjectReference Include="$(RepoRoot)src\common\Common.UI\Common.UI.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\PowerScripts.Core\AgentSkills\AgentSkillBundle.cs" Link="Helpers\AgentSkillBundle.cs" />
+    <Content Include="..\AgentSkills\powertoys-powerscripts\**\*"
+             Link="PowerScriptsAgentSkill\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="$(SettingsSource)SettingsXAML\Controls\SettingsGroup\*.cs" Link="Controls\%(Filename)%(Extension)" />
     <Page Include="$(SettingsSource)SettingsXAML\Controls\SettingsGroup\SettingsGroup.xaml" Link="Controls\SettingsGroup.xaml" />
     <Compile Include="$(SettingsSource)Helpers\OpenFileName.cs" Link="Helpers\OpenFileName.cs" />

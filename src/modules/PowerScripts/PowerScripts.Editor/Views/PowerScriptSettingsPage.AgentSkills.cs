@@ -3,23 +3,29 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Globalization;
 using ManagedCommon;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PowerScripts.Core.AgentSkills;
+using PowerScripts.UI.Helpers;
 using Windows.ApplicationModel.DataTransfer;
 
-namespace Microsoft.PowerToys.Settings.UI.Views;
+namespace PowerScripts.Editor.Views;
 
-public sealed partial class PowerScriptsPage
+public sealed partial class PowerScriptSettingsPage
 {
     private void CopyAgentSkillInstructions_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var resources = Helpers.ResourceLoaderInstance.ResourceLoader;
-            var instructions = resources.GetString("PowerScripts_AgentSetupInstructions")
-                .Replace("{0}", AgentSkillBundle.GetDirectory(AppContext.BaseDirectory), StringComparison.Ordinal);
+            var resources = ResourceLoaderInstance.ResourceLoader;
+            var instructions = string.Format(
+                CultureInfo.CurrentCulture,
+                resources.GetString("PowerScripts_AgentSetupInstructions"),
+                AgentSkillBundle.GetDirectory(AppContext.BaseDirectory),
+                _context.Script.EntryFullPath,
+                _context.Script.EntryFullPath + ".tool.json");
             var data = new DataPackage();
             data.SetText(instructions);
             Clipboard.SetContent(data);
