@@ -19,7 +19,7 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
 
         internal static DateTimeFormatter CreateReleaseDetailsDateFormatter()
         {
-            return Create("month day year");
+            return Create("longdate");
         }
 
         private static DateTimeFormatter Create(string template)

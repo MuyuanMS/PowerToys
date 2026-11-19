@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Microsoft.PowerToys.Settings.UI;
 using Microsoft.PowerToys.Settings.UI.Helpers;
 using Microsoft.PowerToys.Settings.UI.Library;
+using Microsoft.PowerToys.Settings.UI.OOBE.Views;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Windows.Globalization.DateTimeFormatting;
 
@@ -57,13 +58,13 @@ namespace Settings.UI.UnitTests
         }
 
         [TestMethod]
-        public void ReleaseDetailsDateFormatterUsesMonthDayYearTemplate()
+        public void ReleaseDetailsDateFormatterUsesLongDateTemplate()
         {
             var formatter = ScoobeDateFormatter.CreateReleaseDetailsDateFormatter();
-            var expectedFormatter = new DateTimeFormatter("month day year", formatter.Languages);
+            var expectedFormatter = new DateTimeFormatter("longdate", formatter.Languages);
             var publishedDate = new DateTimeOffset(2023, 3, 8, 0, 0, 0, TimeSpan.Zero);
 
-            Assert.AreEqual("month day year", formatter.Template);
+            Assert.AreEqual("longdate", formatter.Template);
             Assert.AreEqual(expectedFormatter.Format(publishedDate), formatter.Format(publishedDate));
         }
 
