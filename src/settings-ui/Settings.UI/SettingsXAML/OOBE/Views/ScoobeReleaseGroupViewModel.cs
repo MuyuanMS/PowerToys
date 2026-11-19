@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 using Microsoft.PowerToys.Settings.UI.Helpers;
@@ -42,9 +41,10 @@ namespace Microsoft.PowerToys.Settings.UI.OOBE.Views
                 var latestRelease = releases[0];
                 IsPreview = releases.All(release => release.IsPrerelease);
                 VersionText = GetVersionFromRelease(latestRelease);
+                var formatter = ScoobeDateFormatter.CreateMonthYearFormatter();
                 DateText = IsPreview ?
                     ResourceLoaderInstance.ResourceLoader.GetString("ScoobeReleaseGroup_Preview") :
-                    latestRelease.PublishedDate.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
+                    formatter.Format(latestRelease.PublishedDate);
             }
             else
             {
