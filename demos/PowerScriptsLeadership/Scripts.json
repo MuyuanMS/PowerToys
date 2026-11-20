@@ -63,6 +63,20 @@
     }
   },
   {
+    "icon": "Icons\\rotate.ico",
+    "implementation": "Source\\Rotate image 90 degrees.ps1",
+    "inputMimeTypes": ["image/png", "image/jpeg"],
+    "outputMimeTypes": ["image/png"],
+    "options": {
+      "projectName": "Rotate image 90 degrees",
+      "description": "Rotate one PNG or JPEG 90 degrees clockwise and return a PNG image. No options. Paste the result with Advanced Paste, or export it from File Explorer. Originals unchanged.",
+      "runtime": "powershell",
+      "input": "image",
+      "output": "image",
+      "parameters": []
+    }
+  },
+  {
     "icon": "Icons\\files.ico",
     "implementation": "Source\\Create a file summary.ps1",
     "options": {

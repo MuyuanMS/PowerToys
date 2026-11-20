@@ -82,6 +82,19 @@ foreach ($definition in $definitions) {
     if ($definition.implementation) {
         [IO.File]::Copy((Read-KitFile $definition.implementation), $entry, $true)
     }
+    if ($definition.inputMimeTypes -or $definition.outputMimeTypes) {
+        $descriptorPath = $entry + '.tool.json'
+        $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json -AsHashtable
+        if ($definition.inputMimeTypes) {
+            if ($options.input -ne 'image') { throw 'Input MIME types require an image contract.' }
+            $descriptor.inputSchema.properties.image.properties.mimeType.enum = @($definition.inputMimeTypes)
+        }
+        if ($definition.outputMimeTypes) {
+            if ($options.output -ne 'image') { throw 'Output MIME types require an image contract.' }
+            $descriptor.outputSchema.properties.image.properties.mimeType.enum = @($definition.outputMimeTypes)
+        }
+        [IO.File]::WriteAllText($descriptorPath, ($descriptor | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
+    }
     $installed += [pscustomobject]@{ title = $options.projectName; entryPath = $entry }
 }
 

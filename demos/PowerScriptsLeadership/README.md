@@ -12,10 +12,11 @@ The source snapshot includes the current editor UX work, including uncommitted c
 | File Explorer | Combine CSV reports | 1-20 CSVs -> new HTML file; no options |
 | File Explorer | Extract text from image | one PNG/JPEG -> separate OCR TXT; no options |
 | File Explorer | Create a file summary | 1-20 files of any type -> HTML inventory + SHA-256; no options; up to 256 MB total |
+| Advanced Paste + File Explorer | Rotate image 90 degrees | one PNG/JPEG -> PNG bitmap; fixed clockwise 90 degrees; no options |
 | CmdPal + Keyboard Manager | Switch to dark theme | no primary input/options; fixed Light Switch CLI action |
 | CmdPal + Keyboard Manager | Switch to light theme | no primary input/options; fixed Light Switch CLI action |
 
-Seven prepared scripts give each consumer at least two relevant choices, with the two no-input theme actions reused across CmdPal and Keyboard Manager. OCR belongs to the Explorer image-selection demo, not a CmdPal file-picker flow.
+Eight prepared scripts give each consumer at least two relevant choices, with the two no-input theme actions reused across CmdPal and Keyboard Manager. OCR belongs to the Explorer image-selection demo, not a CmdPal file-picker flow.
 
 Start with `SHOW FIRST.txt` for exact sample paths and expected results. `Create from template\Remove hyphens.txt` is the small PowerShell body for the live template-creation segment. `Inputs` contains synthetic CSV/text/image samples, including a mixed-type `General files` folder; `Icons` includes matching custom ICOs.
 
@@ -33,7 +34,7 @@ The importer:
 - Scaffolds through the matching Host, so CLI launch paths are generated for **this installation**, not copied from the original x64 machine.
 - Respects an explicit `-ScriptsRoot`, then `POWERSCRIPTS_ROOT`, configured `scriptsRoot`, then the normal LocalAppData root.
 - Refuses duplicate demo titles rather than overwriting existing packages.
-- Creates fresh IDs and leaves all seven packages **untrusted**.
+- Creates fresh IDs and leaves all eight packages **untrusted**. The image example narrows the generic template's MIME types to PNG/JPEG input and PNG output, matching its implementation.
 - Does not execute scripts, approve trust, change configuration/policies, archive existing packages or create hotkeys.
 
 IDs are written to ignored, machine-local `installed-demo.json`. Never copy another machine's `trust.json`, runtime configuration or keyboard bindings.
@@ -45,6 +46,8 @@ IDs are written to ignored, machine-local `installed-demo.json`. Never copy anot
 3. Explorer: select `Inputs\Screenshots\Meeting notes.png`; invoke **Extract text from image**. Open the newly exported TXT and show the three recognized action items. Then select **both** report CSVs and invoke **Combine CSV reports**. Open the exported HTML manually: 2 files, 6 rows, 4 columns. For an any-file example, select the three files in `Inputs\General files` and choose **Create a file summary**: show names, sizes, three types and full SHA-256 fingerprints in a new HTML report. It also works with a single file, PDFs, Office files, binary and extensionless files without parsing their formats. Originals stay unchanged.
 4. CmdPal: search **Switch to dark theme** and invoke it directly; use **Switch to light theme** for the opposite action. No file picker or transformation form.
 5. Keyboard Manager: through its normal UI, bind the SAME dark/light scripts to confirmed-unused shortcuts, e.g. Ctrl+Alt+Shift+D / Ctrl+Alt+Shift+L. Review/approve first. Show that two consumers invoke the same script IDs, not copied implementations. Record the original theme before any test; setting light is not guaranteed to restore an initially mixed app/system theme.
+
+**Visual image option:** `Inputs\Screenshots\sample-arrow.png` is the original blue arrow. Copy its bitmap and choose **Rotate image 90 degrees** in Advanced Paste, then paste into a scratch image-capable app. Or select the PNG in Explorer and export the result. The arrow turns from right (320 x 180) to down (180 x 320), with no angle parameter and no change to the original.
 
 ## Two obvious existing CLI modules
 
