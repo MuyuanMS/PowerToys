@@ -1,0 +1,46 @@
+POWERSCRIPTS / DEMO INPUTS
+
+Everything below is synthetic. Originals are kept unchanged.
+Use Inputs for live selections; no generated results are left beside them.
+
+LIVE CREATION
+  Copy: Create from template\Remove hyphens.txt
+  Input: Inputs\Clipboard - remove hyphens.txt
+  Result: PT2026001, AB1234CD, 808012345678
+
+ADVANCED PASTE
+  Open Inputs\Clipboard - PDF paragraphs.txt and copy all.
+  Run Clean copied PDF text: wrapped prose becomes readable paragraphs.
+  Then copy Inputs\Clipboard - CSV table.txt.
+  Run Paste a Markdown table: show the ready-to-paste table.
+
+FILE EXPLORER / REAL LOCAL OCR
+  Select Inputs\Screenshots\Meeting notes.png.
+  Run Extract text from image; open the newly exported TXT.
+  Show the three recognized action items.
+
+FILE EXPLORER / CSV REPORT
+  Open Inputs\Reports and select North.csv + South.csv.
+  Run Combine CSV reports; open the newly exported HTML.
+  Show 2 files, 6 records and 4 columns.
+
+FILE EXPLORER / ANY FILE TYPE
+  Open Inputs\General files and select all THREE files:
+    Project brief.txt, North.csv, Meeting notes.png.
+  Run Create a file summary; open the newly exported HTML.
+  Show three different file types, names, sizes and SHA-256 fingerprints.
+  No format-specific application, parameters or network required.
+  For a faster version, select just Project brief.txt.
+  Works with other locally available regular files too, including PDFs,
+  Office files and extensionless files; it reads bytes, not document formats.
+  Demo bounds: 1-20 files, up to 256 MB in total.
+
+COMMAND PALETTE / KEYBOARD MANAGER
+  Switch to dark theme / Switch to light theme.
+  These are shared no-input actions, not file transforms.
+  Check existing bindings before assigning an unused shortcut.
+
+FIRST RUN
+  Review and approve Create a file summary through the normal prompt.
+  New imports and any script edits also require normal approval.
+  No trust settings or shortcut bindings are copied from another machine.

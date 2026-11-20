@@ -11,12 +11,13 @@ The source snapshot includes the current editor UX work, including uncommitted c
 | Advanced Paste | Clean copied PDF text | text -> text; no options |
 | File Explorer | Combine CSV reports | 1-20 CSVs -> new HTML file; no options |
 | File Explorer | Extract text from image | one PNG/JPEG -> separate OCR TXT; no options |
+| File Explorer | Create a file summary | 1-20 files of any type -> HTML inventory + SHA-256; no options; up to 256 MB total |
 | CmdPal + Keyboard Manager | Switch to dark theme | no primary input/options; fixed Light Switch CLI action |
 | CmdPal + Keyboard Manager | Switch to light theme | no primary input/options; fixed Light Switch CLI action |
 
-Six prepared scripts give each consumer at least two relevant choices, with the two no-input theme actions reused across CmdPal and Keyboard Manager. OCR belongs to the Explorer image-selection demo, not a CmdPal file-picker flow.
+Seven prepared scripts give each consumer at least two relevant choices, with the two no-input theme actions reused across CmdPal and Keyboard Manager. OCR belongs to the Explorer image-selection demo, not a CmdPal file-picker flow.
 
-`Create from template\Remove hyphens.txt` is the small PowerShell body for the live template-creation segment. `Inputs` contains synthetic CSV/text/image samples; `Icons` includes matching custom ICOs and a six-script preview.
+Start with `SHOW FIRST.txt` for exact sample paths and expected results. `Create from template\Remove hyphens.txt` is the small PowerShell body for the live template-creation segment. `Inputs` contains synthetic CSV/text/image samples, including a mixed-type `General files` folder; `Icons` includes matching custom ICOs.
 
 ## Import after building
 
@@ -32,7 +33,7 @@ The importer:
 - Scaffolds through the matching Host, so CLI launch paths are generated for **this installation**, not copied from the original x64 machine.
 - Respects an explicit `-ScriptsRoot`, then `POWERSCRIPTS_ROOT`, configured `scriptsRoot`, then the normal LocalAppData root.
 - Refuses duplicate demo titles rather than overwriting existing packages.
-- Creates fresh IDs and leaves all six packages **untrusted**.
+- Creates fresh IDs and leaves all seven packages **untrusted**.
 - Does not execute scripts, approve trust, change configuration/policies, archive existing packages or create hotkeys.
 
 IDs are written to ignored, machine-local `installed-demo.json`. Never copy another machine's `trust.json`, runtime configuration or keyboard bindings.
@@ -41,7 +42,7 @@ IDs are written to ignored, machine-local `installed-demo.json`. Never copy anot
 
 1. Create **Remove hyphens** live: PowerShell, text -> text, no options; paste the TXT body, use `Icons\hyphens.ico`, save and review normally. Show **Consumer modules > Advanced Paste** activation. Copy the hyphen input and invoke through Advanced Paste.
 2. Advanced Paste: copy `Inputs\Clipboard - PDF paragraphs.txt`; choose **Clean copied PDF text**. Show repaired `auto-` + line break + `mation`, preserved paragraph breaks and the unchanged `in-line` hyphen. Then copy the CSV-table input and show **Paste a Markdown table**.
-3. Explorer: select `Inputs\Screenshots\Meeting notes.png`; invoke **Extract text from image**. Open the newly exported TXT and show the three recognized action items. Then select **both** report CSVs and invoke **Combine CSV reports**. Open the exported HTML manually: 2 files, 6 rows, 4 columns. Originals stay unchanged.
+3. Explorer: select `Inputs\Screenshots\Meeting notes.png`; invoke **Extract text from image**. Open the newly exported TXT and show the three recognized action items. Then select **both** report CSVs and invoke **Combine CSV reports**. Open the exported HTML manually: 2 files, 6 rows, 4 columns. For an any-file example, select the three files in `Inputs\General files` and choose **Create a file summary**: show names, sizes, three types and full SHA-256 fingerprints in a new HTML report. It also works with a single file, PDFs, Office files, binary and extensionless files without parsing their formats. Originals stay unchanged.
 4. CmdPal: search **Switch to dark theme** and invoke it directly; use **Switch to light theme** for the opposite action. No file picker or transformation form.
 5. Keyboard Manager: through its normal UI, bind the SAME dark/light scripts to confirmed-unused shortcuts, e.g. Ctrl+Alt+Shift+D / Ctrl+Alt+Shift+L. Review/approve first. Show that two consumers invoke the same script IDs, not copied implementations. Record the original theme before any test; setting light is not guaranteed to restore an initially mixed app/system theme.
 
@@ -55,6 +56,6 @@ OCR is real **local Windows OCR**, not an LLM placeholder. OCR and theme changes
 
 ## What this backup does not claim
 
-Packages are prepared and discoverable but **not yet executed or rehearsed**: normal user approval and execution consent are still required. An ARM64 build has not been run on the original x64 machine. A clean clone is not automatically demo-ready: finish the prompt's build and all four real consumer checks.
+Fresh imports are **untrusted and not rehearsed on the destination machine**: normal user approval and execution consent are still required. An ARM64 build has not been run on the original x64 machine. A clean clone is not automatically demo-ready: finish the prompt's build and all four real consumer checks.
 
 Old local demo collections and the private leadership PPTX/PDF are intentionally not in this public branch. The slides have a separate OneDrive backup. No credentials, trust database, personal PowerToys settings or compiled binaries are bundled.

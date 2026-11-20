@@ -63,6 +63,20 @@
     }
   },
   {
+    "icon": "Icons\\files.ico",
+    "implementation": "Source\\Create a file summary.ps1",
+    "options": {
+      "projectName": "Create a file summary",
+      "description": "Summarize any selected files in a polished HTML inventory: names, types, sizes and SHA-256 fingerprints. Originals unchanged. No options or network. Up to 20 files / 256 MB total.",
+      "runtime": "powershell",
+      "input": "files",
+      "output": "files",
+      "minFiles": 1,
+      "maxFiles": 20,
+      "parameters": []
+    }
+  },
+  {
     "icon": "Icons\\dark.ico",
     "options": {
       "projectName": "Switch to dark theme",

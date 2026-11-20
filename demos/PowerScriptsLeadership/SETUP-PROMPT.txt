@@ -163,16 +163,19 @@ It respects the normal scripts-root configuration; -ScriptsRoot is an
 explicit alternative, not a request to change effective settings silently.
 installed-demo.json contains NEW machine-local IDs; use those exact IDs later.
 
-Prepared set: SIX scripts, with no unnecessary parameters.
+Prepared set: SEVEN scripts, with no unnecessary parameters.
   Advanced Paste has TWO text transforms:
     Paste a Markdown table -- copied CSV -> Markdown.
     Clean copied PDF text -- repair line wraps and line-break hyphenation,
       preserve blank-line paragraphs and in-line hyphens; prose, not code/lists.
-  File Explorer has TWO file-oriented transforms:
+  File Explorer has THREE file-oriented transforms:
     Extract text from image -- one selected PNG/JPEG -> separate OCR TXT.
       Uses real local Windows OCR through Advanced Paste CLI image-to-text,
       with the selected file as primary input. No picker parameter or LLM.
     Combine CSV reports -- 1-20 matching-column CSVs -> a NEW HTML report.
+    Create a file summary -- 1-20 files of ANY type -> a NEW HTML inventory
+      with names, sizes, file types and SHA-256 fingerprints. Up to 256 MB total.
+      Select all three files in Inputs\General files for a clear mixed-type demo.
   CmdPal AND Keyboard Manager share TWO no-input actions:
     Switch to dark theme -- fixed Light Switch CLI command dark.
     Switch to light theme -- fixed Light Switch CLI command light.
@@ -190,15 +193,16 @@ file-transform recipe declares network capability, but the reviewed OCR
 bindings fix Action=image-to-text and leave prompt/provider/custom action/
 output path empty. Do not add a cloud model or credentials.
 
-Keep the matching ICOs, clipboard samples, both report CSVs and the
+Start with SHOW FIRST.txt for sample paths and expected results.
+Keep the matching ICOs, mixed-type General files folder, clipboard samples, both report CSVs and the
 synthetic meeting-notes image in this kit. Use a short local, non-reparse input
 folder for Explorer. Copy only demo fixtures if preparing a presentation folder.
 
 6. NORMAL TRUST + REAL REHEARSAL
 
-The source machine had only completed discovery/schema/icon/syntax checks.
-Do not claim these scripts have already passed runtime or consumer tests.
-The importer creates SIX UNTRUSTED scripts and never executes them.
+Source-machine checks do not prove this machine's runtime or consumers.
+Do not claim fresh imports have passed runtime or consumer tests here.
+The importer creates SEVEN UNTRUSTED scripts and never executes them.
 
 Obtain explicit permission to execute synthetic-input tests and modify the
 clipboard/theme. Have ME review and approve each exact package normally.

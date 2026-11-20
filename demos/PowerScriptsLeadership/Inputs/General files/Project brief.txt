@@ -1,0 +1,13 @@
+PROJECT AURORA
+Small automations. More time for people.
+
+Goal
+Turn repetitive work into reusable, shareable actions.
+
+Pilot
+Three teams. One week. A few useful scripts.
+
+Success looks like
+Less copy-paste, fewer manual steps, and no new application to learn.
+
+This is a fictional sample for the PowerScripts demo.
