@@ -1,0 +1,94 @@
+PASTE THIS INTO THE LOCAL CODING AGENT ON THE BACKUP ARM64 MACHINE
+
+Prepare this Windows ARM64 machine as my live PowerScripts demo backup.
+Start from no repository clone. Deliver runnable scripts, synthetic input
+files, registered consumer integrations and an actually rehearsed demo.
+Do not stop at a successful editor build or script discovery.
+
+1. Install only missing, approved prerequisites from official sources:
+   Git, native PowerShell 7, Visual Studio 2026 (18.x) with this repo's
+   .vsconfig/ARM64 C++/WinUI components and Windows SDKs, and the exact
+   ARM64 .NET SDK pinned by global.json (currently 10.0.404).
+   Do not edit the SDK pin, copy x64 binaries, or change existing settings.
+
+2. Clone this separate backup branch, not Niels' development branch:
+
+   git -c core.longpaths=true clone --single-branch --branch demo/powerscripts-leadership-2026-11-19 https://github.com/MuyuanMS/PowerToys.git C:\src\PowerToys-demo
+   Set-Location C:\src\PowerToys-demo
+   git config core.longpaths true
+   git submodule update --init --recursive
+   git log -1 --oneline
+
+   Refuse to overwrite an existing clone. Record the exact cloned commit.
+   Read AGENTS.md, .github\copilot-instructions.md, the build guidelines,
+   and demos\PowerScriptsLeadership\SETUP-PROMPT.txt in full.
+   Follow that full prompt for prerequisites, registration, trust and rehearsal.
+   Never push to or replace muyuanli/powerscripts-niels-ux.
+
+3. Build a COMPLETE ARM64 Debug installation using the repo wrappers.
+   Run each operation separately and require success before proceeding:
+
+   & .\tools\build\build-essentials.ps1 -Platform ARM64 -Configuration Debug
+   & .\tools\build\build.ps1 -Platform ARM64 -Configuration Debug -ExtraArgs '/p:BuildTests=false'
+   & .\demos\PowerScriptsLeadership\Check-DemoBuild.ps1 -BuildRoot .\ARM64\Debug
+
+   Required: Runner/Settings, PowerScripts Host/Editor/Core/Client/MXC,
+   Advanced Paste UI AND CLI, Light Switch CLI, Keyboard Manager,
+   File Explorer managed/native integration, and CmdPal + PowerScripts extension.
+   Check failure logs and fix real prerequisites; never launch partial output
+   or weaken MXC to get past a failure. Deploy CmdPal and register Explorer
+   through the documented development workflow using the same ARM64 build.
+
+4. Launch ARM64\Debug\PowerToys.exe, verify its path and responsiveness,
+   enable the four PowerScripts consumers through their normal UI, then run:
+
+   & .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe
+   & .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe -DiagnosticsOnly
+
+   This creates eight prepared scripts plus the optional Check script access.
+   Fresh packages are UNTRUSTED; use normal review/approval, never trust.json
+   copying or automatic trust commands. Preserve existing scripts and bindings.
+   IDs are machine-local; do not use IDs from the original x64 machine.
+
+5. The clone ALREADY contains all necessary synthetic demo inputs and icons.
+   Keep them local and unchanged. Read SHOW FIRST.txt for the sequence:
+   clipboard PDF/CSV/hyphen text, both report CSVs, the meeting-notes image,
+   the original blue arrow, mixed-type General files, and the sandbox canary.
+   Do not generate fake OCR results or leave test output beside the fixtures.
+
+   With my permission, test through Host --consumer command-line and then
+   Advanced Paste, Explorer, CmdPal and Keyboard Manager separately.
+   Preserve/restore clipboard and initial theme. Use only unused shortcuts.
+   Clean only outputs you created; keep user-created files. Leave MXC enabled.
+
+6. Optional Azure OCR: follow AZURE-OCR.txt and launch the matching ARM64 CLI
+   with azure-ocr-setup. Let ME enter the resource endpoint and Key 1/Key 2.
+   Do not inspect, copy or log the key, or include it in scripts/backups.
+   Saving uploads nothing; OCR uploads the selected image and may incur charges.
+   Confirm a real authenticated result separately; do not silently fall back.
+
+7. Do NOT pre-create Remove hyphens if I will create it live on stage.
+   Have Create from template\Remove hyphens.txt and Icons\hyphens.ico ready.
+   In the editor create PowerShell, text -> text, no parameters.
+   Paste that body, save and review normally. Use the hyphen clipboard input.
+   Expected identifiers: PT2026001, AB1234CD, 808012345678.
+
+8. Finish by opening the input folder ON THIS BACKUP MACHINE:
+
+   Start-Process explorer.exe -ArgumentList '"C:\src\PowerToys-demo\demos\PowerScriptsLeadership\Inputs"'
+
+   Report the exact branch/commit, running ARM64 build root, installed IDs,
+   observed consumer results and any pending approvals. Do not declare
+   demo-ready until build, registration and real consumer runs succeed.
+   Avoid Show Desktop, unrelated process termination and other monitors.
+
+REMOVE HYPHENS / BODY TO PASTE INTO THE LIVE TEMPLATE
+
+param([string]$Text)
+
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+
+$clean = $Text -replace '[-\u00AD\u2010\u2011]', ''
+[Console]::Write($clean)
+
+This removes ordinary, soft and Unicode hyphens. En/em dashes are preserved.

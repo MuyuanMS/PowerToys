@@ -3,7 +3,7 @@
 This is a **separate backup branch**, not the active UX-development branch or an official release.
 The source snapshot includes the current editor UX work, including uncommitted changes captured without changing the original worktree/index. See `Source snapshot.json` for its base commit and captured-file hashes.
 
-**Start on a clean Windows ARM64 machine:** paste [SETUP-PROMPT.txt](SETUP-PROMPT.txt) into your local coding agent. It covers cloning, native ARM64 prerequisites, the complete build, consumer registration, script creation, normal approval and rehearsal.
+**Start on a clean Windows ARM64 machine:** paste [BACKUP-MACHINE.txt](BACKUP-MACHINE.txt) into your local coding agent. It is a concise end-to-end handoff, including cloning, script/input preparation, opening the input folder and the live Remove hyphens body. [SETUP-PROMPT.txt](SETUP-PROMPT.txt) supplies the detailed build, registration and rehearsal instructions it references.
 
 | Consumer | Script | Contract |
 |---|---|---|
