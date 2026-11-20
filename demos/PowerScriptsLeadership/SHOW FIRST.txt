@@ -1,21 +1,23 @@
 POWERSCRIPTS / DEMO INPUTS
 
 Everything below is synthetic. Originals are kept unchanged.
-Use Inputs for live selections; no generated results are left beside them.
+Run Stage-DemoInputs.ps1 first. Use Documents\PowerScripts-Demo for live
+selections; paths below are relative to that clean folder. Guides, script
+bodies and icons stay in the source kit (or PowerScripts-Demo-Support).
 
 LIVE CREATION
   Copy: Create from template\Remove hyphens.txt
-  Input: Inputs\Clipboard - remove hyphens.txt
+  Input: Clipboard-Hyphens.txt
   Result: PT2026001, AB1234CD, 808012345678
 
 ADVANCED PASTE
-  Open Inputs\Clipboard - PDF paragraphs.txt and copy all.
+  Open Clipboard-PDF.txt and copy all.
   Run Clean copied PDF text: wrapped prose becomes readable paragraphs.
-  Then copy Inputs\Clipboard - CSV table.txt.
+  Then copy Clipboard-CSV.txt.
   Run Paste a Markdown table: show the ready-to-paste table.
 
 FILE EXPLORER / OCR
-  Select Inputs\Screenshots\Meeting notes.png.
+  Select Images\Meeting notes.png.
   Run Extract text from image; open the newly exported TXT.
   Show the three recognized action items.
   For optional Azure Computer Vision, first follow AZURE-OCR.txt. Enter your
@@ -24,7 +26,7 @@ FILE EXPLORER / OCR
   Saving the profile uploads nothing. Azure errors do not silently fall back.
 
 VISUAL IMAGE TRANSFORM / ROTATE 90 DEGREES
-  Input: Inputs\Screenshots\sample-arrow.png (the original blue arrow).
+  Input: Images\sample-arrow.png (the original blue arrow).
   Advanced Paste: open it, copy the IMAGE rather than just its file path,
   run Rotate image 90 degrees, and paste into a scratch image-capable app.
   Alternative: select the PNG in Explorer and run the same script;
@@ -34,12 +36,12 @@ VISUAL IMAGE TRANSFORM / ROTATE 90 DEGREES
   Always 90 degrees clockwise. No angle parameter. Original stays unchanged.
 
 FILE EXPLORER / CSV REPORT
-  Open Inputs\Reports and select North.csv + South.csv.
+  Open Reports and select North.csv + South.csv.
   Run Combine CSV reports; open the newly exported HTML.
   Show 2 files, 6 records and 4 columns.
 
 FILE EXPLORER / ANY FILE TYPE
-  Open Inputs\General files and select all THREE files:
+  Open General-files and select all THREE files:
     Project brief.txt, North.csv, Meeting notes.png.
   Run Create a file summary; open the newly exported HTML.
   Show three different file types, names, sizes and SHA-256 fingerprints.
@@ -53,10 +55,12 @@ COMMAND PALETTE / KEYBOARD MANAGER
   Switch to dark theme / Switch to light theme.
   These are shared no-input actions, not file transforms.
   Check existing bindings before assigning an unused shortcut.
+  Bindings can be saved/enabled before approval; execution still requires
+  normal approval of the exact script version. Approve before the live hotkey.
 
 OPTIONAL / SHOW THE GUARDRAILS
   Add Check script access separately; see ACCESS-CHECK.txt.
-  Select Inputs\Access checks\Sandbox canary.txt and open the exported HTML.
+  Select Access-checks\Sandbox canary.txt and open the exported HTML.
   The report shows observed access, not an assumption that every failed
   connection is an MXC block. UNKNOWN settings do not mean protection is off.
   The eight core demo imports remain unchanged.

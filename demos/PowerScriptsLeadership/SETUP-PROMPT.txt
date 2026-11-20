@@ -1,4 +1,4 @@
-Prepare this Windows ARM64 machine for my PowerScripts leadership live demo.
+Prepare this Windows ARM64 machine for my PowerScripts live demo.
 Start from no repository clone. Deliver a working, locally rehearsed demo, not
 just a successful build or script discovery. Keep changes narrowly scoped.
 
@@ -163,6 +163,16 @@ It respects the normal scripts-root configuration; -ScriptsRoot is an
 explicit alternative, not a request to change effective settings silently.
 installed-demo.json contains NEW machine-local IDs; use those exact IDs later.
 
+Stage only live inputs into the clean Documents\PowerScripts-Demo folder:
+
+  & .\demos\PowerScriptsLeadership\Stage-DemoInputs.ps1
+
+The folder contains Clipboard-PDF.txt, Clipboard-CSV.txt, Clipboard-Hyphens.txt,
+Images, Reports, General-files and Access-checks. Source Inputs paths below
+refer to the same fixtures in the kit; SHOW FIRST.txt gives clean-folder paths.
+Do not place guides, script sources, JSON checks or generated outputs in the
+live folder. Differing existing files are refused; never overwrite them.
+
 Prepared set: EIGHT scripts, with no unnecessary parameters.
   Advanced Paste has TWO text transforms:
     Paste a Markdown table -- copied CSV -> Markdown.
@@ -284,7 +294,9 @@ Then verify separately through each real consumer:
   - Keyboard Manager: inspect existing shortcuts; with permission add a
     confirmed-unused shortcut for each SAME theme script via its NORMAL UI,
     e.g. Ctrl+Alt+Shift+D and Ctrl+Alt+Shift+L. Do not edit KBM JSON or replace
-    mappings. Approve before silent invocation. Test only with permission.
+    mappings. Saving/enabling the binding does not require prior approval and
+    does not grant trust. Approve before silent invocation; the Host still
+    refuses unapproved execution. Test only with permission.
     Record initial app/system theme state: setting light after dark does not
     necessarily restore a mixed initial theme. Do not surprise someone working
     on another monitor. This proves script reuse across two consumers.
@@ -304,3 +316,4 @@ any pending user approvals, and the precise unblocked demo sequence.
 Only call the machine demo-ready after build, registration, normal trust and
 the four actual consumer scenarios succeed. If blocked, identify the exact
 prerequisite rather than weakening security or claiming readiness.
+Open Documents\PowerScripts-Demo at the end, not the source/support folder.

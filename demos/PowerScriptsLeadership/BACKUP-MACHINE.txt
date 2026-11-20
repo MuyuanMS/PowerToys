@@ -49,9 +49,21 @@ Do not stop at a successful editor build or script discovery.
    Fresh packages are UNTRUSTED; use normal review/approval, never trust.json
    copying or automatic trust commands. Preserve existing scripts and bindings.
    IDs are machine-local; do not use IDs from the original x64 machine.
+   Keyboard Manager can save/enable a binding before script approval.
+   This does not approve execution: review the exact script normally before
+   demonstrating its silent hotkey. Never remove the Host approval gate.
 
 5. The clone ALREADY contains all necessary synthetic demo inputs and icons.
-   Keep them local and unchanged. Read SHOW FIRST.txt for the sequence:
+   Create the clean, inputs-only demo folder:
+
+   & .\demos\PowerScriptsLeadership\Stage-DemoInputs.ps1
+
+   It stages 11 files under Documents\PowerScripts-Demo, with no spaces in
+   folder names and no source, guides, JSON checks or generated outputs.
+   Existing differing files are refused, never overwritten. If an older
+   collection occupies that folder, preserve it separately with my permission.
+   Keep guides/icons in the clone, not in the live input folder.
+   Read SHOW FIRST.txt for the sequence:
    clipboard PDF/CSV/hyphen text, both report CSVs, the meeting-notes image,
    the original blue arrow, mixed-type General files, and the sandbox canary.
    Do not generate fake OCR results or leave test output beside the fixtures.
@@ -75,7 +87,8 @@ Do not stop at a successful editor build or script discovery.
 
 8. Finish by opening the input folder ON THIS BACKUP MACHINE:
 
-   Start-Process explorer.exe -ArgumentList '"C:\src\PowerToys-demo\demos\PowerScriptsLeadership\Inputs"'
+   $demo = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerScripts-Demo'
+   Start-Process explorer.exe -ArgumentList ('"' + $demo + '"')
 
    Report the exact branch/commit, running ARM64 build root, installed IDs,
    observed consumer results and any pending approvals. Do not declare

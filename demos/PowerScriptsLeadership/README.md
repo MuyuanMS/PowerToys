@@ -20,6 +20,8 @@ Eight prepared scripts give each consumer at least two relevant choices, with th
 
 Start with `SHOW FIRST.txt` for exact sample paths and expected results. `Create from template\Remove hyphens.txt` is the small PowerShell body for the live template-creation segment. `Inputs` contains synthetic CSV/text/image samples, including a mixed-type `General files` folder; `Icons` includes matching custom ICOs.
 
+For presentation, use **Documents\PowerScripts-Demo**, not this source/guide folder. `Stage-DemoInputs.ps1` copies only 11 synthetic inputs into three clipboard TXT files and the `Images`, `Reports`, `General-files` and `Access-checks` folders. It never overwrites differing existing files or copies check results, scripts, guides or rehearsal outputs. Keep support material outside the live folder.
+
 ## Import after building
 
 From the clone root, in PowerShell 7:
@@ -27,6 +29,7 @@ From the clone root, in PowerShell 7:
 ```powershell
 & .\demos\PowerScriptsLeadership\Check-DemoBuild.ps1 -BuildRoot .\ARM64\Debug
 & .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe
+& .\demos\PowerScriptsLeadership\Stage-DemoInputs.ps1
 ```
 
 The importer:
@@ -42,12 +45,12 @@ IDs are written to ignored, machine-local `installed-demo.json`. Never copy anot
 ## Run order
 
 1. Create **Remove hyphens** live: PowerShell, text -> text, no options; paste the TXT body, use `Icons\hyphens.ico`, save and review normally. Show **Consumer modules > Advanced Paste** activation. Copy the hyphen input and invoke through Advanced Paste.
-2. Advanced Paste: copy `Inputs\Clipboard - PDF paragraphs.txt`; choose **Clean copied PDF text**. Show repaired `auto-` + line break + `mation`, preserved paragraph breaks and the unchanged `in-line` hyphen. Then copy the CSV-table input and show **Paste a Markdown table**.
-3. Explorer: select `Inputs\Screenshots\Meeting notes.png`; invoke **Extract text from image**. Open the newly exported TXT and show the three recognized action items. Then select **both** report CSVs and invoke **Combine CSV reports**. Open the exported HTML manually: 2 files, 6 rows, 4 columns. For an any-file example, select the three files in `Inputs\General files` and choose **Create a file summary**: show names, sizes, three types and full SHA-256 fingerprints in a new HTML report. It also works with a single file, PDFs, Office files, binary and extensionless files without parsing their formats. Originals stay unchanged.
+2. Advanced Paste: copy `Clipboard-PDF.txt` from the clean demo folder; choose **Clean copied PDF text**. Show repaired `auto-` + line break + `mation`, preserved paragraph breaks and the unchanged `in-line` hyphen. Then copy `Clipboard-CSV.txt` and show **Paste a Markdown table**.
+3. Explorer: select `Images\Meeting notes.png` in the clean demo folder; invoke **Extract text from image**. Open the newly exported TXT and show the three recognized action items. Then select **both** report CSVs and invoke **Combine CSV reports**. Open the exported HTML manually: 2 files, 6 rows, 4 columns. For an any-file example, select the three files in `General-files` and choose **Create a file summary**: show names, sizes, three types and full SHA-256 fingerprints in a new HTML report. It also works with a single file, PDFs, Office files, binary and extensionless files without parsing their formats. Originals stay unchanged.
 4. CmdPal: search **Switch to dark theme** and invoke it directly; use **Switch to light theme** for the opposite action. No file picker or transformation form.
-5. Keyboard Manager: through its normal UI, bind the SAME dark/light scripts to confirmed-unused shortcuts, e.g. Ctrl+Alt+Shift+D / Ctrl+Alt+Shift+L. Review/approve first. Show that two consumers invoke the same script IDs, not copied implementations. Record the original theme before any test; setting light is not guaranteed to restore an initially mixed app/system theme.
+5. Keyboard Manager: through its normal UI, bind the SAME dark/light scripts to confirmed-unused shortcuts, e.g. Ctrl+Alt+Shift+D / Ctrl+Alt+Shift+L. Saving or enabling a binding does **not** require prior script approval and does **not** grant approval. The Host still refuses silent execution until the exact script is approved normally. Review/approve before demonstrating the hotkey. Show that two consumers invoke the same script IDs, not copied implementations. Record the original theme before any test; setting light is not guaranteed to restore an initially mixed app/system theme.
 
-**Visual image option:** `Inputs\Screenshots\sample-arrow.png` is the original blue arrow. Copy its bitmap and choose **Rotate image 90 degrees** in Advanced Paste, then paste into a scratch image-capable app. Or select the PNG in Explorer and export the result. The arrow turns from right (320 x 180) to down (180 x 320), with no angle parameter and no change to the original.
+**Visual image option:** `Images\sample-arrow.png` in the clean demo folder is the original blue arrow. Copy its bitmap and choose **Rotate image 90 degrees** in Advanced Paste, then paste into a scratch image-capable app. Or select the PNG in Explorer and export the result. The arrow turns from right (320 x 180) to down (180 x 320), with no angle parameter and no change to the original.
 
 ## Two obvious existing CLI modules
 
@@ -79,7 +82,7 @@ The backend uses Computer Vision **Read 3.2**, rather than relying on Image Anal
 & .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe -DiagnosticsOnly
 ```
 
-Select `Inputs\Access checks\Sandbox canary.txt` in Explorer and run it to export a readable HTML report. It separates resolved MXC settings from observed canary/workspace write access, one anonymous Microsoft HTTPS HEAD, and administrator-role status. It does not read clipboard contents, inspect personal files, alter inputs or change policies. Failed connectivity is not automatically labeled an MXC block. Desktop/clipboard access is explicitly **not probed**.
+Select `Access-checks\Sandbox canary.txt` in the clean demo folder and run it to export a readable HTML report. It separates resolved MXC settings from observed canary/workspace write access, one anonymous Microsoft HTTPS HEAD, and administrator-role status. It does not read clipboard contents, inspect personal files, alter inputs or change policies. Failed connectivity is not automatically labeled an MXC block. Desktop/clipboard access is explicitly **not probed**.
 
 The report describes the contained script, not approved host CLI actions such as Azure OCR. Imports remain untrusted. Diagnostic IDs are saved separately in ignored `installed-diagnostics.json`. Keep MXC enabled; disabling it can reduce local startup but does not accelerate Azure processing or remove service polling.
 
