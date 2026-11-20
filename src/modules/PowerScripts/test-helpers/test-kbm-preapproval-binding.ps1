@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][string]$HostPath,
     [Parameter(Mandatory)][string]$ProbeId,
     [Parameter(Mandatory)][string]$ResultsPath,
-    [switch]$AllowTemporaryBinding
+    [switch]$AllowTemporaryBinding,
+    [scriptblock]$VerifySavedBinding
 )
 
 $ErrorActionPreference = 'Stop'
@@ -102,10 +103,15 @@ try {
     [void](Invoke-UI @('invoke', 'PrimaryButton'))
     Wait-BindingState $true
     $binding = @(Get-Binding)[0]
-    if ($binding.Shortcut.ProgramArgs -notmatch ' --consumer keyboard-manager --no-consent') {
-        throw 'The saved binding no longer uses the ordinary noninteractive Host execution gate.'
+    if ($binding.Shortcut.ProgramArgs -notmatch ' --consumer keyboard-manager' -or
+        $binding.Shortcut.ProgramArgs -match ' --no-consent') {
+        throw 'The saved binding must allow ordinary first-use Host approval.'
     }
     $results += @{ name = 'Save an active binding before approval'; status = 'PASS' }
+    if ($VerifySavedBinding) {
+        & $VerifySavedBinding $binding
+        $results += @{ name = 'Saved binding first-use verification'; status = 'PASS' }
+    }
 
     foreach ($active in @($false, $true)) {
         $row = Get-ProbeRow
@@ -128,7 +134,7 @@ try {
     finally {
         if (Test-Path -LiteralPath $stderrPath) { Remove-Item -LiteralPath $stderrPath }
     }
-    $results += @{ name = 'Unapproved execution remains refused'; status = 'PASS' }
+    $results += @{ name = 'Explicit noninteractive execution remains refused'; status = 'PASS' }
 }
 finally {
     if (@(Get-Binding).Count) {
@@ -154,4 +160,4 @@ finally {
     $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ResultsPath -Encoding utf8
 }
 
-Write-Output 'PASS: preapproval save/activation, execution refusal, and existing-binding preservation.'
+Write-Output 'PASS: preapproval save/activation, interactive binding arguments, explicit noninteractive refusal, and existing-binding preservation.'

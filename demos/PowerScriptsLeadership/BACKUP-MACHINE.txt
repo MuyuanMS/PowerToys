@@ -50,8 +50,12 @@ Do not stop at a successful editor build or script discovery.
    copying or automatic trust commands. Preserve existing scripts and bindings.
    IDs are machine-local; do not use IDs from the original x64 machine.
    Keyboard Manager can save/enable a binding before script approval.
-   This does not approve execution: review the exact script normally before
-   demonstrating its silent hotkey. Never remove the Host approval gate.
+   This does not grant trust: the first hotkey invocation offers normal Host
+   approval of the exact script. Declining does not run or approve it; changing
+   the script requires approval again. Existing bindings work without recreation.
+   When updating an existing build, rebuild BOTH the native Keyboard Manager
+   engine and its editor, then restart Keyboard Manager (or PowerToys).
+   Preapprove reviewed demo scripts normally to avoid prompts on stage.
 
 5. The clone ALREADY contains all necessary synthetic demo inputs and icons.
    Create the clean, inputs-only demo folder:

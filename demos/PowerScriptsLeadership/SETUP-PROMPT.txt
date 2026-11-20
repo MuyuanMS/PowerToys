@@ -295,8 +295,11 @@ Then verify separately through each real consumer:
     confirmed-unused shortcut for each SAME theme script via its NORMAL UI,
     e.g. Ctrl+Alt+Shift+D and Ctrl+Alt+Shift+L. Do not edit KBM JSON or replace
     mappings. Saving/enabling the binding does not require prior approval and
-    does not grant trust. Approve before silent invocation; the Host still
-    refuses unapproved execution. Test only with permission.
+    does not grant trust. First invocation offers normal Host approval of the
+    exact script; declining does not execute or approve it. Changed scripts
+    require approval again. Existing bindings do not need recreation.
+    After updating, rebuild BOTH the native Keyboard Manager engine and editor,
+    then restart Keyboard Manager or PowerToys. Test only with permission.
     Record initial app/system theme state: setting light after dark does not
     necessarily restore a mixed initial theme. Do not surprise someone working
     on another monitor. This proves script reuse across two consumers.

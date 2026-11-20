@@ -56,7 +56,9 @@ COMMAND PALETTE / KEYBOARD MANAGER
   These are shared no-input actions, not file transforms.
   Check existing bindings before assigning an unused shortcut.
   Bindings can be saved/enabled before approval; execution still requires
-  normal approval of the exact script version. Approve before the live hotkey.
+  normal approval of the exact script version. First use opens that approval
+  prompt; declining does not run or approve the script. Changed scripts re-prompt.
+  Preapprove reviewed demo scripts normally to avoid prompts on stage.
 
 OPTIONAL / SHOW THE GUARDRAILS
   Add Check script access separately; see ACCESS-CHECK.txt.
