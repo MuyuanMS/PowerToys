@@ -227,6 +227,17 @@ folder, clipboard samples, both report CSVs and the
 synthetic meeting-notes image in this kit. Use a short local, non-reparse input
 folder for Explorer. Copy only demo fixtures if preparing a presentation folder.
 
+OPTIONAL DIAGNOSTIC
+
+The eight core imports stay focused. If requested, add Check script access
+separately using the same importer with -DiagnosticsOnly. Read ACCESS-CHECK.txt.
+Select Inputs\Access checks\Sandbox canary.txt in Explorer to export the HTML
+report. It distinguishes current settings from observed workspace/canary write
+access, one anonymous Microsoft HTTPS HEAD, and administrator-role status.
+It never reads the clipboard or personal files, and it changes no policies.
+Do not disable MXC or accept risk prompts just to get a comparison.
+Diagnostic IDs go to installed-diagnostics.json, not installed-demo.json.
+
 6. NORMAL TRUST + REAL REHEARSAL
 
 Source-machine checks do not prove this machine's runtime or consumers.

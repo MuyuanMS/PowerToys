@@ -1,0 +1,2 @@
+PowerScripts sandbox access canary.
+Synthetic input only. This file must stay unchanged.

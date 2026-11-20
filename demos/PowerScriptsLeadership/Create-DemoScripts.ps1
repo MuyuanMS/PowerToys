@@ -3,7 +3,8 @@
 param(
     [Parameter(Mandatory)]
     [string]$HostPath,
-    [string]$ScriptsRoot
+    [string]$ScriptsRoot,
+    [switch]$DiagnosticsOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,7 +54,8 @@ function Invoke-HostJson([string[]]$HostArguments, [string]$JsonInput) {
     }
 }
 
-$definitions = @(Get-Content -LiteralPath (Read-KitFile 'Scripts.json') -Raw | ConvertFrom-Json -AsHashtable)
+$definitionFile = if ($DiagnosticsOnly) { 'Diagnostics.json' } else { 'Scripts.json' }
+$definitions = @(Get-Content -LiteralPath (Read-KitFile $definitionFile) -Raw | ConvertFrom-Json -AsHashtable)
 foreach ($definition in $definitions) {
     [void](Read-KitFile $definition.icon)
     if ($definition.implementation) {
@@ -82,7 +84,7 @@ foreach ($definition in $definitions) {
     if ($definition.implementation) {
         [IO.File]::Copy((Read-KitFile $definition.implementation), $entry, $true)
     }
-    if ($definition.inputMimeTypes -or $definition.outputMimeTypes) {
+    if ($definition.inputMimeTypes -or $definition.outputMimeTypes -or $definition.capabilities) {
         $descriptorPath = $entry + '.tool.json'
         $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json -AsHashtable
         if ($definition.inputMimeTypes) {
@@ -92,6 +94,9 @@ foreach ($definition in $definitions) {
         if ($definition.outputMimeTypes) {
             if ($options.output -ne 'image') { throw 'Output MIME types require an image contract.' }
             $descriptor.outputSchema.properties.image.properties.mimeType.enum = @($definition.outputMimeTypes)
+        }
+        if ($definition.capabilities) {
+            $descriptor['x-powerscript'].capabilities = @($definition.capabilities)
         }
         [IO.File]::WriteAllText($descriptorPath, ($descriptor | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
     }
@@ -114,7 +119,8 @@ $result = foreach ($package in $installed) {
         trusted = $script.trusted
     }
 }
-$indexPath = Join-Path $PSScriptRoot 'installed-demo.json'
+$indexName = if ($DiagnosticsOnly) { 'installed-diagnostics.json' } else { 'installed-demo.json' }
+$indexPath = Join-Path $PSScriptRoot $indexName
 [IO.File]::WriteAllText($indexPath, (ConvertTo-Json -InputObject @($result) -Depth 8), [Text.UTF8Encoding]::new($false))
 $result | Format-Table title, input, output, trusted -AutoSize
 Write-Host "Created $($installed.Count) NEW, UNTRUSTED packages in $ScriptsRoot"

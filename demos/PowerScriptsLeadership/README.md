@@ -71,6 +71,18 @@ With a profile saved, CLI `image-to-text` uploads the selected image to that Azu
 
 The backend uses Computer Vision **Read 3.2**, rather than relying on Image Analysis 4.0's narrower regional availability. It submits the image once, then polls only the same HTTPS resource with a bounded deadline. The resource must support Read 3.2. Targeted mocked HTTP/routing/CLI tests and real Host offline regression passed on the source x64 machine. A valid user-entered key and an actual Azure call are still needed to verify that resource and cloud accuracy. Do not equate mocked tests or saving a profile with authenticated Azure success.
 
+## Optional sandbox-access diagnostic
+
+[ACCESS-CHECK.txt](ACCESS-CHECK.txt) adds **Check script access** separately, without changing the eight core imports:
+
+```powershell
+& .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe -DiagnosticsOnly
+```
+
+Select `Inputs\Access checks\Sandbox canary.txt` in Explorer and run it to export a readable HTML report. It separates resolved MXC settings from observed canary/workspace write access, one anonymous Microsoft HTTPS HEAD, and administrator-role status. It does not read clipboard contents, inspect personal files, alter inputs or change policies. Failed connectivity is not automatically labeled an MXC block. Desktop/clipboard access is explicitly **not probed**.
+
+The report describes the contained script, not approved host CLI actions such as Azure OCR. Imports remain untrusted. Diagnostic IDs are saved separately in ignored `installed-diagnostics.json`. Keep MXC enabled; disabling it can reduce local startup but does not accelerate Azure processing or remove service polling.
+
 ## What this backup does not claim
 
 Fresh imports are **untrusted and not rehearsed on the destination machine**: normal user approval and execution consent are still required. An ARM64 build has not been run on the original x64 machine. A clean clone is not automatically demo-ready: finish the prompt's build and all four real consumer checks.

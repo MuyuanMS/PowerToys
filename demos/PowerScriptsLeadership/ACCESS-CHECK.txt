@@ -1,0 +1,42 @@
+OPTIONAL / CHECK SCRIPT ACCESS
+
+The eight core demo scripts stay unchanged. To add this separate diagnostic
+after a complete ARM64 build, run from the clone root:
+
+  & .\demos\PowerScriptsLeadership\Create-DemoScripts.ps1 -HostPath .\ARM64\Debug\PowerScripts\PowerScripts.Host.exe -DiagnosticsOnly
+
+This creates one NEW, UNTRUSTED package; it does not execute or approve it.
+IDs go to installed-diagnostics.json, not the eight-script installed-demo.json.
+
+Review and approve normally. In Explorer select ONLY:
+  Inputs\Access checks\Sandbox canary.txt
+Right-click > PowerScripts > Check script access, then open the exported HTML.
+It refuses other names/content and never opens the input for writing.
+
+The report separates current resolved settings from actual bounded probes:
+  - MXC, filesystem, network, desktop/clipboard, least-privilege preferences.
+  - Read the synthetic canary.
+  - Create/delete a one-byte temporary file in the runtime workspace.
+  - Try the same beside the canary, outside that workspace.
+  - Make one anonymous HTTPS HEAD to www.microsoft.com (3-second limit).
+  - Check whether the current token has the administrator role.
+  - Do NOT inspect clipboard, capture desktop or inject UI input.
+
+Probe files use unique names and DeleteOnClose. No personal files or secrets
+are read or sent. No response body, redirects or user credentials are used.
+The report itself is a new workspace file; Explorer owns exporting it.
+
+Filesystem restriction is not a blanket read ban. A failed network request
+can also mean DNS/TLS/proxy/offline trouble; it is not automatically proof of
+an MXC block. A reachable destination does not prove all hosts/ports allowed.
+Unreadable/default-only settings are UNKNOWN, not guessed. Settings/markers
+are diagnostic hints, not a signed security attestation.
+
+Approved host CLI actions (for example Azure OCR) execute outside MXC; this
+report describes the contained script, not those explicit host actions.
+
+Leave protections enabled for preparation. If the owner intentionally changes
+MXC in normal Settings and accepts the risk, rerun the same canary to compare.
+Do not automate disabling protections, accept risk prompts, or weaken policy
+just to make a probe succeed. Even with MXC off, standard-user launching still
+applies; it is not permission to run as administrator.

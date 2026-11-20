@@ -1,0 +1,18 @@
+[
+  {
+    "icon": "Icons\\report.ico",
+    "implementation": "Source\\Check script access.ps1",
+    "capabilities": ["fileRead", "fileWrite", "network"],
+    "options": {
+      "projectName": "Check script access",
+      "description": "Select the supplied Sandbox canary.txt to get an HTML access report. Reads MXC settings; probes workspace/canary-folder writes with auto-deleted one-byte files; makes one anonymous HTTPS HEAD to Microsoft (3s limit). No input, clipboard or policy changes.",
+      "runtime": "powershell",
+      "input": "files",
+      "output": "files",
+      "fileExtensions": ".txt",
+      "minFiles": 1,
+      "maxFiles": 1,
+      "parameters": []
+    }
+  }
+]
