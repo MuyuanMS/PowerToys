@@ -14,10 +14,14 @@ ADVANCED PASTE
   Then copy Inputs\Clipboard - CSV table.txt.
   Run Paste a Markdown table: show the ready-to-paste table.
 
-FILE EXPLORER / REAL LOCAL OCR
+FILE EXPLORER / OCR
   Select Inputs\Screenshots\Meeting notes.png.
   Run Extract text from image; open the newly exported TXT.
   Show the three recognized action items.
+  For optional Azure Computer Vision, first follow AZURE-OCR.txt. Enter your
+  key only in the native setup window. A saved profile uploads selected images
+  to Azure and may incur charges. Without a profile, OCR remains offline.
+  Saving the profile uploads nothing. Azure errors do not silently fall back.
 
 VISUAL IMAGE TRANSFORM / ROTATE 90 DEGREES
   Input: Inputs\Screenshots\sample-arrow.png (the original blue arrow).

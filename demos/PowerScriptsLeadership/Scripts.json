@@ -27,7 +27,7 @@
     "icon": "Icons\\ocr.ico",
     "options": {
       "projectName": "Extract text from image",
-      "description": "Select one PNG or JPEG in Explorer and extract its text with local Windows OCR through Advanced Paste CLI. Produces a separate TXT; originals unchanged. No cloud model.",
+      "description": "Extract one PNG/JPEG to text through Advanced Paste CLI. A saved Azure OCR profile uploads the image to Azure (charges may apply); otherwise uses offline Windows OCR. Originals unchanged. Credentials stay in Windows Credential Vault.",
       "runtime": "powershell",
       "input": "files",
       "output": "text",

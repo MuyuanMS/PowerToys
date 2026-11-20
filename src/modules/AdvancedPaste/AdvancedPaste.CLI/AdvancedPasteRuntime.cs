@@ -22,7 +22,8 @@ internal sealed class AdvancedPasteRuntime(
     IPasteFormatExecutor executor,
     IUserSettings settings,
     Func<bool>? isAdvancedPasteEnabled = null,
-    Func<PasteAIProviderDefinition, bool>? isProviderAllowed = null) : IAdvancedPasteRuntime
+    Func<PasteAIProviderDefinition, bool>? isProviderAllowed = null,
+    Func<DataPackageView, CancellationToken, Task<DataPackage?>>? tryAzureOcr = null) : IAdvancedPasteRuntime
 {
     internal static readonly IReadOnlyDictionary<string, PasteFormats> BuiltInActions =
         new Dictionary<string, PasteFormats>(StringComparer.OrdinalIgnoreCase)
@@ -44,6 +45,7 @@ internal sealed class AdvancedPasteRuntime(
     private readonly IUserSettings _settings = settings;
     private readonly Func<bool> _isAdvancedPasteEnabled = isAdvancedPasteEnabled ?? (() => AdvancedPastePolicy.IsAdvancedPasteEnabled);
     private readonly Func<PasteAIProviderDefinition, bool> _isProviderAllowed = isProviderAllowed ?? AdvancedPastePolicy.IsProviderAllowed;
+    private readonly Func<DataPackageView, CancellationToken, Task<DataPackage?>>? _tryAzureOcr = tryAzureOcr;
 
     public bool IsEnabled => _isAdvancedPasteEnabled();
 
@@ -103,6 +105,12 @@ internal sealed class AdvancedPasteRuntime(
         if (!pasteFormat.IsEnabled)
         {
             throw new CliActionUnavailableException("The selected action does not support the supplied input or its configured AI provider is unavailable.");
+        }
+
+        if (pasteFormat.Format == PasteFormats.ImageToText && _tryAzureOcr is not null &&
+            await _tryAzureOcr(input, cancellationToken) is { } azureResult)
+        {
+            return azureResult;
         }
 
         return await _executor.ExecutePasteFormatAsync(pasteFormat, input, PasteActionSource.CommandLine, cancellationToken, progress);

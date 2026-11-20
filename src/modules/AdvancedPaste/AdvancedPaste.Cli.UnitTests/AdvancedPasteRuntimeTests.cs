@@ -22,6 +22,37 @@ namespace AdvancedPaste.Cli.UnitTests;
 [TestClass]
 public class AdvancedPasteRuntimeTests
 {
+    [DataTestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ImageToText_UsesOptInAzureResult_OrKeepsOfflineExecutor(bool configured)
+    {
+        var package = new DataPackage();
+        package.SetBitmap(RandomAccessStreamReference.CreateFromStream(new InMemoryRandomAccessStream()));
+        var azure = new DataPackage();
+        azure.SetText("Azure OCR lines");
+        var executor = new TestPasteFormatExecutor();
+        var calls = 0;
+        var runtime = new AdvancedPasteRuntime(
+            executor,
+            new TestUserSettings(isAIEnabled: false),
+            isAdvancedPasteEnabled: () => true,
+            tryAzureOcr: (_, _) =>
+            {
+                calls++;
+                return Task.FromResult<DataPackage?>(configured ? azure : null);
+            });
+
+        var result = await runtime.ExecuteAsync(new CliActionRequest("image-to-text", null, null, null), package.GetView(), CancellationToken.None);
+
+        Assert.AreEqual(1, calls);
+        Assert.AreEqual(!configured, executor.WasCalled);
+        if (configured)
+        {
+            Assert.AreEqual("Azure OCR lines", await result.GetView().GetTextAsync());
+        }
+    }
+
     [TestMethod]
     public async Task AiActions_WhenDisabledInSettings_AreRejectedBeforeExecution()
     {

@@ -55,7 +55,21 @@ IDs are written to ignored, machine-local `installed-demo.json`. Never copy anot
 
 To explain CLI-backed creation, show **New script > PowerToys action**, select the module/action and fix these arguments instead of exposing parameters. The importer uses the same Host scaffolding.
 
-OCR is real **local Windows OCR**, not an LLM placeholder. OCR and theme changes use fixed, approved host CLI recipes; their host actions are **outside MXC**, while the script remains contained. The generic file-transform recipe declares network capability, but this fixed OCR configuration has no provider, prompt, custom action or destination path. Keep MXC and its restrictions enabled.
+OCR uses **offline Windows OCR by default**, with an optional Azure Computer Vision backend in this demo build's CLI. It is not an LLM placeholder. OCR and theme changes use fixed, approved host CLI recipes; their host actions are **outside MXC**, while the script remains contained. The generic file-transform recipe declares network capability; OCR still fixes its action and has no provider, prompt, custom action or destination path. Keep MXC and its restrictions enabled.
+
+## Optional Azure OCR
+
+Follow [AZURE-OCR.txt](AZURE-OCR.txt). From the clone root, launch the matching native setup window:
+
+```powershell
+& .\ARM64\Debug\WinUI3Apps\PowerToys.AdvancedPaste.Cli.exe azure-ocr-setup
+```
+
+Enter the Computer Vision resource's **Endpoint** and **Key 1 or Key 2** from Azure Portal's **Keys and Endpoint** page. No separate region field is required. The masked key is stored in Windows Credential Vault; do not put it in a script, descriptor, parameter, prompt, terminal command or this repository. Saving the profile uploads nothing.
+
+With a profile saved, CLI `image-to-text` uploads the selected image to that Azure resource and charges may apply. This is a CLI-wide opt-in, not a change to the regular Advanced Paste UI or an LLM provider. Online-AI policy is honored. Azure errors are explicit; there is no silent offline fallback. **Use offline Windows OCR** in setup removes only the owned demo profile. No profile means the original offline path.
+
+The backend uses Computer Vision **Read 3.2**, rather than relying on Image Analysis 4.0's narrower regional availability. It submits the image once, then polls only the same HTTPS resource with a bounded deadline. The resource must support Read 3.2. Targeted mocked HTTP/routing/CLI tests and real Host offline regression passed on the source x64 machine. A valid user-entered key and an actual Azure call are still needed to verify that resource and cloud accuracy. Do not equate mocked tests or saving a profile with authenticated Azure success.
 
 ## What this backup does not claim
 

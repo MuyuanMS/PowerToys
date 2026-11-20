@@ -1,0 +1,35 @@
+OPTIONAL AZURE COMPUTER VISION OCR
+
+After the complete ARM64 build, run from the clone root:
+  & .\ARM64\Debug\WinUI3Apps\PowerToys.AdvancedPaste.Cli.exe azure-ocr-setup
+
+In the native window, enter Endpoint and API key (Key 1 or Key 2) from Azure
+Portal > your Computer Vision resource > Keys and Endpoint.
+No separate region value is needed. A subscription ID is not a resource key.
+
+The key field is masked. Saving stores the endpoint/key profile in Windows
+Credential Vault and uploads nothing. Never put keys in scripts, metadata,
+parameters, command-line arguments, logs, screenshots or backups.
+Enter credentials independently on each machine; do not export the profile.
+
+Approve Extract text from image normally. Select the synthetic
+Inputs\Screenshots\Meeting notes.png in Explorer, invoke the script, and open
+the separate TXT. A saved profile uploads that image to the configured Azure
+resource and charges may apply. Originals stay unchanged.
+
+This profile opts CLI image-to-text into Azure; it does not change the regular
+Advanced Paste UI OCR or configure an LLM provider. The approved host CLI action
+runs outside MXC with standard-user permissions. Scripts remain contained;
+do not disable MXC restrictions or bypass online-AI policy.
+
+No profile: offline Windows OCR. Saved profile: Azure, with explicit errors
+and no silent offline fallback. Use offline Windows OCR in setup removes
+only this demo's Azure profile.
+
+Implemented API: Computer Vision Read 3.2, with bounded same-resource polling
+and no repeated image submission. This avoids Image Analysis 4.0's narrower
+regional availability. Verify the resource supports Read 3.2.
+Saving a profile or passing mocked HTTP
+tests does not prove a real authenticated call. Rehearse on this machine with
+permission after entering credentials. Check recognized text, preserve input
+hashes, and remove only outputs created by that test, not the user's files.

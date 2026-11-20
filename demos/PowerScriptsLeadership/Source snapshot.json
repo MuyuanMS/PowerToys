@@ -1,12 +1,42 @@
 {
   "baseCommit": "e4fd0b4f56469eb001ea4b149386ef0d78bc6f35",
-  "capturedAt": "2026-11-19T23:26:22.7363777+08:00",
-  "description": "Captured editor UX and script-specific AI setup relocation. Exact SDK pin updated to the installed, successfully built 10.0.404 patch. No private demo state or compiled output.",
+  "capturedAt": "2026-11-20T10:23:03.5548469+08:00",
+  "description": "Editor UX/AI-help and exact SDK snapshot, plus opt-in Azure Computer Vision CLI OCR with masked native setup and Windows Credential Vault storage. No private endpoint, credentials, personal state or compiled output.",
   "files": [
     {
       "path": "global.json",
       "capturedSha256": "76B4CB7CF47577E8A8D2CAABA2BB25D43EC3C17D4AAC107D575224E69BE8AEE4",
       "gitBlob": "38b1cdeccd3e3b5f3b9d957e42ed1e66f22221f8"
+    },
+    {
+      "path": "src/modules/AdvancedPaste/AdvancedPaste.Cli.UnitTests/AdvancedPasteRuntimeTests.cs",
+      "capturedSha256": "22CC8117F645D8B88C7EE17C9F89477D60497B6AF1E791E1BF6F4AF413F8D673",
+      "gitBlob": "a54248631d1505da95bc63bd49219e275d07efb4"
+    },
+    {
+      "path": "src/modules/AdvancedPaste/AdvancedPaste.Cli.UnitTests/AzureVisionOcrTests.cs",
+      "capturedSha256": "4DC19C413DA948BFC62DA2312F7B2C8E6BBF17ED12049E41868AA6431537C7E8",
+      "gitBlob": "c047eaa3fca1df46441410b30ccc93743b41d4c4"
+    },
+    {
+      "path": "src/modules/AdvancedPaste/AdvancedPaste.CLI/AdvancedPasteRuntime.cs",
+      "capturedSha256": "7CD9E555796E9194A658D6CC486CDDB3585E945DD03D15C100CA0FE1526F9E78",
+      "gitBlob": "2439290a022167a9ecf37c4d9d24e71cedd65ea1"
+    },
+    {
+      "path": "src/modules/AdvancedPaste/AdvancedPaste.CLI/AzureVisionOcr.cs",
+      "capturedSha256": "4AE2114AA8C0281E321DFEB055594D383EAD68B2F4637A4DFDA68920EA606136",
+      "gitBlob": "9101b3b9069e91d1ff8d38788b0ca371987011d2"
+    },
+    {
+      "path": "src/modules/AdvancedPaste/AdvancedPaste.CLI/AzureVisionOcrSetup.cs",
+      "capturedSha256": "6C1BBEF064C2096AE872DB08AA67A9C42F88401EDE7C535ACE6D8EDF088B2065",
+      "gitBlob": "d1af31907f82cd6268e49c31a470174411a25190"
+    },
+    {
+      "path": "src/modules/AdvancedPaste/AdvancedPaste.CLI/Program.cs",
+      "capturedSha256": "01A01D92BFF94CBBD095F3B884E140E08EBFFD7CDC9F523BF685324DB36EC8EE",
+      "gitBlob": "2c2a2bf34860ac5ee1fcef14b91ef4caaa0c756b"
     },
     {
       "path": "src/modules/PowerScripts/PowerScripts.Core/AgentSkills/AgentSkillBundle.cs",

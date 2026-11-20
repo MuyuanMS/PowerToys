@@ -40,6 +40,7 @@ public static partial class Program
     private const string WorkflowHelp = """
         Saved AI actions: run 'actions list' to find custom IDs/names, then use --custom-action <id-or-name>.
         AI providers: configure them in PowerToys Settings > Advanced Paste and run 'providers list' to find IDs for --provider.
+        Azure Computer Vision OCR: run 'azure-ocr-setup' to securely configure the opt-in image-to-text backend.
         Input and output default to the clipboard. Use --stdin for piped text and --stdout to print text without changing the clipboard.
         Choose at most one input mode (--input, --stdin, --clipboard) and one output mode (--output, --stdout, --output-clipboard).
         Generated files cannot be written to stdout. Clipboard operations require an interactive user session.
@@ -93,13 +94,21 @@ public static partial class Program
                 return RuntimeErrorExitCode;
             }
 
+            if (args.Length == 1 && args[0] == "azure-ocr-setup")
+            {
+                AzureVisionOcrSetup.Show();
+                exitCode = SuccessExitCode;
+                return exitCode;
+            }
+
             using var host = Host.CreateDefaultBuilder()
                 .UseContentRoot(AppContext.BaseDirectory)
                 .ConfigureServices((_, services) => services.AddAdvancedPasteEngine(watchSettings: false))
                 .Build();
             var runtime = new AdvancedPasteRuntime(
                 host.Services.GetRequiredService<IPasteFormatExecutor>(),
-                host.Services.GetRequiredService<IUserSettings>());
+                host.Services.GetRequiredService<IUserSettings>(),
+                tryAzureOcr: AzureVisionOcr.TryExtractAsync);
 
             exitCode = await RunAsync(args, Console.In, Console.Out, Console.Error, new SystemClipboardAdapter(), runtime, cancellationSource.Token);
             return exitCode;
@@ -204,6 +213,7 @@ public static partial class Program
         options.ProvidersList.Options.Add(options.ProvidersJson);
         providers.Subcommands.Add(options.ProvidersList);
         root.Subcommands.Add(providers);
+        root.Subcommands.Add(new Command("azure-ocr-setup", "Configure opt-in Azure Computer Vision OCR using a masked key field and Windows Credential Vault. No image is uploaded by setup."));
         return root;
     }
 
