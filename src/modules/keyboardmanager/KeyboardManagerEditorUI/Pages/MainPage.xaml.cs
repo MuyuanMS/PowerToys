@@ -644,12 +644,8 @@ namespace KeyboardManagerEditorUI.Pages
 
             _previousPowerScriptSettings = _isEditMode && _editingItem?.Item is PowerScriptShortcut shortcut &&
                 SettingsManager.EditorSettings.ShortcutSettingsDictionary.TryGetValue(shortcut.Id, out var settings) ? settings : null;
-            if ((_previousPowerScriptSettings?.IsActive ?? true) && !current.Trusted)
-            {
-                UnifiedMappingControl.ShowValidationError(ResourceHelper.GetString("PowerScript_ValidationTitle"), ResourceHelper.GetString("PowerScript_ReviewTrust"));
-                return false;
-            }
 
+            // Binding configuration does not grant trust; the Host enforces approval when the hotkey runs.
             _preparedPowerScriptHostPath = UnifiedMappingControl.GetPowerScriptsHostPath();
             _preparedPowerScriptArguments = PowerScriptInvocation.BuildArguments(current.Id, UnifiedMappingControl.GetPowerScriptParameters());
             if (!PowerScriptInvocation.TryValidateLength(_preparedPowerScriptHostPath ?? string.Empty, _preparedPowerScriptArguments, out error))
@@ -1111,11 +1107,6 @@ namespace KeyboardManagerEditorUI.Pages
             if (script is null)
             {
                 return ResourceHelper.GetString("PowerScript_NoLongerAvailable");
-            }
-
-            if (!script.Trusted)
-            {
-                return ResourceHelper.GetString("PowerScript_ReviewTrust");
             }
 
             if (!PowerScripts.Client.PowerScriptParameterValues.TryCreate(script.Script, shortcut.ParameterValues, out _, out string? error))
