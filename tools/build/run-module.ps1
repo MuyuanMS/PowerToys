@@ -10,7 +10,7 @@ Wraps the common inner loop for module development:
    requested configuration.
 3. Assembles a runnable layout through copying the runner's runtime files (Windows App SDK dlls/winmds,
    .pri, locale folders, svgs) next to the module outputs in the repo-root
-   x64\<Configuration> folder.
+   <Platform>\<Configuration> folder.
 4. Launches the runner unless -NoLaunch is specified.
 
 Module outputs accumulate in the layout, so several modules can be built into one runner.
@@ -50,7 +50,7 @@ Builds both modules into the same layout and launches the runner once.
 
 .EXAMPLE
 .\tools\build\run-module.ps1 -Module peek -Configuration Release -NoLaunch
-Builds Peek for Release and assembles x64\Release without launching.
+Builds Peek for Release and assembles the selected platform's Release layout without launching.
 
 .NOTES
 - Requires build-common.ps1 in the same folder.
@@ -155,15 +155,12 @@ foreach ($moduleDir in $moduleDirs) {
 
     foreach ($project in $projects) {
         # Pass the SolutionDir a solution build would give this project, so IntDir/OutDir
-        # land in the shared x64\<Config> tree instead of inside the project folder.
+        # land in the shared <Platform>\<Config> tree instead of inside the project folder.
         $solutionDir = Get-ProjectSolutionDir $project.FullName
         $projectArgs = "/m"
-        if ($solutionDir -and -not $solutionDir.Contains(' ')) {
-            $projectArgs = "$projectArgs /p:SolutionDir=$solutionDir"
-        }
         if ($extraArgsString) { $projectArgs = "$projectArgs $extraArgsString" }
         Write-Host ("[RUN-MODULE] Building {0}" -f $project.FullName)
-        RestoreThenBuild $project.FullName $projectArgs $Platform $Configuration
+        RestoreThenBuild $project.FullName $projectArgs $Platform $Configuration -SolutionDir $solutionDir
     }
 }
 
@@ -171,9 +168,9 @@ foreach ($moduleDir in $moduleDirs) {
 # built for this configuration yet. Without them the dev runner cannot open its
 # own settings window or the quick access flyout.
 $essentials = @(
-    @{ Exe = "x64\$Configuration\WinUI3Apps\PowerToys.exe"; Project = "src\runner\Runner.vcxproj"; Name = "Runner" }
-    @{ Exe = "x64\$Configuration\WinUI3Apps\PowerToys.Settings.exe"; Project = "src\settings-ui\Settings.UI\PowerToys.Settings.csproj"; Name = "Settings UI" }
-    @{ Exe = "x64\$Configuration\WinUI3Apps\PowerToys.QuickAccess.exe"; Project = "src\settings-ui\QuickAccess.UI\PowerToys.QuickAccess.csproj"; Name = "Quick Access" }
+    @{ Exe = "src\runner\$Platform\$Configuration\PowerToys.exe"; Project = "src\runner\Runner.vcxproj"; Name = "Runner" }
+    @{ Exe = "$Platform\$Configuration\WinUI3Apps\PowerToys.Settings.exe"; Project = "src\settings-ui\Settings.UI\PowerToys.Settings.csproj"; Name = "Settings UI" }
+    @{ Exe = "$Platform\$Configuration\WinUI3Apps\PowerToys.QuickAccess.exe"; Project = "src\settings-ui\QuickAccess.UI\PowerToys.QuickAccess.csproj"; Name = "Quick Access" }
 )
 foreach ($e in $essentials) {
     $exePath = Join-Path $repoRoot $e.Exe
@@ -183,11 +180,11 @@ foreach ($e in $essentials) {
 }
 
 # Put runner runtime files next to the module outputs.
-# The module outputs already land in <repo>\x64\<Configuration>\WinUI3Apps, but the runner
-# needs its own runtime files in <repo>\x64\<Configuration>. Never /MIR so
+# The module outputs already land in <repo>\<Platform>\<Configuration>\WinUI3Apps, but the runner
+# needs its own runtime files in <repo>\<Platform>\<Configuration>. Never /MIR so
 # freshly built module outputs (including those of other modules) are not deleted.
-$runnerDir = Join-Path $repoRoot "src\runner\x64\$Configuration"
-$outDir = Join-Path $repoRoot "x64\$Configuration"
+$runnerDir = Join-Path $repoRoot "src\runner\$Platform\$Configuration"
+$outDir = Join-Path $repoRoot "$Platform\$Configuration"
 Write-Host "[RUN-MODULE] Assembling layout: $runnerDir -> $outDir"
 robocopy $runnerDir $outDir /E /XD WinUI3Apps /NFL /NDL /NJH /NJS | Out-Null
 if ($LASTEXITCODE -ge 8) {
