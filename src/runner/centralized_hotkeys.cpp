@@ -111,7 +111,7 @@ namespace CentralizedHotkeys
                     // Look the action up again in case it changed the registrations while running.
                     const auto slowIt = actions.find(shortcut);
                     const std::wstring moduleName = slowIt != actions.end() && !slowIt->second.empty() ? slowIt->second.begin()->moduleName : L"<unknown>";
-                    SlowHotkeyWatchdog::ReportSlowAction(L"WM_HOTKEY", moduleName, ToWstring(shortcut), elapsed);
+                    SlowHotkeyWatchdog::ReportSlowAction(L"WM_HOTKEY", moduleName, ToWatchdogHotkey(shortcut), elapsed);
                 }
             }
             catch(std::exception& ex)

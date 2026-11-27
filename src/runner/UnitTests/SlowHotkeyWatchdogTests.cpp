@@ -6,6 +6,7 @@
 #include "CppUnitTest.h"
 
 #include "../slow_hotkey_watchdog.h"
+#include "../centralized_hotkeys.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace std::chrono_literals;
@@ -39,6 +40,22 @@ namespace RunnerUnitTests
         {
             Assert::AreEqual(std::wstring(L"win+ctrl+shift+alt+VK 0x56"), SlowHotkeyWatchdog::DescribeHotkey(true, true, true, true, 0x56));
             Assert::AreEqual(std::wstring(L"VK 0x5B"), SlowHotkeyWatchdog::DescribeHotkey(false, false, false, false, VK_LWIN));
+        }
+
+        TEST_METHOD (WMHotkeyIdentityUsesVirtualKeyAndIgnoresNoRepeat)
+        {
+            const CentralizedHotkeys::Shortcut shortcut{ MOD_SHIFT | MOD_ALT, VK_OEM_1 };
+            const CentralizedHotkeys::Shortcut repeated{ MOD_SHIFT | MOD_ALT | MOD_NOREPEAT, VK_OEM_1 };
+            Assert::AreEqual(std::wstring(L"shift+alt+VK 0xBA"), CentralizedHotkeys::ToWatchdogHotkey(shortcut));
+            Assert::AreEqual(CentralizedHotkeys::ToWatchdogHotkey(shortcut), CentralizedHotkeys::ToWatchdogHotkey(repeated));
+        }
+
+        TEST_METHOD (WMHotkeyAndKeyboardHookShareLimiterIdentity)
+        {
+            const CentralizedHotkeys::Shortcut shortcut{ MOD_WIN | MOD_CONTROL | MOD_SHIFT | MOD_ALT, 0x56 };
+            SlowHotkeyWatchdog::ReportLimiter limiter;
+            Assert::IsTrue(limiter.TryMarkReported(L"TestModule", SlowHotkeyWatchdog::DescribeHotkey(true, true, true, true, 0x56)));
+            Assert::IsFalse(limiter.TryMarkReported(L"TestModule", CentralizedHotkeys::ToWatchdogHotkey(shortcut)));
         }
     };
 }

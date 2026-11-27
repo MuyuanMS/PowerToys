@@ -1,6 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <functional>
+#include "slow_hotkey_watchdog.h"
 
 namespace CentralizedHotkeys
 {
@@ -34,6 +35,16 @@ namespace CentralizedHotkeys
             return std::pair<WORD, WORD>{ this->modifiersMask, this->vkCode } < std::pair<WORD, WORD>{ key.modifiersMask, key.vkCode };
         }
     };
+
+    inline std::wstring ToWatchdogHotkey(const Shortcut& shortcut)
+    {
+        return SlowHotkeyWatchdog::DescribeHotkey(
+            (shortcut.modifiersMask & MOD_WIN) != 0,
+            (shortcut.modifiersMask & MOD_CONTROL) != 0,
+            (shortcut.modifiersMask & MOD_SHIFT) != 0,
+            (shortcut.modifiersMask & MOD_ALT) != 0,
+            shortcut.vkCode);
+    }
 
     std::wstring ToWstring(const Shortcut& shortcut);
 
