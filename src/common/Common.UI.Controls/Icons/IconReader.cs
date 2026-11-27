@@ -53,6 +53,10 @@ namespace Microsoft.PowerToys.Common.UI.Controls
         private static extern bool DestroyIcon(IntPtr icon);
 
         [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject(IntPtr bitmap);
+
+        [DllImport("gdi32.dll")]
         private static extern int GetDIBits(
             IntPtr deviceContext,
             IntPtr bitmap,
@@ -75,6 +79,9 @@ namespace Microsoft.PowerToys.Common.UI.Controls
                 return null;
             }
 
+            var mask = IntPtr.Zero;
+            var color = IntPtr.Zero;
+
             try
             {
                 var icon = large != IntPtr.Zero ? large : small;
@@ -82,9 +89,6 @@ namespace Microsoft.PowerToys.Common.UI.Controls
                 {
                     return null;
                 }
-
-                var mask = IntPtr.Zero;
-                var color = IntPtr.Zero;
 
                 var info = Marshal.AllocHGlobal(IconInfoSize);
                 try
@@ -124,6 +128,16 @@ namespace Microsoft.PowerToys.Common.UI.Controls
             }
             finally
             {
+                if (mask != IntPtr.Zero)
+                {
+                    _ = DeleteObject(mask);
+                }
+
+                if (color != IntPtr.Zero)
+                {
+                    _ = DeleteObject(color);
+                }
+
                 // The handles of the drawings of the icon belong to the caller, so they have to be given back.
                 if (large != IntPtr.Zero)
                 {
