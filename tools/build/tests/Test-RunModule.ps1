@@ -75,7 +75,8 @@ foreach ($Platform in @('x64', 'ARM64')) {
 $calls.Clear()
 $Platform = 'x64'
 $projects = @([pscustomobject]@{ FullName = 'C:\PowerToys With Spaces\src\modules\peek\Peek.Common.UnitTests\Peek.Common.UnitTests.csproj' })
-$extraArgsString = '/p:BuildTests=true'
+$ExtraArgs = @('/p:BuildTests=true', '/p:Foo="a b"', '/bl:C:\Build Logs\msbuild.binlog')
+$extraArgsString = $ExtraArgs -join ' '
 $projectLoop = $moduleAst.Find({
     param($item)
     $item -is [System.Management.Automation.Language.ForEachStatementAst] -and
@@ -90,6 +91,28 @@ foreach ($call in $calls) {
         $properties.Count -eq 1 -and $properties[0] -eq '/p:SolutionDir=C:\PowerToys With Spaces\'
     )
     Assert-Check 'Module ExtraArgs remain forwarded' ($call.arguments -contains '/p:BuildTests=true')
+    Assert-Check 'Quoted property value stays one argument' ($call.arguments -contains '/p:Foo="a b"')
+    Assert-Check 'Binlog path with spaces stays one argument' ($call.arguments -contains '/bl:C:\Build Logs\msbuild.binlog')
+}
+$calls.Clear()
+$existingPaths = @()
+. ([scriptblock]::Create($essentialLoop.Extent.Text))
+Assert-Check 'Missing essentials restore and build all three projects' ($calls.Count -eq 6)
+Assert-Check 'Essentials preserve space-containing ExtraArgs' (
+    @($calls | Where-Object {
+        $_.arguments -notcontains '/p:Foo="a b"' -or $_.arguments -notcontains '/bl:C:\Build Logs\msbuild.binlog'
+    }).Count -eq 0
+)
+$repoRoot = 'C:\PowerToys'
+foreach ($case in @(
+    @{ path = 'C:\PowerToys\x64\Debug\PowerToys.exe'; outside = $false },
+    @{ path = 'c:\POWERTOYS\ARM64\Debug\PowerToys.exe'; outside = $false },
+    @{ path = 'C:\PowerToysClone\x64\Debug\PowerToys.exe'; outside = $true },
+    @{ path = 'C:\Program Files\PowerToys\PowerToys.exe'; outside = $true }
+)) {
+    $running = @([pscustomobject]@{ Path = $case.path })
+    . (Get-Assignment $moduleAst '$installed')
+    Assert-Check "Runner boundary: $($case.path)" ((@($installed).Count -gt 0) -eq $case.outside)
 }
 $calls.Clear()
 RestoreThenBuild 'C:\PowerToys\module.csproj' '/p:BuildTests=false' 'x64' 'Release'

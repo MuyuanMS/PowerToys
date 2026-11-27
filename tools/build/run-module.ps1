@@ -119,9 +119,6 @@ if ($missing) {
 }
 $moduleDirs = @($moduleDirs | Select-Object -Unique)
 
-$extraArgsString = $null
-if ($ExtraArgs -and $ExtraArgs.Count -gt 0) { $extraArgsString = ($ExtraArgs -join ' ') }
-
 $index = 0
 foreach ($moduleDir in $moduleDirs) {
     $index++
@@ -157,10 +154,8 @@ foreach ($moduleDir in $moduleDirs) {
         # Pass the SolutionDir a solution build would give this project, so IntDir/OutDir
         # land in the shared <Platform>\<Config> tree instead of inside the project folder.
         $solutionDir = Get-ProjectSolutionDir $project.FullName
-        $projectArgs = "/m"
-        if ($extraArgsString) { $projectArgs = "$projectArgs $extraArgsString" }
         Write-Host ("[RUN-MODULE] Building {0}" -f $project.FullName)
-        RestoreThenBuild $project.FullName $projectArgs $Platform $Configuration -SolutionDir $solutionDir
+        RestoreThenBuild $project.FullName $null $Platform $Configuration -SolutionDir $solutionDir -ArgumentList $ExtraArgs
     }
 }
 
@@ -176,7 +171,7 @@ foreach ($e in $essentials) {
     $exePath = Join-Path $repoRoot $e.Exe
     if (Test-Path $exePath) { continue }
     Write-Host ("[RUN-MODULE] {0} not built for $Configuration, building it once." -f $e.Name)
-    RestoreThenBuild (Join-Path $repoRoot $e.Project) $extraArgsString $Platform $Configuration
+    RestoreThenBuild (Join-Path $repoRoot $e.Project) $null $Platform $Configuration -ArgumentList $ExtraArgs
 }
 
 # Put runner runtime files next to the module outputs.
@@ -202,7 +197,7 @@ if ($NoLaunch) {
 # Refuse to fight with an installed PowerToys quietly
 $running = Get-Process -Name 'PowerToys' -ErrorAction SilentlyContinue
 if ($running) {
-    $installed = $running | Where-Object { $_.Path -and ($_.Path -notlike "$repoRoot*") }
+    $installed = $running | Where-Object { $_.Path -and -not $_.Path.StartsWith("$($repoRoot.TrimEnd('\'))\", [StringComparison]::OrdinalIgnoreCase) }
     if ($installed) {
         Write-Warning "An installed PowerToys is running ($($installed[0].Path)). Exit it first; two runners compete for keyboard hooks and hotkeys."
         exit 1
