@@ -267,9 +267,9 @@ namespace MarkdownPreviewHandlerUnitTests
                 {
                     markdownPreviewHandlerControl.DoPreview<string>("HelperFiles/MarkdownWithScript.txt");
 
-                    int beforeTick = Environment.TickCount;
+                    long beforeTick = Environment.TickCount64;
 
-                    while (markdownPreviewHandlerControl.Controls.Count == 0 && unhandledException == null && Environment.TickCount < beforeTick + HardTimeoutInMilliseconds)
+                    while (markdownPreviewHandlerControl.Controls.Count == 0 && unhandledException == null && Environment.TickCount64 - beforeTick < HardTimeoutInMilliseconds)
                     {
                         Application.DoEvents();
                         Thread.Sleep(SleepTimeInMilliseconds);
