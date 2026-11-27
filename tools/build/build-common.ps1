@@ -5,8 +5,8 @@ Shared build helper functions for PowerToys build scripts.
 .DESCRIPTION
 This file provides reusable helper functions used by the build scripts:
 - Get-BuildPaths: returns ScriptDir, OriginalCwd, RepoRoot (repo root detection)
-- RunMSBuild: wrapper around msbuild.exe (accepts optional Platform/Configuration)
-- RestoreThenBuild: performs restore and optionally builds the solution/project
+- RunMSBuild: wrapper around msbuild.exe (accepts optional Platform/Configuration and a tokenized ArgumentList)
+- RestoreThenBuild: performs restore and optionally builds the solution/project; accepts SolutionDir as a separate argument for paths containing spaces
 - Get-ProjectSolutionDir: returns the $(SolutionDir) a solution build would give a single project
 - BuildProjectsInDirectory: discovers and builds local .slnx/.csproj/.vcxproj files
 - Ensure-VsDevEnvironment: initializes the Visual Studio developer environment when possible.
@@ -70,7 +70,9 @@ function RunMSBuild {
         [string]$Solution,
         [string]$ExtraArgs,
         [string]$Platform,
-        [string]$Configuration
+        [string]$Configuration,
+        [string]$SolutionDir,
+        [string[]]$ArgumentList
     )
 
     # Logs go to <repo>\artifacts\logs\<project name>\, not the project folder: the context-menu
@@ -103,7 +105,11 @@ function RunMSBuild {
         '/nologo'
     )
 
+    if ($SolutionDir) {
+        $base += "/p:SolutionDir=$SolutionDir"
+    }
     $cmd = $base + ($ExtraArgs -split ' ')
+    if ($ArgumentList) { $cmd += $ArgumentList }
     Write-Host (("[MSBUILD] {0}" -f ($cmd -join ' ')))
 
     Push-Location $script:RepoRoot
@@ -124,17 +130,19 @@ function RestoreThenBuild {
         [string]$ExtraArgs,
         [string]$Platform,
         [string]$Configuration,
-        [bool]$RestoreOnly=$false
+        [bool]$RestoreOnly=$false,
+        [string]$SolutionDir,
+        [string[]]$ArgumentList
     )
 
     $restoreArgs = '/t:restore /p:RestorePackagesConfig=true'
     if ($ExtraArgs) { $restoreArgs = "$restoreArgs $ExtraArgs" }
-    RunMSBuild $Solution $restoreArgs $Platform $Configuration
+    RunMSBuild $Solution $restoreArgs $Platform $Configuration -SolutionDir $SolutionDir -ArgumentList $ArgumentList
 
     if (-not $RestoreOnly) {
         $buildArgs = '/m'
         if ($ExtraArgs) { $buildArgs = "$buildArgs $ExtraArgs" }
-        RunMSBuild $Solution $buildArgs $Platform $Configuration
+        RunMSBuild $Solution $buildArgs $Platform $Configuration -SolutionDir $SolutionDir -ArgumentList $ArgumentList
     }
 }
 

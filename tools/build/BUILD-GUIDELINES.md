@@ -13,7 +13,7 @@ Tip: Add `D:\PowerToys\tools\build` to your PATH to use the wrappers anywhere.
 ## When to use which
 1) `build-essentials.ps1`
    - Restores NuGet for `PowerToys.slnx` and builds essentials (runner, settings).
-   - Auto-detects Platform; initializes VS Dev environment automatically.
+   - Auto-detects Platform; uses the selected platform's output layout and initializes VS Dev environment automatically.
    - Example (PowerShell):
      - `./tools/build/build-essentials.ps1`
      - `./tools/build/build-essentials.ps1 -Platform arm64 -Configuration Release`
@@ -33,6 +33,18 @@ Tip: Add `D:\PowerToys\tools\build` to your PATH to use the wrappers anywhere.
    - Key options: `-PerUser true|false`, `-InstallerSuffix wix5|vnext`.
    - Example:
      - `./tools/build/build-installer.ps1 -Platform x64 -Configuration Release -PerUser true -InstallerSuffix wix5`
+
+4) `run-module.ps1` (from any folder, locates the repo from the script path)
+   - Builds one or more modules' projects (tests skipped unless `-IncludeTests`),
+     missing dev essentials (runner, Settings UI, Quick Access UI), the dev layout,
+     then launches the runner.
+   - Auto-detects Platform; initializes VS Dev environment automatically.
+   - Use it instead of a full-solution build when working on a single module.
+   - Key options: `-Module <name>[,<name>...]`, `-Configuration Debug|Release`, `-NoLaunch`, `-IncludeTests`.
+   - Examples:
+     - `./tools/build/run-module.ps1 -Module peek`
+     - `./tools/build/run-module.ps1 -Module peek -Configuration Release -NoLaunch`
+     - `./tools/build/run-module.ps1 -Module peek,poweraccent`
 
 ## Logs and troubleshooting
 - On failure, see logs in `artifacts\logs\<project>\` at the root of the repo/worktree that contains the project being built (the first parent folder with `PowerToys.slnx`, even when the `tools\build` scripts come from another clone on PATH), where `<project>` is the solution/project file name without its extension:
