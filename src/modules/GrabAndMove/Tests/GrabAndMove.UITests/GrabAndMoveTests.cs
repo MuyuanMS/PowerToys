@@ -491,7 +491,7 @@ public sealed class GrabAndMoveTests : UITestBase
         FocusFixture();
         var before = fixture.Bounds;
         var start = oppositeEdgeResize
-            ? new Point(before.Left + 60, before.Top + 60)
+            ? new Point(before.Left + (before.Width / 8), before.Top + (before.Height / 8))
             : resize
                 ? new Point(before.Right - 60, before.Bottom - 60)
                 : new Point(before.Left + (before.Width / 2), before.Top + (before.Height / 2));
