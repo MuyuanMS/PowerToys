@@ -17,6 +17,7 @@ namespace UnitTestsCommonUtils
         {
             DWORD sequence = 100;
             int sleeps = 0;
+            std::vector<std::chrono::milliseconds> sleep_durations;
 
             // The sequence number changes on the next check after WM_COPY / Ctrl+C when set.
             bool wm_copy_changes_clipboard = false;
@@ -82,7 +83,10 @@ namespace UnitTestsCommonUtils
                 };
                 result.input.is_key_down = [](WORD) { return false; };
                 result.input.get_last_error = [] { return static_cast<DWORD>(ERROR_ACCESS_DENIED); };
-                result.input.sleep = [this](std::chrono::milliseconds) { ++sleeps; };
+                result.input.sleep = [this](std::chrono::milliseconds duration) {
+                    sleep_durations.push_back(duration);
+                    ++sleeps;
+                };
                 return result;
             }
         };
@@ -277,6 +281,25 @@ namespace UnitTestsCommonUtils
 
             Assert::IsTrue(copy_selection::wait_for_clipboard_change(fake.sequence, std::chrono::milliseconds{ 150 }, std::chrono::milliseconds{ 30 }, fake.api()));
             Assert::AreEqual(5, fake.sleeps);
+        }
+
+        TEST_METHOD(WaitForClipboardChange_ClampsSleepToRemainingTimeout)
+        {
+            {
+                fake_system fake;
+
+                Assert::IsFalse(copy_selection::wait_for_clipboard_change(fake.sequence, std::chrono::milliseconds{ 50 }, std::chrono::milliseconds{ 30 }, fake.api()));
+                Assert::AreEqual(size_t{ 2 }, fake.sleep_durations.size());
+                Assert::IsTrue(fake.sleep_durations[0] == std::chrono::milliseconds{ 30 });
+                Assert::IsTrue(fake.sleep_durations[1] == std::chrono::milliseconds{ 20 });
+            }
+            {
+                fake_system fake;
+
+                Assert::IsFalse(copy_selection::wait_for_clipboard_change(fake.sequence, std::chrono::milliseconds{ 10 }, std::chrono::milliseconds{ 30 }, fake.api()));
+                Assert::AreEqual(size_t{ 1 }, fake.sleep_durations.size());
+                Assert::IsTrue(fake.sleep_durations[0] == std::chrono::milliseconds{ 10 });
+            }
         }
     };
 }

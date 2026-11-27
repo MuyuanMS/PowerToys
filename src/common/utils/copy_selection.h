@@ -126,8 +126,9 @@ namespace copy_selection
                 return false;
             }
 
-            api.input.sleep(interval);
-            waited += interval;
+            const auto delay = (std::min)(interval, timeout - waited);
+            api.input.sleep(delay);
+            waited += delay;
         }
 
         return true;
