@@ -57,7 +57,7 @@ namespace ManagedCommon
         }
 
         /// <summary>
-        /// Polls until no modifier key is down.
+        /// Polls until no modifier key is down, limiting each requested sleep to the remaining timeout.
         /// </summary>
         /// <returns><see langword="false"/> if a modifier is still down after <paramref name="timeout"/>.</returns>
         public static bool WaitForModifiersRelease(TimeSpan timeout, TimeSpan pollInterval)
@@ -76,8 +76,10 @@ namespace ManagedCommon
                     return false;
                 }
 
-                api.Sleep(interval);
-                waited += interval;
+                var remaining = timeout - waited;
+                var delay = interval < remaining ? interval : remaining;
+                api.Sleep(delay);
+                waited += delay;
             }
 
             return true;

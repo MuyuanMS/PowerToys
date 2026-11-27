@@ -19,6 +19,7 @@ namespace UnitTestsCommonUtils
             std::vector<std::vector<INPUT>> batches;
             std::vector<UINT> send_limits; // How many events each SendInput call accepts; all when not set.
             std::set<WORD> held;
+            std::vector<std::chrono::milliseconds> sleep_durations;
             int sleeps = 0;
             int release_after_sleeps = -1; // Clears `held` after this many sleeps; never when negative.
 
@@ -32,7 +33,8 @@ namespace UnitTestsCommonUtils
                 };
                 result.is_key_down = [this](WORD vk) { return held.contains(vk); };
                 result.get_last_error = [] { return static_cast<DWORD>(ERROR_ACCESS_DENIED); };
-                result.sleep = [this](std::chrono::milliseconds) {
+                result.sleep = [this](std::chrono::milliseconds duration) {
+                    sleep_durations.push_back(duration);
                     if (++sleeps == release_after_sleeps)
                     {
                         held.clear();
@@ -230,6 +232,22 @@ namespace UnitTestsCommonUtils
             Assert::AreEqual(5, fake.sleeps);
             assert_key(fake.batches[0][1], VK_RCONTROL, true);
             assert_key(fake.batches[0][2], VK_CONTROL, false);
+        }
+
+        TEST_METHOD(WaitForModifiersRelease_LimitsFinalSleepToRemainingTimeout)
+        {
+            for (const int timeout : { 5, 25 })
+            {
+                fake_input fake;
+                fake.held = { VK_RCONTROL };
+
+                const bool released = input_injection::wait_for_modifiers_release(
+                    std::chrono::milliseconds{ timeout }, std::chrono::milliseconds{ 10 }, fake.api());
+
+                Assert::IsFalse(released);
+                Assert::AreEqual(timeout == 5 ? 1 : 3, fake.sleeps);
+                Assert::AreEqual(5ll, static_cast<long long>(fake.sleep_durations.back().count()));
+            }
         }
     };
 }

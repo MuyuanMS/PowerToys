@@ -91,7 +91,8 @@ namespace input_injection
         return std::any_of(modifier_keys.begin(), modifier_keys.end(), [&api](WORD vk) { return api.is_key_down(vk); });
     }
 
-    // Polls until no modifier key is down. Returns false if one is still down after the timeout.
+    // Polls until no modifier key is down, limiting each requested sleep to the remaining timeout.
+    // Returns false if one is still down after the timeout.
     inline bool wait_for_modifiers_release(std::chrono::milliseconds timeout, std::chrono::milliseconds poll_interval, const system_api& api = {})
     {
         const auto interval = (std::max)(poll_interval, std::chrono::milliseconds{ 1 });
@@ -103,8 +104,9 @@ namespace input_injection
                 return false;
             }
 
-            api.sleep(interval);
-            waited += interval;
+            const auto delay = (std::min)(interval, timeout - waited);
+            api.sleep(delay);
+            waited += delay;
         }
 
         return true;

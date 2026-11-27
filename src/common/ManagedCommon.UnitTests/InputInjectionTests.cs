@@ -187,6 +187,22 @@ public sealed class InputInjectionTests
         AssertKey(fake.Batches[0][2], VkControl, keyUp: false);
     }
 
+    [TestMethod]
+    [DataRow(5, 1)]
+    [DataRow(25, 3)]
+    public void WaitForModifiersReleaseLimitsFinalSleepToRemainingTimeout(int timeoutMilliseconds, int expectedSleeps)
+    {
+        var fake = new FakeInputApi();
+        fake.Held.Add(VkRControl);
+
+        bool released = InputInjection.WaitForModifiersRelease(
+            TimeSpan.FromMilliseconds(timeoutMilliseconds), TimeSpan.FromMilliseconds(10), fake);
+
+        Assert.IsFalse(released);
+        Assert.AreEqual(expectedSleeps, fake.Sleeps);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(5), fake.SleepDurations.Last());
+    }
+
     private static InputChordOptions OptionsWithoutWait() => new() { ExtraInfo = TestExtraInfo };
 
     private static void AssertKey(NativeMethods.INPUT input, ushort vk, bool keyUp)
@@ -207,6 +223,8 @@ public sealed class InputInjectionTests
 
         public HashSet<ushort> Held { get; } = new();
 
+        public List<TimeSpan> SleepDurations { get; } = new();
+
         public int Sleeps { get; private set; }
 
         // Clears Held after this many sleeps; never when negative.
@@ -224,6 +242,7 @@ public sealed class InputInjectionTests
 
         public void Sleep(TimeSpan duration)
         {
+            SleepDurations.Add(duration);
             if (++Sleeps == ReleaseAfterSleeps)
             {
                 Held.Clear();
