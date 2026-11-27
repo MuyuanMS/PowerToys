@@ -176,7 +176,7 @@ internal sealed class ZoomItUi(TestContext context)
         var middleBottom = bounds.Top + (((bounds.Bottom - bounds.Top) * 2) / 3);
         MouseHelper.MoveTo(bounds.Left + 50, bounds.Top + 50);
         var ready = WaitForDialogButton(
-            () => Control<Button>(cardId, "Button"),
+            () => Control<Button>(cardId, "Button", cardId == "ZoomItDemoTypeFile" ? "ZoomItDemoTypeFileBrowse" : null),
             target =>
             {
                 target.ScrollIntoView();
