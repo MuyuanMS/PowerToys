@@ -218,7 +218,6 @@ void WindowBorder::UpdateCompositionBorder(bool refreshColor) const
     RECT frame{};
     if (!SUCCEEDED(DwmGetWindowAttribute(m_trackingWindow, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))))
     {
-        m_compositionBorder->Hide();
         return;
     }
 
